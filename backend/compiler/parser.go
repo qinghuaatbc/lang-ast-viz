@@ -259,7 +259,13 @@ func (p *Parser) parseClassDecl() *Node {
 		p.nextToken()
 	}
 	for p.cur.Type != RBRACE && p.cur.Type != EOF {
-		if p.cur.Type == IDENT && p.peek.Type == ASSIGN {
+		if p.cur.Type == FN {
+			// method definition
+			method := p.parseFuncDecl()
+			if method != nil {
+				n.AddChild(method)
+			}
+		} else if p.cur.Type == IDENT && p.peek.Type == ASSIGN {
 			fident := NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
 			p.nextToken()
 			p.nextToken()
@@ -386,7 +392,8 @@ var precedences = map[TokenType]int{
 	MOD:    PRODUCT,
 	SLASH:  PRODUCT,
 	PERCENT: PRODUCT,
-	DOT:    PREFIX, // highest precedence for field access
+	DOT:    PREFIX,
+	LBRACKET: PREFIX, // highest precedence for field access
 }
 
 func (p *Parser) peekPrecedence() int {
@@ -475,23 +482,41 @@ func (p *Parser) parseExpr(prec int) *Node {
 			p.nextToken()
 		}
 	case LBRACKET:
-		left = NewNode(NObjLit, "object", p.cur.Line, p.cur.Col)
 		p.nextToken()
-		for p.cur.Type != RBRACKET && p.cur.Type != EOF {
-			if p.cur.Type == IDENT && p.peek.Type == ASSIGN {
-				fident := NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
-				p.nextToken()
-				p.nextToken()
+		// Check if it's an object literal [x=10, y=20] or array [1,2,3]
+		if p.cur.Type == IDENT && p.peek.Type == ASSIGN {
+			// Object literal: [x = 10, y = 20]
+			left = NewNode(NObjLit, "object", p.cur.Line, p.cur.Col)
+			for p.cur.Type != RBRACKET && p.cur.Type != EOF {
+				if p.cur.Type == IDENT && p.peek.Type == ASSIGN {
+					fident := NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
+					p.nextToken()
+					p.nextToken()
+					val := p.parseExpr(0)
+					left.AddChild(fident)
+					if val != nil {
+						left.AddChild(val)
+					}
+				}
+				if p.cur.Type == COMMA {
+					p.nextToken()
+				} else {
+					break
+				}
+			}
+		} else {
+			// Array literal: [1, 2, 3]
+			left = NewNode(NArrayList, "array", p.cur.Line, p.cur.Col)
+			for p.cur.Type != RBRACKET && p.cur.Type != EOF {
 				val := p.parseExpr(0)
-				left.AddChild(fident)
 				if val != nil {
 					left.AddChild(val)
 				}
-			}
-			if p.cur.Type == COMMA {
-				p.nextToken()
-			} else {
-				break
+				if p.cur.Type == COMMA {
+					p.nextToken()
+				} else {
+					break
+				}
 			}
 		}
 		if p.cur.Type == RBRACKET {
@@ -540,6 +565,21 @@ func (p *Parser) parseExpr(prec int) *Node {
 				p.addErr("expected field/method name after '.'")
 				break
 			}
+			continue
+		}
+		if p.cur.Type == LBRACKET {
+			// array access: arr[index]
+			p.nextToken()
+			idx := p.parseExpr(0)
+			access := NewNode(NArrayAccess, "[]", p.cur.Line, p.cur.Col)
+			access.AddChild(left)
+			if idx != nil {
+				access.AddChild(idx)
+			}
+			if p.cur.Type == RBRACKET {
+				p.nextToken()
+			}
+			left = access
 			continue
 		}
 		op := p.cur.Literal

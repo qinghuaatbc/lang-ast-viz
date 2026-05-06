@@ -43,6 +43,11 @@ const (
 	OP_SCOPE_ENTER
 	OP_SCOPE_EXIT
 	OP_DUP
+	OP_ARRAYLIT
+	OP_ARRAYGET
+	OP_ARRAYSET
+	OP_METHOD_CALL
+	OP_CLASS_METHOD
 )
 
 func (op Opcode) String() string {
@@ -80,7 +85,12 @@ func (op Opcode) String() string {
 	case OP_POPARG:      return "POPARG"
 	case OP_DECLARE:     return "DECLARE"
 	case OP_SCOPE_ENTER: return "SCOPE_ENTER"
-	case OP_DUP:          return "DUP"
+	case OP_DUP:         return "DUP"
+	case OP_ARRAYLIT:    return "ARRAYLIT"
+	case OP_ARRAYGET:    return "ARRAYGET"
+	case OP_ARRAYSET:    return "ARRAYSET"
+	case OP_METHOD_CALL: return "METHOD_CALL"
+	case OP_CLASS_METHOD: return "CLASS_METHOD"
 	default:             return "UNKNOWN"
 	}
 }
@@ -233,6 +243,22 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 			bg.emit(OP_SCOPE_ENTER, 0, "")
 		case "SCOPE_EXIT":
 			bg.emit(OP_SCOPE_EXIT, 0, "")
+		case "CLASS_METHOD":
+			// Src1 = original method name, Src2 = mangled function name (ClassName_methodName)
+			fnLabel := "fn_" + inst.Src2
+			if pos, ok := bg.labelPos[fnLabel]; ok {
+				bg.emit(OP_CLASS_METHOD, pos, inst.Src1+":"+inst.Src2)
+			} else {
+				bg.emit(OP_CLASS_METHOD, 0, inst.Src1+":"+inst.Src2)
+			}
+		case "ARRAY_LIT":
+			bg.emit(OP_ARRAYLIT, 0, "")
+		case "ARRAY_SET":
+			bg.emit(OP_ARRAYSET, 0, "")
+		case "ARRAY_GET":
+			bg.emit(OP_ARRAYGET, 0, "")
+		case "METHOD_CALL":
+			bg.emit(OP_METHOD_CALL, 0, inst.Src1+":"+inst.Src2)
 		}
 	}
 

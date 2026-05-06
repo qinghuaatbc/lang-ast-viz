@@ -26,6 +26,8 @@ const (
 	NFuncDecl
 	NReturnStmt
 	NMethodCall
+	NArrayList
+	NArrayAccess
 )
 
 type Node struct {
@@ -88,6 +90,10 @@ func (n *Node) TypeName() string {
 		return "ReturnStmt"
 	case NMethodCall:
 		return "MethodCall"
+	case NArrayList:
+		return "ArrayList"
+	case NArrayAccess:
+		return "ArrayAccess"
 	default:
 		return "Unknown"
 	}

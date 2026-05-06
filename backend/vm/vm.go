@@ -8,9 +8,10 @@ import (
 )
 
 type classInfo struct {
-	name   string
-	parent string
-	fields []string
+	name    string
+	parent  string
+	fields  []string
+	methods map[string]int // method name -> bytecode address
 }
 
 type VM struct {
@@ -202,7 +203,7 @@ func (vm *VM) Run() ([]string, error) {
 			}
 		case compiler.OP_CLASS_DEF:
 			parts := strings.SplitN(inst.ArgStr, ":", 2)
-			ci := &classInfo{name: parts[0]}
+			ci := &classInfo{name: parts[0], methods: map[string]int{}}
 			if len(parts) > 1 {
 				ci.parent = parts[1]
 			}
@@ -227,6 +228,7 @@ func (vm *VM) Run() ([]string, error) {
 				for _, f := range allFields {
 					obj[f] = VInt(0)
 				}
+				obj["__class"] = VStr(ci.name)
 			}
 			vm.objects = append(vm.objects, obj)
 			vm.objRefs = append(vm.objRefs, 0)
@@ -278,6 +280,69 @@ func (vm *VM) Run() ([]string, error) {
 			if len(vm.stack) > 0 {
 				vm.push(vm.stack[len(vm.stack)-1])
 			}
+		case compiler.OP_ARRAYLIT:
+			vm.objects = append(vm.objects, map[string]Value{})
+			vm.objRefs = append(vm.objRefs, 0)
+			// Tag with __array=1 internally
+			vm.objects[len(vm.objects)-1]["__len"] = VInt(0)
+			vm.push(VObj(len(vm.objects) - 1))
+		case compiler.OP_ARRAYSET:
+			val := vm.pop()
+			if len(vm.stack) > 0 {
+				arrIdx := vm.stack[len(vm.stack)-1].Int
+				if arrIdx >= 0 && arrIdx < len(vm.objects) {
+					len := vm.objects[arrIdx]["__len"].Int
+					vm.objects[arrIdx][fmt.Sprintf("%d", len)] = val
+					vm.objects[arrIdx]["__len"] = VInt(len + 1)
+				}
+			}
+		case compiler.OP_ARRAYGET:
+			idx, err := vm.popInt()
+			if err != nil { return nil, fmt.Errorf("array index: %v", err) }
+			v := vm.pop()
+			if v.Type == ValObj && v.Int >= 0 && v.Int < len(vm.objects) {
+				vm.push(vm.objects[v.Int][fmt.Sprintf("%d", idx)])
+			} else {
+				vm.push(VInt(0))
+			}
+		case compiler.OP_CLASS_METHOD:
+			// ArgStr = "methodName:ClassName_methodName", Arg = function entry address
+			parts := strings.SplitN(inst.ArgStr, ":", 2)
+			if len(parts) == 2 {
+				methodName := parts[0]
+				for _, ci := range vm.classes {
+					ci.methods[methodName] = inst.Arg
+				}
+			}
+		case compiler.OP_METHOD_CALL:
+			// ArgStr = "methodName:argCount"
+			parts := strings.SplitN(inst.ArgStr, ":", 2)
+			methodName := parts[0]
+			argCount := 0
+			fmt.Sscanf(parts[1], "%d", &argCount)
+
+			// Look up the method from self's class
+			if len(vm.argStack) >= argCount {
+				selfVal := vm.argStack[0]
+				if selfVal.Type == ValObj && selfVal.Int >= 0 && selfVal.Int < len(vm.objects) {
+					if clsStr := vm.objects[selfVal.Int]["__class"]; clsStr.Type == ValStr {
+						className := clsStr.Str
+						if ci, ok := vm.classes[className]; ok {
+							if fnAddr, ok := ci.methods[methodName]; ok {
+								// Save all args (self + explicit args)
+								// argStack already has [self, arg1, arg2, ...]
+								// Jump to function
+								vm.callStack = append(vm.callStack, vm.pc)
+								vm.pc = fnAddr
+								break
+							}
+						}
+					}
+				}
+			}
+			// Fallback: method not found, push 0
+			vm.argStack = nil
+			vm.push(VInt(0))
 		}
 	}
 	return vm.output, nil

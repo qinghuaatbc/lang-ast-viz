@@ -159,16 +159,31 @@ func (ir *IRGen) genNode(n *Node) string {
 			startIdx = 1
 		}
 		ir.emit("CLASS_DEF", n.Value, parentClass, "")
-		// Compute all fields including inherited
 		var allFields []string
 		if parentClass != "" {
 			allFields = append(allFields, ir.classFields[parentClass]...)
 		}
-		for i := startIdx; i+1 < len(n.Children); i += 2 {
-			fname := n.Children[i].Value
-			fval := ir.genNode(n.Children[i+1])
-			ir.emit("CLASS_FIELD", n.Value, fname, fval)
-			allFields = append(allFields, fname)
+		i := startIdx
+		for i < len(n.Children) {
+			child := n.Children[i]
+			if child.Type == NFuncDecl {
+				// Method: generate ClassName_methodName function
+				origName := child.Value
+				child.Value = n.Value + "_" + origName
+				ir.genNode(child)
+				child.Value = origName // restore
+				ir.emit("CLASS_METHOD", n.Value, origName, n.Value+"_"+origName)
+				i++
+			} else if i+1 < len(n.Children) {
+				// Field: name + value pair
+				fname := child.Value
+				fval := ir.genNode(n.Children[i+1])
+				ir.emit("CLASS_FIELD", n.Value, fname, fval)
+				allFields = append(allFields, fname)
+				i += 2
+			} else {
+				i++
+			}
 		}
 		ir.classFields[n.Value] = allFields
 		return ""
@@ -230,6 +245,20 @@ func (ir *IRGen) genNode(n *Node) string {
 			ir.emit("SETFIELD", obj, fname, arg)
 		}
 		return obj
+	case NArrayList:
+		arr := ir.newTemp()
+		ir.emit("ARRAY_LIT", arr, "", fmt.Sprintf("%d", len(n.Children)))
+		for _, child := range n.Children {
+			val := ir.genNode(child)
+			ir.emit("ARRAY_SET", arr, val, "")
+		}
+		return arr
+	case NArrayAccess:
+		arrObj := ir.genNode(n.Children[0])
+		idx := ir.genNode(n.Children[1])
+		dest := ir.newTemp()
+		ir.emit("ARRAY_GET", dest, arrObj, idx)
+		return dest
 	case NFuncDecl:
 		// fn name(params) { body }
 		paramCount := 0
@@ -267,19 +296,17 @@ func (ir *IRGen) genNode(n *Node) string {
 		}
 		return ""
 	case NMethodCall:
-		// obj.method(args...) -> push self(obj), then args
 		obj := ir.genNode(n.Children[0])
 		methodName := n.Value
-		fnLabel := "fn_" + methodName
-		// self is the first implicit argument
+		// Push self and args
 		ir.emit("PUSH_ARG", "", obj, "")
 		for i := 1; i < len(n.Children); i++ {
 			arg := ir.genNode(n.Children[i])
 			ir.emit("PUSH_ARG", "", arg, "")
 		}
 		dest := ir.newTemp()
-		// Total args = self + explicit args
-		ir.emit("CALL", dest, fnLabel, fmt.Sprintf("%d", len(n.Children)))
+		// Use METHOD_CALL which does dynamic dispatch at runtime
+		ir.emit("METHOD_CALL", dest, methodName, fmt.Sprintf("%d", len(n.Children)))
 		return dest
 	}
 	return ""
