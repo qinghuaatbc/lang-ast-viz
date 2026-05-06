@@ -128,6 +128,11 @@ func (l *Lexer) NextToken() Token {
 			tok = Token{Type: NUMBER, Literal: lit, Line: l.tokLine, Col: l.tokCol}
 			return tok
 		}
+		if l.ch == '"' {
+			lit := l.readString()
+			tok = Token{Type: STRING, Literal: lit, Line: l.tokLine, Col: l.tokCol}
+			return tok
+		}
 		tok = l.makeToken(ILLEGAL, string(l.ch))
 	}
 	return tok
@@ -160,6 +165,19 @@ func (l *Lexer) readNumber() string {
 		l.readChar()
 	}
 	return l.input[start:l.pos]
+}
+
+func (l *Lexer) readString() string {
+	l.readChar() // skip opening "
+	start := l.pos
+	for l.ch != '"' && l.ch != 0 {
+		l.readChar()
+	}
+	result := l.input[start:l.pos]
+	if l.ch == '"' {
+		l.readChar() // skip closing "
+	}
+	return result
 }
 
 func (l *Lexer) peekChar() byte {

@@ -343,6 +343,9 @@ func (p *Parser) parseExpr(prec int) *Node {
 	case NUMBER:
 		left = NewNode(NNumberLit, p.cur.Literal, p.cur.Line, p.cur.Col)
 		p.nextToken()
+	case STRING:
+		left = NewNode(NStringLit, p.cur.Literal, p.cur.Line, p.cur.Col)
+		p.nextToken()
 	case TRUE, FALSE:
 		left = NewNode(NBoolLit, p.cur.Literal, p.cur.Line, p.cur.Col)
 		p.nextToken()

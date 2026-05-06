@@ -7,6 +7,7 @@ const (
 	EOF
 	IDENT
 	NUMBER
+	STRING
 	TRUE
 	FALSE
 	ASSIGN

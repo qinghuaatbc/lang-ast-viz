@@ -14,6 +14,8 @@ import (
 	"lang-ast-viz/pipeline"
 )
 
+const maxBodySize = 1 << 16 // 64KB max request body
+
 const (
 	rateWindow   = time.Minute
 	rateMaxHits  = 30
@@ -87,9 +89,9 @@ func (h *Handler) handleCompile(w http.ResponseWriter, r *http.Request) {
 	}
 
 	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
-	body, err := io.ReadAll(r.Body)
+	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodySize))
 	if err != nil {
-		http.Error(w, "request too large or bad request", http.StatusBadRequest)
+		http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 	defer r.Body.Close()

@@ -10,6 +10,7 @@ type Opcode int
 const (
 	OP_HALT Opcode = iota
 	OP_PUSH
+	OP_PUSHSTR
 	OP_LOAD
 	OP_STORE
 	OP_ADD
@@ -17,6 +18,7 @@ const (
 	OP_MUL
 	OP_DIV
 	OP_MOD
+	OP_CONCAT
 	OP_EQ
 	OP_NEQ
 	OP_LT
@@ -38,14 +40,16 @@ const (
 func (op Opcode) String() string {
 	switch op {
 	case OP_HALT:        return "HALT"
-	case OP_PUSH:        return "PUSH"
+	case OP_PUSH:         return "PUSH"
+	case OP_PUSHSTR:      return "PUSHSTR"
 	case OP_LOAD:        return "LOAD"
 	case OP_STORE:       return "STORE"
 	case OP_ADD:         return "ADD"
 	case OP_SUB:         return "SUB"
 	case OP_MUL:         return "MUL"
 	case OP_DIV:         return "DIV"
-	case OP_MOD:         return "MOD"
+	case OP_MOD:          return "MOD"
+	case OP_CONCAT:       return "CONCAT"
 	case OP_EQ:          return "EQ"
 	case OP_NEQ:         return "NEQ"
 	case OP_LT:          return "LT"
@@ -133,6 +137,8 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 			val := 0
 			fmt.Sscanf(inst.Src1, "%d", &val)
 			bg.emit(OP_PUSH, val, inst.Src1)
+		case "LOAD_STR":
+			bg.emit(OP_PUSHSTR, 0, inst.Src1)
 		case "LOAD":
 			bg.emit(OP_LOAD, 0, inst.Src1)
 		case "ASSIGN":

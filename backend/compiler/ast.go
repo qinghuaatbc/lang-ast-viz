@@ -14,6 +14,7 @@ const (
 	NBlockStmt
 	NBinaryExpr
 	NNumberLit
+	NStringLit
 	NBoolLit
 	NIdent
 	NFieldAccess
@@ -60,6 +61,8 @@ func (n *Node) TypeName() string {
 		return "BinaryExpression"
 	case NNumberLit:
 		return "NumberLiteral"
+	case NStringLit:
+		return "StringLiteral"
 	case NBoolLit:
 		return "BoolLiteral"
 	case NIdent:

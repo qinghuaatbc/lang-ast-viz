@@ -1,7 +1,6 @@
 package vm
 
 import (
-	"fmt"
 	"strings"
 
 	"lang-ast-viz/compiler"
@@ -10,13 +9,13 @@ import (
 type classInfo struct {
 	name   string
 	parent string
-	fields []string // field names in order
+	fields []string
 }
 
 type VM struct {
-	stack     []int
-	variables map[string]int
-	objects   []map[string]int
+	stack     []Value
+	variables map[string]Value
+	objects   []map[string]Value
 	classes   map[string]*classInfo
 	pc        int
 	program   []compiler.BytecodeInstr
@@ -25,35 +24,30 @@ type VM struct {
 
 func NewVM(program []compiler.BytecodeInstr) *VM {
 	return &VM{
-		stack:     []int{},
-		variables: map[string]int{},
-		objects:   []map[string]int{},
+		stack:     []Value{},
+		variables: map[string]Value{},
+		objects:   []map[string]Value{},
 		classes:   map[string]*classInfo{},
 		program:   program,
 		output:    []string{},
 	}
 }
 
-func (vm *VM) push(v int) {
+func (vm *VM) push(v Value) {
 	vm.stack = append(vm.stack, v)
 }
 
-func (vm *VM) pop() int {
+func (vm *VM) pop() Value {
 	if len(vm.stack) == 0 {
-		return 0
+		return VInt(0)
 	}
 	v := vm.stack[len(vm.stack)-1]
 	vm.stack = vm.stack[:len(vm.stack)-1]
 	return v
 }
 
-func (vm *VM) safePop() (int, bool) {
-	if len(vm.stack) == 0 {
-		return 0, false
-	}
-	v := vm.stack[len(vm.stack)-1]
-	vm.stack = vm.stack[:len(vm.stack)-1]
-	return v, true
+func (vm *VM) popInt() int {
+	return vm.pop().Int
 }
 
 func (vm *VM) Run() ([]string, error) {
@@ -68,69 +62,73 @@ func (vm *VM) Run() ([]string, error) {
 		case compiler.OP_HALT:
 			return vm.output, nil
 		case compiler.OP_PUSH:
-			vm.push(inst.Arg)
+			vm.push(VInt(inst.Arg))
+		case compiler.OP_PUSHSTR:
+			vm.push(VStr(inst.ArgStr))
 		case compiler.OP_LOAD:
-			val := vm.variables[inst.ArgStr]
-			vm.push(val)
+			vm.push(vm.variables[inst.ArgStr])
 		case compiler.OP_STORE:
 			vm.variables[inst.ArgStr] = vm.pop()
 		case compiler.OP_ADD:
-			b, a := vm.pop(), vm.pop()
-			vm.push(a + b)
+			b, a := vm.popInt(), vm.popInt()
+			vm.push(VInt(a + b))
 		case compiler.OP_SUB:
-			b, a := vm.pop(), vm.pop()
-			vm.push(a - b)
+			b, a := vm.popInt(), vm.popInt()
+			vm.push(VInt(a - b))
 		case compiler.OP_MUL:
-			b, a := vm.pop(), vm.pop()
-			vm.push(a * b)
+			b, a := vm.popInt(), vm.popInt()
+			vm.push(VInt(a * b))
 		case compiler.OP_DIV:
-			b, a := vm.pop(), vm.pop()
-			vm.push(a / b)
+			b, a := vm.popInt(), vm.popInt()
+			vm.push(VInt(a / b))
 		case compiler.OP_MOD:
+			b, a := vm.popInt(), vm.popInt()
+			vm.push(VInt(a % b))
+		case compiler.OP_CONCAT:
 			b, a := vm.pop(), vm.pop()
-			vm.push(a % b)
+			vm.push(VStr(a.String() + b.String()))
 		case compiler.OP_EQ:
-			b, a := vm.pop(), vm.pop()
-			if a == b { vm.push(1) } else { vm.push(0) }
+			b, a := vm.popInt(), vm.popInt()
+			if a == b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_NEQ:
-			b, a := vm.pop(), vm.pop()
-			if a != b { vm.push(1) } else { vm.push(0) }
+			b, a := vm.popInt(), vm.popInt()
+			if a != b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_LT:
-			b, a := vm.pop(), vm.pop()
-			if a < b { vm.push(1) } else { vm.push(0) }
+			b, a := vm.popInt(), vm.popInt()
+			if a < b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_GT:
-			b, a := vm.pop(), vm.pop()
-			if a > b { vm.push(1) } else { vm.push(0) }
+			b, a := vm.popInt(), vm.popInt()
+			if a > b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_LE:
-			b, a := vm.pop(), vm.pop()
-			if a <= b { vm.push(1) } else { vm.push(0) }
+			b, a := vm.popInt(), vm.popInt()
+			if a <= b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_GE:
-			b, a := vm.pop(), vm.pop()
-			if a >= b { vm.push(1) } else { vm.push(0) }
+			b, a := vm.popInt(), vm.popInt()
+			if a >= b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_PRINT:
-			vm.output = append(vm.output, fmt.Sprintf("%d", vm.pop()))
+			vm.output = append(vm.output, vm.pop().String())
 		case compiler.OP_JMP:
 			vm.pc += inst.Arg - 1
 		case compiler.OP_JZ:
-			if vm.pop() == 0 {
+			if vm.popInt() == 0 {
 				vm.pc += inst.Arg - 1
 			}
 		case compiler.OP_OBJLIT:
-			obj := map[string]int{}
+			obj := map[string]Value{}
 			vm.objects = append(vm.objects, obj)
-			vm.push(len(vm.objects) - 1)
+			vm.push(VInt(len(vm.objects) - 1))
 		case compiler.OP_OBJSET:
 			val := vm.pop()
-			objIdx := vm.pop()
+			objIdx := vm.popInt()
 			if objIdx >= 0 && objIdx < len(vm.objects) {
 				vm.objects[objIdx][inst.ArgStr] = val
 			}
 		case compiler.OP_OBJGET:
-			objIdx := vm.pop()
+			objIdx := vm.popInt()
 			if objIdx >= 0 && objIdx < len(vm.objects) {
 				vm.push(vm.objects[objIdx][inst.ArgStr])
 			} else {
-				vm.push(0)
+				vm.push(VInt(0))
 			}
 		case compiler.OP_CLASS_DEF:
 			parts := strings.SplitN(inst.ArgStr, ":", 2)
@@ -148,27 +146,23 @@ func (vm *VM) Run() ([]string, error) {
 			}
 			vm.pop() // discard default value
 		case compiler.OP_INSTANTIATE:
-			obj := map[string]int{}
+			obj := map[string]Value{}
 			if ci, ok := vm.classes[inst.ArgStr]; ok {
-				// inherited fields
 				parentFields := []string{}
 				if ci.parent != "" {
 					if pci, pok := vm.classes[ci.parent]; pok {
 						parentFields = pci.fields
 					}
 				}
-				allFields := append(parentFields, ci.fields...)
-				for _, f := range allFields {
-					obj[f] = 0
+				for _, f := range append(parentFields, ci.fields...) {
+					obj[f] = VInt(0)
 				}
-				// store class name for SETFIELD lookup
-				obj["__class"] = 0 // placeholder
 			}
 			vm.objects = append(vm.objects, obj)
-			vm.push(len(vm.objects) - 1)
+			vm.push(VInt(len(vm.objects) - 1))
 		case compiler.OP_SETFIELD:
 			val := vm.pop()
-			objIdx := vm.pop()
+			objIdx := vm.popInt()
 			if objIdx >= 0 && objIdx < len(vm.objects) {
 				vm.objects[objIdx][inst.ArgStr] = val
 			}

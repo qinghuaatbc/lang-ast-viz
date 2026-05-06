@@ -120,6 +120,9 @@ func (ir *IRGen) genNode(n *Node) string {
 		dest := ir.newTemp()
 		ir.emit("LOAD_IMM", dest, n.Value, "")
 		return dest
+	case NStringLit:
+		dest := ir.newTemp()
+		ir.emit("LOAD_STR", dest, n.Value, "")
 	case NBoolLit:
 		dest := ir.newTemp()
 		val := "0"
@@ -144,14 +147,18 @@ func (ir *IRGen) genNode(n *Node) string {
 			startIdx = 1
 		}
 		ir.emit("CLASS_DEF", n.Value, parentClass, "")
-		var fieldNames []string
+		// Compute all fields including inherited
+		var allFields []string
+		if parentClass != "" {
+			allFields = append(allFields, ir.classFields[parentClass]...)
+		}
 		for i := startIdx; i+1 < len(n.Children); i += 2 {
 			fname := n.Children[i].Value
 			fval := ir.genNode(n.Children[i+1])
 			ir.emit("CLASS_FIELD", n.Value, fname, fval)
-			fieldNames = append(fieldNames, fname)
+			allFields = append(allFields, fname)
 		}
-		ir.classFields[n.Value] = fieldNames
+		ir.classFields[n.Value] = allFields
 		return ""
 	case NFieldAccess:
 		obj := ir.genNode(n.Children[0])
