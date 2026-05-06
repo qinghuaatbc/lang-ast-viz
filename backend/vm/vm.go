@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"fmt"
 	"strings"
 
 	"lang-ast-viz/compiler"
@@ -13,32 +14,38 @@ type classInfo struct {
 }
 
 type VM struct {
-	stack     []Value
-	variables map[string]Value
+	stack      []Value
+	variables  map[string]Value
 	scopeStack []map[string]Value
-	objects   []map[string]Value
-	classes   map[string]*classInfo
-	callStack []int
-	argStack  []Value
-	pc        int
-	program   []compiler.BytecodeInstr
-	output    []string
+	objects    []map[string]Value
+	objRefs    []int // reference count per object
+	classes    map[string]*classInfo
+	callStack  []int
+	argStack   []Value
+	pc         int
+	program    []compiler.BytecodeInstr
+	output     []string
 }
 
 func NewVM(program []compiler.BytecodeInstr) *VM {
 	return &VM{
-		stack:     []Value{},
-		variables: map[string]Value{},
-		objects:   []map[string]Value{},
-		classes:   map[string]*classInfo{},
-		callStack: []int{},
-		argStack:  []Value{},
-		program:   program,
-		output:    []string{},
+		stack:      []Value{},
+		variables:  map[string]Value{},
+		scopeStack: []map[string]Value{},
+		objects:    []map[string]Value{},
+		objRefs:    []int{},
+		classes:    map[string]*classInfo{},
+		callStack:  []int{},
+		argStack:   []Value{},
+		program:    program,
+		output:     []string{},
 	}
 }
 
 func (vm *VM) push(v Value) {
+	if v.Type == ValObj {
+		vm.objRefs[v.Int]++
+	}
 	vm.stack = append(vm.stack, v)
 }
 
@@ -48,11 +55,44 @@ func (vm *VM) pop() Value {
 	}
 	v := vm.stack[len(vm.stack)-1]
 	vm.stack = vm.stack[:len(vm.stack)-1]
+	if v.Type == ValObj {
+		vm.objRefs[v.Int]--
+		if vm.objRefs[v.Int] <= 0 {
+			vm.objRefs[v.Int] = 0
+		}
+	}
 	return v
 }
 
-func (vm *VM) popInt() int {
-	return vm.pop().Int
+func (vm *VM) storeVar(name string, v Value) {
+	if old, ok := vm.variables[name]; ok && old.Type == ValObj {
+		vm.objRefs[old.Int]--
+	}
+	if v.Type == ValObj {
+		vm.objRefs[v.Int]++
+	}
+	vm.variables[name] = v
+}
+
+func (vm *VM) declareVar(name string, v Value) {
+	vm.storeVar(name, v)
+	// Track in current scope for cleanup on SCOPE_EXIT
+	if len(vm.scopeStack) > 0 {
+		vm.scopeStack[len(vm.scopeStack)-1][name] = VInt(0)
+	}
+}
+
+func (vm *VM) popInt() (int, error) {
+	v := vm.pop()
+	return v.AsInt()
+}
+
+func (vm *VM) popTwoInts() (int, int, error) {
+	b, err := vm.popInt()
+	if err != nil { return 0, 0, err }
+	a, err := vm.popInt()
+	if err != nil { return 0, 0, err }
+	return a, b, nil
 }
 
 func (vm *VM) Run() ([]string, error) {
@@ -73,61 +113,73 @@ func (vm *VM) Run() ([]string, error) {
 		case compiler.OP_LOAD:
 			vm.push(vm.variables[inst.ArgStr])
 		case compiler.OP_STORE:
-			vm.variables[inst.ArgStr] = vm.pop()
+			vm.storeVar(inst.ArgStr, vm.pop())
 		case compiler.OP_DECLARE:
-			vm.variables[inst.ArgStr] = vm.pop()
-			// Track in current scope for cleanup on SCOPE_EXIT
-			if len(vm.scopeStack) > 0 {
-				vm.scopeStack[len(vm.scopeStack)-1][inst.ArgStr] = VInt(0)
-			}
+			vm.declareVar(inst.ArgStr, vm.pop())
 		case compiler.OP_ADD:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			vm.push(VInt(a + b))
 		case compiler.OP_SUB:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			vm.push(VInt(a - b))
 		case compiler.OP_MUL:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			vm.push(VInt(a * b))
 		case compiler.OP_DIV:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
+			if b == 0 { return nil, fmt.Errorf("division by zero") }
 			vm.push(VInt(a / b))
 		case compiler.OP_MOD:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
+			if b == 0 { return nil, fmt.Errorf("modulo by zero") }
 			vm.push(VInt(a % b))
 		case compiler.OP_CONCAT:
 			b, a := vm.pop(), vm.pop()
 			vm.push(VStr(a.String() + b.String()))
 		case compiler.OP_EQ:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			if a == b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_NEQ:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			if a != b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_LT:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			if a < b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_GT:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			if a > b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_LE:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			if a <= b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_GE:
-			b, a := vm.popInt(), vm.popInt()
+			a, b, err := vm.popTwoInts()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
 			if a >= b { vm.push(VInt(1)) } else { vm.push(VInt(0)) }
 		case compiler.OP_PRINT:
 			vm.output = append(vm.output, vm.pop().String())
 		case compiler.OP_JMP:
 			vm.pc += inst.Arg - 1
 		case compiler.OP_JZ:
-			if vm.popInt() == 0 {
+			val, err := vm.popInt()
+			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
+			if val == 0 {
 				vm.pc += inst.Arg - 1
 			}
 		case compiler.OP_OBJLIT:
 			obj := map[string]Value{}
 			vm.objects = append(vm.objects, obj)
-			vm.push(VInt(len(vm.objects) - 1))
+			vm.objRefs = append(vm.objRefs, 0)
+			vm.push(VObj(len(vm.objects) - 1))
 		case compiler.OP_OBJSET:
 			val := vm.pop()
 			if len(vm.stack) > 0 {
@@ -137,9 +189,14 @@ func (vm *VM) Run() ([]string, error) {
 				}
 			}
 		case compiler.OP_OBJGET:
-			objIdx := vm.popInt()
-			if objIdx >= 0 && objIdx < len(vm.objects) {
-				vm.push(vm.objects[objIdx][inst.ArgStr])
+			v := vm.pop()
+			if v.Type == ValObj {
+				objIdx := v.Int
+				if objIdx >= 0 && objIdx < len(vm.objects) {
+					vm.push(vm.objects[objIdx][inst.ArgStr])
+				} else {
+					vm.push(VInt(0))
+				}
 			} else {
 				vm.push(VInt(0))
 			}
@@ -152,35 +209,37 @@ func (vm *VM) Run() ([]string, error) {
 			vm.classes[ci.name] = ci
 		case compiler.OP_CLASS_FIELD:
 			parts := strings.SplitN(inst.ArgStr, ".", 2)
-			className := parts[0]
-			fieldName := parts[1]
+			className, fieldName := parts[0], parts[1]
 			if ci, ok := vm.classes[className]; ok {
 				ci.fields = append(ci.fields, fieldName)
 			}
-			vm.pop() // discard default value
+			vm.pop()
 		case compiler.OP_INSTANTIATE:
 			obj := map[string]Value{}
 			if ci, ok := vm.classes[inst.ArgStr]; ok {
-				parentFields := []string{}
+				var allFields []string
 				if ci.parent != "" {
 					if pci, pok := vm.classes[ci.parent]; pok {
-						parentFields = pci.fields
+						allFields = append(allFields, pci.fields...)
 					}
 				}
-				for _, f := range append(parentFields, ci.fields...) {
+				allFields = append(allFields, ci.fields...)
+				for _, f := range allFields {
 					obj[f] = VInt(0)
 				}
 			}
 			vm.objects = append(vm.objects, obj)
-			vm.push(VInt(len(vm.objects) - 1))
+			vm.objRefs = append(vm.objRefs, 0)
+			vm.push(VObj(len(vm.objects) - 1))
 		case compiler.OP_SETFIELD:
 			val := vm.pop()
-			objIdx := vm.popInt()
-			if objIdx >= 0 && objIdx < len(vm.objects) {
-				vm.objects[objIdx][inst.ArgStr] = val
+			if len(vm.stack) > 0 {
+				objIdx := vm.stack[len(vm.stack)-1].Int // peek
+				if objIdx >= 0 && objIdx < len(vm.objects) {
+					vm.objects[objIdx][inst.ArgStr] = val
+				}
 			}
 		case compiler.OP_CALL:
-			// Arg is relative offset to function entry (resolved by codegen)
 			vm.callStack = append(vm.callStack, vm.pc)
 			vm.pc += inst.Arg - 1
 		case compiler.OP_RETURN:
@@ -190,9 +249,8 @@ func (vm *VM) Run() ([]string, error) {
 				vm.callStack = vm.callStack[:len(vm.callStack)-1]
 				vm.push(returnVal)
 			} else {
-				// top-level return
 				vm.push(returnVal)
-				vm.pc = len(vm.program) // halt
+				vm.pc = len(vm.program)
 			}
 		case compiler.OP_PUSHARG:
 			vm.argStack = append(vm.argStack, vm.pop())
@@ -200,8 +258,7 @@ func (vm *VM) Run() ([]string, error) {
 			if len(vm.argStack) > 0 {
 				val := vm.argStack[len(vm.argStack)-1]
 				vm.argStack = vm.argStack[:len(vm.argStack)-1]
-				// Save as local variable, also save as 'self' if first arg
-				vm.variables[inst.ArgStr] = val
+				vm.declareVar(inst.ArgStr, val)
 			}
 		case compiler.OP_SCOPE_ENTER:
 			vm.scopeStack = append(vm.scopeStack, map[string]Value{})
@@ -209,6 +266,10 @@ func (vm *VM) Run() ([]string, error) {
 			if len(vm.scopeStack) > 0 {
 				scope := vm.scopeStack[len(vm.scopeStack)-1]
 				for k := range scope {
+					// decrement object ref before deleting
+					if old, ok := vm.variables[k]; ok && old.Type == ValObj {
+						vm.objRefs[old.Int]--
+					}
 					delete(vm.variables, k)
 				}
 				vm.scopeStack = vm.scopeStack[:len(vm.scopeStack)-1]
