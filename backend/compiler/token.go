@@ -41,6 +41,8 @@ const (
 	EXTENDS
 	SELF
 	NEW
+	FN
+	RETURN
 )
 
 type Token struct {

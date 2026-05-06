@@ -26,6 +26,9 @@ export function astTypeName(nodeType: number): string {
     15: 'CallExpr',
     16: 'Self',
     17: 'NewExpr',
+    18: 'FuncDecl',
+    19: 'ReturnStmt',
+    20: 'MethodCall',
   }
   return names[nodeType] || 'Unknown'
 }
@@ -50,6 +53,9 @@ export function astTypeClass(nodeType: number): string {
     15: 'callexpr',
     16: 'self',
     17: 'newexpr',
+    18: 'funcdecl',
+    19: 'returnstmt',
+    20: 'methodcall',
   }
   return classes[nodeType] || 'unknown'
 }

@@ -35,6 +35,10 @@ const (
 	OP_CLASS_FIELD
 	OP_INSTANTIATE
 	OP_SETFIELD
+	OP_CALL
+	OP_RETURN
+	OP_PUSHARG
+	OP_POPARG
 )
 
 func (op Opcode) String() string {
@@ -66,6 +70,10 @@ func (op Opcode) String() string {
 	case OP_CLASS_FIELD: return "CLASS_FIELD"
 	case OP_INSTANTIATE: return "INSTANTIATE"
 	case OP_SETFIELD:    return "SETFIELD"
+	case OP_CALL:        return "CALL"
+	case OP_RETURN:      return "RETURN"
+	case OP_PUSHARG:     return "PUSHARG"
+	case OP_POPARG:      return "POPARG"
 	default:             return "UNKNOWN"
 	}
 }
@@ -122,13 +130,19 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 			bg.labelPos[inst.Label] = bg.nextAddr
 			continue
 		}
-		if inst.Op == "JZ" || inst.Op == "JMP" {
+		if inst.Op == "JZ" || inst.Op == "JMP" || inst.Op == "CALL" {
 			ref := labelRef{instrIdx: len(bg.instrs), label: inst.Src2}
 			bg.labelRefs = append(bg.labelRefs, ref)
-			if inst.Op == "JMP" {
+			switch inst.Op {
+			case "JMP":
 				bg.emit(OP_JMP, 0, inst.Src2)
-			} else {
+			case "JZ":
 				bg.emit(OP_JZ, 0, inst.Src2)
+			case "CALL":
+				// For CALL, label is in Src1, not Src2
+				ref.label = inst.Src1
+				bg.labelRefs[len(bg.labelRefs)-1] = ref
+				bg.emit(OP_CALL, 0, inst.Src1)
 			}
 			continue
 		}
@@ -188,6 +202,14 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 			bg.emit(OP_INSTANTIATE, 0, inst.Src1)
 		case "SETFIELD":
 			bg.emit(OP_SETFIELD, 0, inst.Src1)
+		case "FUNC_DEF":
+			// No-op: function body is guarded by JMP/skip label from IR
+		case "RETURN":
+			bg.emit(OP_RETURN, 0, "")
+		case "PUSH_ARG":
+			bg.emit(OP_PUSHARG, 0, "")
+		case "POP_ARG":
+			bg.emit(OP_POPARG, 0, inst.Dest)
 		}
 	}
 

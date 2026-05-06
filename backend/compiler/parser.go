@@ -79,6 +79,10 @@ func (p *Parser) parseStmt() *Node {
 		return p.parseWhileStmt()
 	case CLASS:
 		return p.parseClassDecl()
+	case FN:
+		return p.parseFuncDecl()
+	case RETURN:
+		return p.parseReturnStmt()
 	case RBRACE:
 		return nil
 	case EOF:
@@ -280,6 +284,61 @@ func (p *Parser) parseClassDecl() *Node {
 	return n
 }
 
+func (p *Parser) parseFuncDecl() *Node {
+	n := NewNode(NFuncDecl, "fn", p.cur.Line, p.cur.Col)
+	p.nextToken() // consume fn/func
+	if p.cur.Type == IDENT {
+		n.Value = p.cur.Literal
+		p.nextToken()
+	}
+	// parse params: (a, b, c)
+	if p.cur.Type == LPAREN {
+		p.nextToken()
+		for p.cur.Type != RPAREN && p.cur.Type != EOF {
+			if p.cur.Type == IDENT {
+				param := NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
+				n.AddChild(param)
+				p.nextToken()
+			}
+			if p.cur.Type == COMMA {
+				p.nextToken()
+			} else {
+				break
+			}
+		}
+		if p.cur.Type == RPAREN {
+			p.nextToken()
+		}
+	}
+	// parse body
+	if p.cur.Type == LBRACE {
+		p.nextToken()
+	}
+	for p.cur.Type != RBRACE && p.cur.Type != EOF {
+		stmt := p.parseStmt()
+		if stmt != nil {
+			n.AddChild(stmt)
+		}
+		if p.cur.Type == SEMICOLON {
+			p.nextToken()
+		}
+	}
+	if p.cur.Type == RBRACE {
+		p.nextToken()
+	}
+	return n
+}
+
+func (p *Parser) parseReturnStmt() *Node {
+	n := NewNode(NReturnStmt, "return", p.cur.Line, p.cur.Col)
+	p.nextToken()
+	expr := p.parseExpr(0)
+	if expr != nil {
+		n.AddChild(expr)
+	}
+	return n
+}
+
 func (p *Parser) parseBlock() *Node {
 	n := NewNode(NBlockStmt, "block", p.cur.Line, p.cur.Col)
 	for p.cur.Type != RBRACE && p.cur.Type != EOF {
@@ -440,14 +499,38 @@ func (p *Parser) parseExpr(prec int) *Node {
 		if p.cur.Type == DOT {
 			p.nextToken()
 			if p.cur.Type == IDENT {
-				field := NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
+				methodOrField := p.cur.Literal
 				p.nextToken()
-				access := NewNode(NFieldAccess, ".", p.cur.Line, p.cur.Col)
-				access.AddChild(left)
-				access.AddChild(field)
-				left = access
+				if p.cur.Type == LPAREN {
+					// method call: obj.method(args)
+					mc := NewNode(NMethodCall, methodOrField, p.cur.Line, p.cur.Col)
+					mc.AddChild(left)
+					p.nextToken()
+					for p.cur.Type != RPAREN && p.cur.Type != EOF {
+						arg := p.parseExpr(0)
+						if arg != nil {
+							mc.AddChild(arg)
+						}
+						if p.cur.Type == COMMA {
+							p.nextToken()
+						} else {
+							break
+						}
+					}
+					if p.cur.Type == RPAREN {
+						p.nextToken()
+					}
+					left = mc
+				} else {
+					// field access: obj.field
+					field := NewNode(NIdent, methodOrField, p.cur.Line, p.cur.Col)
+					access := NewNode(NFieldAccess, ".", p.cur.Line, p.cur.Col)
+					access.AddChild(left)
+					access.AddChild(field)
+					left = access
+				}
 			} else {
-				p.addErr("expected field name after '.'")
+				p.addErr("expected field/method name after '.'")
 				break
 			}
 			continue

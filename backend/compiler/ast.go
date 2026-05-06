@@ -23,6 +23,9 @@ const (
 	NCallExpr
 	NSelf
 	NNewExpr
+	NFuncDecl
+	NReturnStmt
+	NMethodCall
 )
 
 type Node struct {
@@ -79,6 +82,12 @@ func (n *Node) TypeName() string {
 		return "Self"
 	case NNewExpr:
 		return "NewExpr"
+	case NFuncDecl:
+		return "FuncDecl"
+	case NReturnStmt:
+		return "ReturnStmt"
+	case NMethodCall:
+		return "MethodCall"
 	default:
 		return "Unknown"
 	}

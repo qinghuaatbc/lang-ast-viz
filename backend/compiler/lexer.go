@@ -206,6 +206,10 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		return SELF
 	case "new":
 		return NEW
+	case "fn", "func", "function":
+		return FN
+	case "return":
+		return RETURN
 	case "if":
 		return IF
 	case "else":

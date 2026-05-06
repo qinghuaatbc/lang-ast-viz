@@ -167,19 +167,31 @@ func (ir *IRGen) genNode(n *Node) string {
 		ir.emit("GETFIELD", dest, obj, field)
 		return dest
 	case NCallExpr:
-		className := n.Children[0].Value
-		obj := ir.newTemp()
-		ir.emit("INSTANTIATE", obj, className, fmt.Sprintf("%d", len(n.Children)-1))
-		fieldNames := ir.classFields[className]
+		name := n.Children[0].Value
+		if _, isClass := ir.classFields[name]; isClass {
+			// Class instantiation: ClassName(args...)
+			obj := ir.newTemp()
+			ir.emit("INSTANTIATE", obj, name, fmt.Sprintf("%d", len(n.Children)-1))
+			fieldNames := ir.classFields[name]
+			for i := 1; i < len(n.Children); i++ {
+				arg := ir.genNode(n.Children[i])
+				fname := fmt.Sprintf("_arg%d", i-1)
+				if i-1 < len(fieldNames) {
+					fname = fieldNames[i-1]
+				}
+				ir.emit("SETFIELD", obj, fname, arg)
+			}
+			return obj
+		}
+		// Function call: name(args...)
+		fnLabel := "fn_" + name
 		for i := 1; i < len(n.Children); i++ {
 			arg := ir.genNode(n.Children[i])
-			fname := fmt.Sprintf("_arg%d", i-1)
-			if i-1 < len(fieldNames) {
-				fname = fieldNames[i-1]
-			}
-			ir.emit("SETFIELD", obj, fname, arg)
+			ir.emit("PUSH_ARG", "", arg, "")
 		}
-		return obj
+		dest := ir.newTemp()
+		ir.emit("CALL", dest, fnLabel, fmt.Sprintf("%d", len(n.Children)-1))
+		return dest
 	case NNewExpr:
 		className := ""
 		if len(n.Children) > 0 {
@@ -197,6 +209,56 @@ func (ir *IRGen) genNode(n *Node) string {
 			ir.emit("SETFIELD", obj, fname, arg)
 		}
 		return obj
+	case NFuncDecl:
+		// fn name(params) { body }
+		paramCount := 0
+		for _, c := range n.Children {
+			if c.Type == NIdent {
+				paramCount++
+			} else {
+				break
+			}
+		}
+		fnLabel := "fn_" + n.Value
+		skipLabel := "__skip_" + n.Value
+		ir.emit("FUNC_DEF", n.Value, "", fmt.Sprintf("%d", paramCount))
+		// Jump over function body at startup
+		ir.emit("JMP", "", "", skipLabel)
+		ir.emitLabel(fnLabel)
+		// Pop args from argStack into local variables
+		for i := 0; i < paramCount; i++ {
+			param := n.Children[i].Value
+			ir.emit("POP_ARG", param, "", "")
+		}
+		body := n.Children[paramCount:] // skip param nodes
+		for _, stmt := range body {
+			ir.genNode(stmt)
+		}
+		ir.emit("RETURN", "", "0", "")
+		ir.emitLabel(skipLabel)
+		return ""
+	case NReturnStmt:
+		if len(n.Children) > 0 {
+			val := ir.genNode(n.Children[0])
+			ir.emit("RETURN", "", val, "")
+		} else {
+			ir.emit("RETURN", "", "0", "")
+		}
+		return ""
+	case NMethodCall:
+		// obj.method(args...)
+		obj := ir.genNode(n.Children[0])
+		methodName := n.Value
+		fnLabel := "fn_" + methodName
+		// Pass self and args
+		ir.emit("PUSH_ARG", "", obj, "")
+		for i := 1; i < len(n.Children); i++ {
+			arg := ir.genNode(n.Children[i])
+			ir.emit("PUSH_ARG", "", arg, "")
+		}
+		dest := ir.newTemp()
+		ir.emit("CALL", dest, fnLabel, fmt.Sprintf("%d", len(n.Children)))
+		return dest
 	}
 	return ""
 }
@@ -227,6 +289,16 @@ func (ir *IRInstr) String() string {
 		return fmt.Sprintf("\t%s.%s = %s", ir.Dest, ir.Src1, ir.Src2)
 	case "GETFIELD":
 		return fmt.Sprintf("\t%s = %s.%s", ir.Dest, ir.Src1, ir.Src2)
+	case "FUNC_DEF":
+		return fmt.Sprintf("\tfunc %s(%s params)", ir.Dest, ir.Src2)
+	case "RETURN":
+		return fmt.Sprintf("\treturn %s", ir.Src1)
+	case "METHOD_CALL":
+		return fmt.Sprintf("\t%s = %s.%s()", ir.Dest, ir.Src1, ir.Src2)
+	case "PUSH_ARG":
+		return fmt.Sprintf("\tpush_arg %s", ir.Src1)
+	case "CALL":
+		return fmt.Sprintf("\tcall %s (%s args)", ir.Src1, ir.Src2)
 	default:
 		if sym, ok := opSymbols[ir.Op]; ok {
 			return fmt.Sprintf("\t%s = %s %s %s", ir.Dest, ir.Src1, sym, ir.Src2)

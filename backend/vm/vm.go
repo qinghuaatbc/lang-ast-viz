@@ -17,6 +17,8 @@ type VM struct {
 	variables map[string]Value
 	objects   []map[string]Value
 	classes   map[string]*classInfo
+	callStack []int // return addresses
+	argStack  []Value // function arguments
 	pc        int
 	program   []compiler.BytecodeInstr
 	output    []string
@@ -28,6 +30,8 @@ func NewVM(program []compiler.BytecodeInstr) *VM {
 		variables: map[string]Value{},
 		objects:   []map[string]Value{},
 		classes:   map[string]*classInfo{},
+		callStack: []int{},
+		argStack:  []Value{},
 		program:   program,
 		output:    []string{},
 	}
@@ -165,6 +169,28 @@ func (vm *VM) Run() ([]string, error) {
 			objIdx := vm.popInt()
 			if objIdx >= 0 && objIdx < len(vm.objects) {
 				vm.objects[objIdx][inst.ArgStr] = val
+			}
+		case compiler.OP_CALL:
+			// Arg is relative offset to function entry (resolved by codegen)
+			vm.callStack = append(vm.callStack, vm.pc)
+			vm.pc += inst.Arg - 1
+		case compiler.OP_RETURN:
+			returnVal := vm.pop()
+			if len(vm.callStack) > 0 {
+				vm.pc = vm.callStack[len(vm.callStack)-1]
+				vm.callStack = vm.callStack[:len(vm.callStack)-1]
+				vm.push(returnVal)
+			} else {
+				// top-level return
+				vm.push(returnVal)
+				vm.pc = len(vm.program) // halt
+			}
+		case compiler.OP_PUSHARG:
+			vm.argStack = append(vm.argStack, vm.pop())
+		case compiler.OP_POPARG:
+			if len(vm.argStack) > 0 {
+				vm.variables[inst.ArgStr] = vm.argStack[len(vm.argStack)-1]
+				vm.argStack = vm.argStack[:len(vm.argStack)-1]
 			}
 		}
 	}
