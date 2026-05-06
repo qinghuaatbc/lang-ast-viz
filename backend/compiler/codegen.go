@@ -1,0 +1,201 @@
+package compiler
+
+import (
+	"encoding/json"
+	"fmt"
+)
+
+type Opcode int
+
+const (
+	OP_HALT Opcode = iota
+	OP_PUSH
+	OP_LOAD
+	OP_STORE
+	OP_ADD
+	OP_SUB
+	OP_MUL
+	OP_DIV
+	OP_MOD
+	OP_EQ
+	OP_NEQ
+	OP_LT
+	OP_GT
+	OP_LE
+	OP_GE
+	OP_PRINT
+	OP_JMP
+	OP_JZ
+	OP_OBJLIT
+	OP_OBJSET
+	OP_OBJGET
+	OP_CLASS_DEF
+	OP_CLASS_FIELD
+	OP_INSTANTIATE
+	OP_SETFIELD
+)
+
+func (op Opcode) String() string {
+	switch op {
+	case OP_HALT:        return "HALT"
+	case OP_PUSH:        return "PUSH"
+	case OP_LOAD:        return "LOAD"
+	case OP_STORE:       return "STORE"
+	case OP_ADD:         return "ADD"
+	case OP_SUB:         return "SUB"
+	case OP_MUL:         return "MUL"
+	case OP_DIV:         return "DIV"
+	case OP_MOD:         return "MOD"
+	case OP_EQ:          return "EQ"
+	case OP_NEQ:         return "NEQ"
+	case OP_LT:          return "LT"
+	case OP_GT:          return "GT"
+	case OP_LE:          return "LE"
+	case OP_GE:          return "GE"
+	case OP_PRINT:       return "PRINT"
+	case OP_JMP:         return "JMP"
+	case OP_JZ:          return "JZ"
+	case OP_OBJLIT:      return "OBJLIT"
+	case OP_OBJSET:      return "OBJSET"
+	case OP_OBJGET:      return "OBJGET"
+	case OP_CLASS_DEF:   return "CLASS_DEF"
+	case OP_CLASS_FIELD: return "CLASS_FIELD"
+	case OP_INSTANTIATE: return "INSTANTIATE"
+	case OP_SETFIELD:    return "SETFIELD"
+	default:             return "UNKNOWN"
+	}
+}
+
+func (op Opcode) MarshalJSON() ([]byte, error) {
+	return json.Marshal(op.String())
+}
+
+type BytecodeInstr struct {
+	Op     Opcode `json:"op"`
+	Arg    int    `json:"arg,omitempty"`
+	ArgStr string `json:"argStr,omitempty"`
+}
+
+func (b BytecodeInstr) String() string {
+	if b.ArgStr != "" {
+		return fmt.Sprintf("%-12s %s", b.Op.String(), b.ArgStr)
+	}
+	if b.Op == OP_HALT {
+		return b.Op.String()
+	}
+	return fmt.Sprintf("%-12s %d", b.Op.String(), b.Arg)
+}
+
+type BytecodeGen struct {
+	instrs    []BytecodeInstr
+	labelPos  map[string]int
+	labelRefs []labelRef
+	nextAddr  int
+}
+
+type labelRef struct {
+	instrIdx int
+	label    string
+}
+
+func NewBytecodeGen() *BytecodeGen {
+	return &BytecodeGen{labelPos: map[string]int{}}
+}
+
+func (bg *BytecodeGen) emit(op Opcode, arg int, argStr string) {
+	bg.instrs = append(bg.instrs, BytecodeInstr{Op: op, Arg: arg, ArgStr: argStr})
+	bg.nextAddr++
+}
+
+func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
+	bg.instrs = nil
+	bg.labelPos = map[string]int{}
+	bg.labelRefs = nil
+	bg.nextAddr = 0
+
+	for _, inst := range ir {
+		if inst.Op == "LABEL" {
+			bg.labelPos[inst.Label] = bg.nextAddr
+			continue
+		}
+		if inst.Op == "JZ" || inst.Op == "JMP" {
+			ref := labelRef{instrIdx: len(bg.instrs), label: inst.Src2}
+			bg.labelRefs = append(bg.labelRefs, ref)
+			if inst.Op == "JMP" {
+				bg.emit(OP_JMP, 0, inst.Src2)
+			} else {
+				bg.emit(OP_JZ, 0, inst.Src2)
+			}
+			continue
+		}
+		switch inst.Op {
+		case "LOAD_IMM":
+			val := 0
+			fmt.Sscanf(inst.Src1, "%d", &val)
+			bg.emit(OP_PUSH, val, inst.Src1)
+		case "LOAD":
+			bg.emit(OP_LOAD, 0, inst.Src1)
+		case "ASSIGN":
+			bg.emit(OP_STORE, 0, inst.Dest)
+		case "PRINT":
+			bg.emit(OP_PRINT, 0, "")
+		case "ADD":
+			bg.emit(OP_ADD, 0, "")
+		case "SUB":
+			bg.emit(OP_SUB, 0, "")
+		case "MUL":
+			bg.emit(OP_MUL, 0, "")
+		case "DIV":
+			bg.emit(OP_DIV, 0, "")
+		case "MOD":
+			bg.emit(OP_MOD, 0, "")
+		case "EQ":
+			bg.emit(OP_EQ, 0, "")
+		case "NEQ":
+			bg.emit(OP_NEQ, 0, "")
+		case "LT":
+			bg.emit(OP_LT, 0, "")
+		case "GT":
+			bg.emit(OP_GT, 0, "")
+		case "LE":
+			bg.emit(OP_LE, 0, "")
+		case "GE":
+			bg.emit(OP_GE, 0, "")
+		case "OBJ_LIT":
+			bg.emit(OP_OBJLIT, 0, "")
+		case "OBJ_SET":
+			bg.emit(OP_OBJSET, 0, inst.Src1)
+		case "GETFIELD":
+			bg.emit(OP_OBJGET, 0, inst.Src2)
+		case "CLASS_DEF":
+			// ArgStr = "ClassName" or "ClassName:ParentClass"
+			argStr := inst.Dest
+			if inst.Src1 != "" {
+				argStr += ":" + inst.Src1
+			}
+			bg.emit(OP_CLASS_DEF, 0, argStr)
+		case "CLASS_FIELD":
+			// ArgStr = "ClassName.fieldName", pops default value from stack
+			bg.emit(OP_CLASS_FIELD, 0, inst.Dest+"."+inst.Src1)
+		case "INSTANTIATE":
+			// ArgStr = className, creates object with class fields at defaults
+			bg.emit(OP_INSTANTIATE, 0, inst.Src1)
+		case "SETFIELD":
+			// Arg = positional field index parsed from "_argN"
+			argIdx := 0
+			fmt.Sscanf(inst.Src1, "_arg%d", &argIdx)
+			bg.emit(OP_SETFIELD, argIdx, "")
+		}
+	}
+
+	bg.emit(OP_HALT, 0, "")
+
+	for _, ref := range bg.labelRefs {
+		if pos, ok := bg.labelPos[ref.label]; ok {
+			offset := pos - ref.instrIdx
+			bg.instrs[ref.instrIdx].Arg = offset
+		}
+	}
+
+	return bg.instrs
+}
