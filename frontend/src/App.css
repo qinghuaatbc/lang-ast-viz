@@ -4,6 +4,25 @@
   box-sizing: border-box;
 }
 
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme="dark"]) {
+    --bg-primary: #ffffff;
+    --bg-secondary: #f6f8fa;
+    --bg-tertiary: #eaeef2;
+    --bg-elevated: #d0d7de;
+    --border: #d0d7de;
+    --text-primary: #1f2328;
+    --text-secondary: #656d76;
+    --text-muted: #8b949e;
+    --accent-blue: #0969da;
+    --accent-green: #1a7f37;
+    --accent-orange: #bf6b00;
+    --accent-purple: #8250df;
+    --accent-red: #cf222e;
+    --accent-gradient: linear-gradient(135deg, #0969da, #8250df);
+  }
+}
+
 :root,
 [data-theme="dark"] {
   --bg-primary: #0d1117;
@@ -544,6 +563,13 @@ body {
   color: var(--accent-blue);
 }
 
+.bc-bytes {
+  color: var(--accent-purple);
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .bytecode-row:hover, .ir-row:hover {
   background: var(--bg-tertiary);
 }
@@ -603,6 +629,14 @@ body {
 
 .asm-label-text {
   font-weight: 700;
+}
+
+.asm-bytes {
+  font-family: 'JetBrains Mono', monospace;
+  font-size: 10px;
+  color: var(--accent-purple);
+  white-space: nowrap;
+  padding: 2px 8px;
 }
 
 /* ASM stepping controls */
@@ -791,6 +825,64 @@ body {
   font-weight: 600;
 }
 
+/* Hex bytes: word-break on small screens */
+.bc-bytes, .asm-bytes {
+  font-size: 11px;
+  white-space: nowrap;
+}
+
+/* ASM mobile: scrollable table on small screens */
+@media (max-width: 1100px) {
+  .asm-main {
+    overflow-x: auto;
+  }
+  .asm-table {
+    min-width: 700px;
+  }
+  .asm-state-panel {
+    display: none;
+  }
+}
+
+@media (max-width: 700px) {
+  .asm-table {
+    min-width: 550px;
+  }
+  .asm-table th, .asm-table td {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+  .asm-bytes, .bc-bytes {
+    font-size: 9px;
+  }
+  .reg-header {
+    min-width: 26px;
+    font-size: 8px;
+  }
+  .asm-code {
+    font-size: 10px;
+  }
+}
+
+@media (max-width: 500px) {
+  .asm-bytes, .bc-bytes {
+    font-size: 8px;
+    letter-spacing: -0.3px;
+  }
+  .asm-table {
+    min-width: 450px;
+  }
+  .bc-arg {
+    max-width: 80px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+  .asm-code {
+    font-size: 9px;
+  }
+}
+
 /* ====== Mobile Responsive ====== */
 
 @media (max-width: 900px) {
@@ -829,8 +921,7 @@ body {
     border-top: 1px solid var(--border);
   }
   .ast-tree-svg {
-    max-width: 100%;
-    height: auto;
+    display: block;
   }
 }
 

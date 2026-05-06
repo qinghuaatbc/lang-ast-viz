@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -19,15 +20,54 @@ const maxBodySize = 1 << 16 // 64KB max request body
 const (
 	rateWindow   = time.Minute
 	rateMaxHits  = 30
+	rateCleanInt = 5 * time.Minute
 )
 
 type rateLimiter struct {
-	mu   sync.Mutex
-	hits map[string][]time.Time
+	mu     sync.Mutex
+	hits   map[string][]time.Time
+	done   chan struct{}
+	ctx    context.Context
+	cancel context.CancelFunc
 }
 
 func newRateLimiter() *rateLimiter {
-	return &rateLimiter{hits: make(map[string][]time.Time)}
+	ctx, cancel := context.WithCancel(context.Background())
+	rl := &rateLimiter{hits: make(map[string][]time.Time), done: make(chan struct{}), ctx: ctx, cancel: cancel}
+	go rl.cleanupLoop()
+	return rl
+}
+
+func (rl *rateLimiter) Stop() {
+	rl.cancel()
+}
+
+func (rl *rateLimiter) cleanupLoop() {
+	ticker := time.NewTicker(rateCleanInt)
+	defer ticker.Stop()
+	defer close(rl.done)
+	for {
+		select {
+		case <-rl.ctx.Done():
+			return
+		case <-ticker.C:
+			now := time.Now()
+			cutoff := now.Add(-rateWindow)
+			rl.mu.Lock()
+			for ip, times := range rl.hits {
+				i := 0
+				for i < len(times) && times[i].Before(cutoff) {
+					i++
+				}
+				if i >= len(times) {
+					delete(rl.hits, ip)
+				} else {
+					rl.hits[ip] = times[i:]
+				}
+			}
+			rl.mu.Unlock()
+		}
+	}
 }
 
 func (rl *rateLimiter) allow(ip string) bool {
@@ -59,16 +99,31 @@ func New(database *db.DB) *Handler {
 	return &Handler{db: database, rl: newRateLimiter()}
 }
 
+func (h *Handler) Stop() {
+	h.rl.Stop()
+}
+
 func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/compile", h.handleCompile)
 	mux.HandleFunc("/api/history", h.handleHistory)
 	mux.HandleFunc("/api/history/", h.handleHistoryByID)
 	mux.HandleFunc("/api/languages", h.handleLanguages)
+	// Versioned API
+	mux.HandleFunc("/api/v1/compile", h.handleCompile)
+	mux.HandleFunc("/api/v1/history", h.handleHistory)
+	mux.HandleFunc("/api/v1/history/", h.handleHistoryByID)
+	mux.HandleFunc("/api/v1/languages", h.handleLanguages)
 }
 
 type compileRequest struct {
 	Source   string `json:"source"`
 	Language string `json:"language"`
+}
+
+func jsonError(w http.ResponseWriter, msg string, code int) {
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(code)
+	json.NewEncoder(w).Encode(map[string]string{"error": msg})
 }
 
 func clientIP(r *http.Request) string {
@@ -80,67 +135,73 @@ func clientIP(r *http.Request) string {
 
 func (h *Handler) handleCompile(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if !h.rl.allow(clientIP(r)) {
-		http.Error(w, "rate limit exceeded — max 30 requests/minute", http.StatusTooManyRequests)
+		jsonError(w, "rate limit exceeded — max 30 req/min", http.StatusTooManyRequests)
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, 64*1024)
-	body, err := io.ReadAll(http.MaxBytesReader(w, r.Body, maxBodySize))
+	r.Body = http.MaxBytesReader(w, r.Body, maxBodySize)
+	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "request too large", http.StatusRequestEntityTooLarge)
+		jsonError(w, "request too large", http.StatusRequestEntityTooLarge)
 		return
 	}
 	defer r.Body.Close()
 
 	var req compileRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		http.Error(w, "invalid json", http.StatusBadRequest)
+		jsonError(w, "invalid json", http.StatusBadRequest)
 		return
 	}
 
-	validLangs := map[string]bool{"rust": true, "go": true, "python": true, "typescript": true, "c": true}
-	if !validLangs[req.Language] {
+	validLang := false
+	for _, l := range lang.AllLanguages() {
+		if l.ID == req.Language {
+			validLang = true
+			break
+		}
+	}
+	if !validLang {
 		req.Language = "rust"
 	}
 
 	cfg := lang.GetConfig(lang.Parse(req.Language))
-	res := pipeline.CompileWithLang(req.Source, cfg)
+	ctx, cancel := context.WithTimeout(r.Context(), 8*time.Second)
+	defer cancel()
+	res := pipeline.CompileWithLang(ctx, req.Source, cfg)
 
+	var dbData []byte
 	if h.db != nil {
-		go func() {
-			if _, err := h.db.Save(req.Source, res); err != nil {
-				log.Printf("db save error: %v", err)
-			}
-		}()
+		dbData, _ = json.Marshal(res)
 	}
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(res)
+
+	if h.db != nil && dbData != nil {
+		go func() {
+			if _, err := h.db.SaveRaw(req.Source, dbData); err != nil {
+				log.Printf("db save error: %v", err)
+			}
+		}()
+	}
 }
 
 func (h *Handler) handleLanguages(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	langs := []map[string]string{
-		{"id": "rust", "name": "Rust-style", "desc": "let x = 10; print x;"},
-		{"id": "go", "name": "Go-style", "desc": "var x = 10; print x;"},
-		{"id": "python", "name": "Python-style", "desc": "x = 10\nprint(x)"},
-		{"id": "typescript", "name": "TypeScript-style", "desc": "let x = 10; print x;"},
-		{"id": "c", "name": "C-style", "desc": "int x = 10; printf x;"},
-	}
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(langs)
+	json.NewEncoder(w).Encode(lang.AllLanguages())
 }
 
 func (h *Handler) handleHistory(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 	if h.db == nil {
@@ -149,7 +210,7 @@ func (h *Handler) handleHistory(w http.ResponseWriter, r *http.Request) {
 	}
 	entries, err := h.db.List(20)
 	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
+		jsonError(w, err.Error(), http.StatusInternalServerError)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -158,28 +219,26 @@ func (h *Handler) handleHistory(w http.ResponseWriter, r *http.Request) {
 
 func (h *Handler) handleHistoryByID(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		jsonError(w, "method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
-	// path: /api/history/{id}
 	idStr := r.URL.Path[len("/api/history/"):]
 	if idStr == "" {
-		http.Error(w, "bad request", http.StatusBadRequest)
+		jsonError(w, "bad request", http.StatusBadRequest)
 		return
 	}
-	// parse id
 	var id int
 	if _, err := fmt.Sscanf(idStr, "%d", &id); err != nil {
-		http.Error(w, "invalid id", http.StatusBadRequest)
+		jsonError(w, "invalid id", http.StatusBadRequest)
 		return
 	}
 	if h.db == nil {
-		http.Error(w, "db not available", http.StatusServiceUnavailable)
+		jsonError(w, "db not available", http.StatusServiceUnavailable)
 		return
 	}
 	entry, err := h.db.Get(id)
 	if err != nil {
-		http.Error(w, "not found", http.StatusNotFound)
+		jsonError(w, "not found", http.StatusNotFound)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")

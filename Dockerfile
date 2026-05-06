@@ -4,7 +4,7 @@ WORKDIR /app
 COPY frontend/package*.json ./
 RUN npm install
 COPY frontend/ .
-RUN npx vite build
+RUN npm run build
 
 # Build backend
 FROM golang:1.22-alpine AS backend

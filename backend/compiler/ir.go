@@ -3,19 +3,22 @@ package compiler
 import "fmt"
 
 type IRInstr struct {
-	Op     string `json:"op"`
-	Dest   string `json:"dest,omitempty"`
-	Src1   string `json:"src1,omitempty"`
-	Src2   string `json:"src2,omitempty"`
-	Label  string `json:"label,omitempty"`
+	Op        string `json:"op"`
+	Dest      string `json:"dest,omitempty"`
+	Src1      string `json:"src1,omitempty"`
+	Src2      string `json:"src2,omitempty"`
+	Label     string `json:"label,omitempty"`
+	Formatted string `json:"formatted,omitempty"`
 }
 
 type IRGen struct {
-	instrs    []IRInstr
-	tmpCnt    int
-	labelCnt  int
+	instrs      []IRInstr
+	tmpCnt      int
+	labelCnt    int
 	classFields map[string][]string
-	loopStack []loopLabels
+	loopStack   []loopLabels
+	methodFuncs map[string]bool
+	hasInit     map[string]bool
 }
 
 type loopLabels struct {
@@ -27,6 +30,8 @@ func NewIRGen() *IRGen {
 	return &IRGen{
 		classFields: map[string][]string{},
 		loopStack:   []loopLabels{},
+		methodFuncs: map[string]bool{},
+		hasInit:     map[string]bool{},
 	}
 }
 
@@ -35,6 +40,9 @@ func (ir *IRGen) Gen(ast *Node) []IRInstr {
 	ir.tmpCnt = 0
 	ir.labelCnt = 0
 	ir.genNode(ast)
+	for i := range ir.instrs {
+		ir.instrs[i].Formatted = ir.instrs[i].String()
+	}
 	return ir.instrs
 }
 
@@ -67,7 +75,7 @@ func (ir *IRGen) genNode(n *Node) string {
 		if len(n.Children) >= 2 {
 			ident := n.Children[0].Value
 			ch := n.Children[1]
-			if ch.Type == NNumberLit || ch.Type == NBoolLit || ch.Type == NStringLit || ch.Type == NIdent {
+			if ch.Type == NNumberLit || ch.Type == NBoolLit {
 				ir.emit("DECLARE", ident, ch.Value, "")
 			} else {
 				val := ir.genNode(ch)
@@ -79,7 +87,7 @@ func (ir *IRGen) genNode(n *Node) string {
 		if len(n.Children) >= 2 {
 			ident := n.Children[0].Value
 			ch := n.Children[1]
-			if ch.Type == NNumberLit || ch.Type == NBoolLit || ch.Type == NStringLit || ch.Type == NIdent {
+			if ch.Type == NNumberLit || ch.Type == NBoolLit {
 				ir.emit("ASSIGN", ident, ch.Value, "")
 			} else {
 				val := ir.genNode(ch)
@@ -94,16 +102,61 @@ func (ir *IRGen) genNode(n *Node) string {
 		}
 		return ""
 	case NIfStmt:
-		cond := ir.genNode(n.Children[0])
-		elseLabel := ir.newLabel()
+		// Collect elif chain: find consecutive NIfStmt children then an optional else
+		elifCount := 0
+		hasElse := false
+		for i := 2; i < len(n.Children); i++ {
+			if n.Children[i].Type == NIfStmt {
+				elifCount++
+			} else {
+				hasElse = true
+				break
+			}
+		}
+		// Generate labels: one per elif, plus end label
+		elifLabels := make([]string, elifCount)
+		for i := 0; i < elifCount; i++ {
+			elifLabels[i] = ir.newLabel()
+		}
 		endLabel := ir.newLabel()
-		ir.emit("JZ", "", cond, elseLabel)
+
+		// Main if: cond → if false jump to first elif (or end if no elif/else)
+		firstElseTarget := endLabel
+		if elifCount > 0 {
+			firstElseTarget = elifLabels[0]
+		}
+		cond := ir.genNode(n.Children[0])
+		ir.emit("JZ", "", cond, firstElseTarget)
 		ir.genNode(n.Children[1])
 		ir.emit("JMP", "", "", endLabel)
-		ir.emitLabel(elseLabel)
-		if len(n.Children) == 3 {
-			ir.genNode(n.Children[2])
+
+		// Each elif: false jumps to next elif label, or elseLabel, or endLabel
+		elseLabel := ""
+		if hasElse {
+			elseLabel = ir.newLabel()
 		}
+		for i := 0; i < elifCount; i++ {
+			elifNode := n.Children[2+i]
+			ir.emitLabel(elifLabels[i])
+			nextTarget := endLabel
+			if i+1 < elifCount {
+				nextTarget = elifLabels[i+1]
+			} else if hasElse {
+				nextTarget = elseLabel
+			}
+			elifCond := ir.genNode(elifNode.Children[0])
+			ir.emit("JZ", "", elifCond, nextTarget)
+			ir.genNode(elifNode.Children[1])
+			ir.emit("JMP", "", "", endLabel)
+		}
+
+		// Else block (if any)
+		if hasElse {
+			ir.emitLabel(elseLabel)
+			elseNode := n.Children[2+elifCount]
+			ir.genNode(elseNode)
+		}
+
 		ir.emitLabel(endLabel)
 		return ""
 	case NWhileStmt:
@@ -156,6 +209,7 @@ func (ir *IRGen) genNode(n *Node) string {
 	case NStringLit:
 		dest := ir.newTemp()
 		ir.emit("LOAD_STR", dest, n.Value, "")
+		return dest
 	case NBoolLit:
 		dest := ir.newTemp()
 		val := "0"
@@ -190,10 +244,15 @@ func (ir *IRGen) genNode(n *Node) string {
 			if child.Type == NFuncDecl {
 				// Method: generate ClassName_methodName function
 				origName := child.Value
-				child.Value = n.Value + "_" + origName
+				mangled := n.Value + "_" + origName
+				child.Value = mangled
+				ir.methodFuncs[mangled] = true
+				if origName == "__init__" {
+					ir.hasInit[n.Value] = true
+				}
 				ir.genNode(child)
 				child.Value = origName // restore
-				ir.emit("CLASS_METHOD", n.Value, origName, n.Value+"_"+origName)
+				ir.emit("CLASS_METHOD", n.Value, origName, mangled)
 				i++
 			} else if i+1 < len(n.Children) {
 				// Field: name + value pair
@@ -229,14 +288,24 @@ func (ir *IRGen) genNode(n *Node) string {
 			// Class instantiation: ClassName(args...)
 			obj := ir.newTemp()
 			ir.emit("INSTANTIATE", obj, name, fmt.Sprintf("%d", len(n.Children)-1))
-			fieldNames := ir.classFields[name]
-			for i := 1; i < len(n.Children); i++ {
-				arg := ir.genNode(n.Children[i])
-				fname := fmt.Sprintf("_arg%d", i-1)
-				if i-1 < len(fieldNames) {
-					fname = fieldNames[i-1]
+			if ir.hasInit[name] {
+				// Push self and constructor args for __init__
+				ir.emit("PUSH_ARG", "", obj, "")
+				for i := 1; i < len(n.Children); i++ {
+					arg := ir.genNode(n.Children[i])
+					ir.emit("PUSH_ARG", "", arg, "")
 				}
-				ir.emit("SETFIELD", obj, fname, arg)
+				ir.emit("CALL_INIT", obj, name, fmt.Sprintf("%d", len(n.Children)-1))
+			} else {
+				fieldNames := ir.classFields[name]
+				for i := 1; i < len(n.Children); i++ {
+					arg := ir.genNode(n.Children[i])
+					fname := fmt.Sprintf("_arg%d", i-1)
+					if i-1 < len(fieldNames) {
+						fname = fieldNames[i-1]
+					}
+					ir.emit("SETFIELD", obj, fname, arg)
+				}
 			}
 			return obj
 		}
@@ -296,8 +365,12 @@ func (ir *IRGen) genNode(n *Node) string {
 		// Jump over function body at startup
 		ir.emit("JMP", "", "", skipLabel)
 		ir.emitLabel(fnLabel)
-		// Pop args from argStack into local variables
-		for i := 0; i < paramCount; i++ {
+		// Pop self first if this is a method
+		if ir.methodFuncs[n.Value] {
+			ir.emit("POP_ARG", "self", "", "")
+		}
+		// Pop args from argStack into local variables (reverse order: LIFO)
+		for i := paramCount - 1; i >= 0; i-- {
 			param := n.Children[i].Value
 			ir.emit("POP_ARG", param, "", "")
 		}

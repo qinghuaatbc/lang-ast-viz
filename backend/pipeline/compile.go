@@ -1,6 +1,8 @@
 package pipeline
 
 import (
+	"context"
+
 	"lang-ast-viz/asm"
 	"lang-ast-viz/compiler"
 	"lang-ast-viz/compiler/lang"
@@ -18,11 +20,10 @@ type CompileResult struct {
 }
 
 func Compile(source string) *CompileResult {
-	cfg := lang.GetConfig(lang.Rust)
-	return CompileWithLang(source, cfg)
+	return CompileWithLang(context.Background(), source, lang.GetConfig(lang.Rust))
 }
 
-func CompileWithLang(source string, cfg lang.Config) *CompileResult {
+func CompileWithLang(ctx context.Context, source string, cfg lang.Config) *CompileResult {
 	res := &CompileResult{Language: cfg.Lang.String()}
 
 	lex := compiler.NewLexerWithLang(source, cfg)
@@ -32,9 +33,7 @@ func CompileWithLang(source string, cfg lang.Config) *CompileResult {
 
 	if errs := parser.Errors(); len(errs) > 0 {
 		res.Errors = errs
-		if ast != nil && len(ast.Children) == 0 {
-			return res
-		}
+		return res
 	}
 
 	irGen := compiler.NewIRGen()
@@ -47,7 +46,7 @@ func CompileWithLang(source string, cfg lang.Config) *CompileResult {
 	res.Bytecode = bcGen.Gen(res.IR)
 
 	v := vm.NewVM(res.Bytecode)
-	output, err := v.Run()
+	output, err := v.RunWithCtx(ctx)
 	if err != nil {
 		res.Errors = append(res.Errors, err.Error())
 	} else {

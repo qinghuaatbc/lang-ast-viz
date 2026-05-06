@@ -167,8 +167,29 @@ func (g *Generator) Gen(ir []compiler.IRInstr) []AsmInstr {
 			g.regContent[r] = fmt.Sprintf("[%s]", inst.Src1)
 			emitPlain(fmt.Sprintf("\tmov\t%s, [%s]", r, inst.Src1))
 
+		case "LOAD_STR":
+			r := g.allocReg(inst.Dest)
+			g.regContent[r] = fmt.Sprintf("\"%s\"", inst.Src1)
+			emitPlain(fmt.Sprintf("\t; %s = \"%s\"", r, inst.Src1))
+
+		case "LOAD_SELF":
+			r := g.allocReg(inst.Dest)
+			g.regContent[r] = "self"
+			emitPlain(fmt.Sprintf("\t; %s = self", r))
+
+		case "DECLARE":
+			if compiler.IsNumber(inst.Src1) {
+				srcR := g.allocReg("$lit_" + inst.Src1)
+				g.regContent[srcR] = inst.Src1
+				emitPlain(fmt.Sprintf("\tmov\t%s, %s", srcR, inst.Src1))
+				emit(fmt.Sprintf("\tdecl\t%s, %s", inst.Dest, srcR), inst.Dest, g.regContent[srcR])
+			} else {
+				srcR := g.allocReg(inst.Src1)
+				emit(fmt.Sprintf("\tdecl\t%s, %s", inst.Dest, srcR), inst.Dest, g.regContent[srcR])
+			}
+
 		case "ASSIGN":
-			if isNumber(inst.Src1) {
+			if compiler.IsNumber(inst.Src1) {
 				r := g.allocReg("$lit_" + inst.Src1)
 				g.regContent[r] = inst.Src1
 				emitPlain(fmt.Sprintf("\tmov\t%s, %s", r, inst.Src1))
@@ -179,9 +200,9 @@ func (g *Generator) Gen(ir []compiler.IRInstr) []AsmInstr {
 			}
 
 		case "PRINT":
-			if isNumber(inst.Src1) || (len(inst.Src1) > 0 && inst.Src1[0] >= 'a' && inst.Src1[0] <= 'z') {
+			if compiler.IsNumber(inst.Src1) || (len(inst.Src1) > 0 && inst.Src1[0] >= 'a' && inst.Src1[0] <= 'z') {
 				// src1 is a literal or already in a register
-				if isNumber(inst.Src1) {
+				if compiler.IsNumber(inst.Src1) {
 					r := g.allocReg("$lit_" + inst.Src1)
 					g.regContent[r] = inst.Src1
 					emitPlain(fmt.Sprintf("\tmov\t%s, %s", r, inst.Src1))
@@ -283,6 +304,61 @@ func (g *Generator) Gen(ir []compiler.IRInstr) []AsmInstr {
 		case "JMP":
 			emitPlain(fmt.Sprintf("\tjmp\t%s", inst.Src2))
 
+		case "PUSH_ARG":
+			r := g.allocReg(inst.Src1)
+			emitPlain(fmt.Sprintf("\tpush\t%s\t; arg", r))
+
+		case "POP_ARG":
+			dst := inst.Dest
+			g.memContent[dst] = dst
+			emitPlain(fmt.Sprintf("\tpop\t[%s]\t; param", dst))
+
+		case "SCOPE_ENTER":
+			emitPlain("\t; {")
+
+		case "SCOPE_EXIT":
+			emitPlain("\t; }")
+
+		case "FUNC_DEF":
+			emitPlain(fmt.Sprintf("\t; func %s(%s params)", inst.Dest, inst.Src2))
+
+		case "CLASS_DEF":
+			if inst.Src1 != "" {
+				emitPlain(fmt.Sprintf("\t; class %s extends %s", inst.Dest, inst.Src1))
+			} else {
+				emitPlain(fmt.Sprintf("\t; class %s", inst.Dest))
+			}
+
+		case "CLASS_FIELD":
+			emitPlain(fmt.Sprintf("\t; field %s.%s", inst.Dest, inst.Src1))
+
+		case "CLASS_METHOD":
+			emitPlain(fmt.Sprintf("\t; method %s.%s", inst.Dest, inst.Src1))
+
+		case "INSTANTIATE":
+			dst := g.allocReg(inst.Dest)
+			g.regContent[dst] = fmt.Sprintf("new %s", inst.Src1)
+			emitPlain(fmt.Sprintf("\t; %s = new %s()", dst, inst.Src1))
+
+		case "SETFIELD":
+			valR := g.allocReg(inst.Src2)
+			emitPlain(fmt.Sprintf("\t; %s.%s = %s", inst.Dest, inst.Src1, g.regContent[valR]))
+
+		case "ARRAY_LIT":
+			r := g.allocReg(inst.Dest)
+			g.regContent[r] = fmt.Sprintf("array[%s]", inst.Src2)
+			emitPlain(fmt.Sprintf("\t; %s = array(%s)", r, inst.Src2))
+
+		case "ARRAY_SET":
+			emitPlain(fmt.Sprintf("\t; %s[] = %s", inst.Dest, inst.Src1))
+
+		case "ARRAY_GET":
+			emitPlain(fmt.Sprintf("\t; %s = %s[index]", inst.Dest, inst.Src1))
+
+		case "METHOD_CALL":
+			g.regContent[inst.Dest] = fmt.Sprintf("%s.%s()", inst.Src1, inst.Src2)
+			emitPlain(fmt.Sprintf("\tcall\t%s.%s", inst.Src1, inst.Src2))
+
 		case "OBJ_LIT":
 			r := g.allocReg(inst.Dest)
 			g.regContent[r] = "object"
@@ -324,14 +400,4 @@ func RegStateString(rs map[string]string) string {
 	return strings.Join(parts, " ")
 }
 
-func isNumber(s string) bool {
-	if len(s) == 0 {
-		return false
-	}
-	for _, c := range s {
-		if c < '0' || c > '9' {
-			return false
-		}
-	}
-	return true
-}
+

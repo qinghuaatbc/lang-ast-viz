@@ -139,6 +139,8 @@ func (l *Lexer) NextToken() Token {
 		tok = l.makeToken(RBRACE, "}")
 	case ';':
 		tok = l.makeToken(SEMICOLON, ";")
+	case ':':
+		tok = l.makeToken(COLON, ":")
 	case '.':
 		tok = l.makeToken(DOT, ".")
 	case ',':
@@ -250,6 +252,8 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		return IF
 	case "else":
 		return ELSE
+	case "elif":
+		return ELIF
 	case "while":
 		return WHILE
 	}
@@ -257,8 +261,10 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 	switch l.config.Lang {
 	case lang.GoLang:
 		switch ident {
-		case "true", "false":
+		case "true":
 			return TRUE
+		case "false":
+			return FALSE
 		case "print":
 			return PRINT
 		case "var":
@@ -277,8 +283,10 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		}
 	case lang.TypeScript:
 		switch ident {
-		case "true", "false":
+		case "true":
 			return TRUE
+		case "false":
+			return FALSE
 		case "print":
 			return PRINT
 		case "let", "const":
@@ -288,8 +296,10 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		}
 	case lang.CLang:
 		switch ident {
-		case "true", "false":
+		case "true":
 			return TRUE
+		case "false":
+			return FALSE
 		case "printf":
 			return PRINT
 		case "int":
@@ -299,8 +309,10 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		}
 	default: // Rust-like
 		switch ident {
-		case "true", "false":
+		case "true":
 			return TRUE
+		case "false":
+			return FALSE
 		case "print":
 			return PRINT
 		case "let":

@@ -1,6 +1,9 @@
 package compiler
 
-import "fmt"
+import (
+	"encoding/json"
+	"fmt"
+)
 
 type NodeType int
 
@@ -38,6 +41,17 @@ type Node struct {
 	Value    string   `json:"value"`
 	Line     int      `json:"line"`
 	Col      int      `json:"col"`
+}
+
+func (n *Node) MarshalJSON() ([]byte, error) {
+	type Alias Node
+	return json.Marshal(&struct {
+		TypeName string `json:"typeName"`
+		*Alias
+	}{
+		TypeName: n.TypeName(),
+		Alias:    (*Alias)(n),
+	})
 }
 
 func NewNode(t NodeType, val string, line, col int) *Node {

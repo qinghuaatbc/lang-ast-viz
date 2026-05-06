@@ -48,6 +48,7 @@ const (
 	OP_ARRAYSET
 	OP_METHOD_CALL
 	OP_CLASS_METHOD
+	OP_CALL_INIT
 )
 
 func (op Opcode) String() string {
@@ -91,6 +92,7 @@ func (op Opcode) String() string {
 	case OP_ARRAYSET:    return "ARRAYSET"
 	case OP_METHOD_CALL: return "METHOD_CALL"
 	case OP_CLASS_METHOD: return "CLASS_METHOD"
+	case OP_CALL_INIT:   return "CALL_INIT"
 	default:             return "UNKNOWN"
 	}
 }
@@ -166,23 +168,29 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 		switch inst.Op {
 		case "LOAD_IMM":
 			val := 0
-			fmt.Sscanf(inst.Src1, "%d", &val)
+			if _, err := fmt.Sscanf(inst.Src1, "%d", &val); err != nil {
+				val = 0
+			}
 			bg.emit(OP_PUSH, val, inst.Src1)
 		case "LOAD_STR":
 			bg.emit(OP_PUSHSTR, 0, inst.Src1)
 		case "LOAD":
 			bg.emit(OP_LOAD, 0, inst.Src1)
 		case "ASSIGN":
-			if isNum(inst.Src1) {
+			if IsNumber(inst.Src1) {
 				val := 0
-				fmt.Sscanf(inst.Src1, "%d", &val)
+				if _, err := fmt.Sscanf(inst.Src1, "%d", &val); err != nil {
+					val = 0
+				}
 				bg.emit(OP_PUSH, val, inst.Src1)
 			}
 			bg.emit(OP_STORE, 0, inst.Dest)
 		case "DECLARE":
-			if isNum(inst.Src1) {
+			if IsNumber(inst.Src1) {
 				val := 0
-				fmt.Sscanf(inst.Src1, "%d", &val)
+				if _, err := fmt.Sscanf(inst.Src1, "%d", &val); err != nil {
+					val = 0
+				}
 				bg.emit(OP_PUSH, val, inst.Src1)
 			}
 			bg.emit(OP_DECLARE, 0, inst.Dest)
@@ -244,12 +252,13 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 		case "SCOPE_EXIT":
 			bg.emit(OP_SCOPE_EXIT, 0, "")
 		case "CLASS_METHOD":
-			// Src1 = original method name, Src2 = mangled function name (ClassName_methodName)
+			// Dest = className, Src1 = methodName, Src2 = ClassName_methodName
 			fnLabel := "fn_" + inst.Src2
 			if pos, ok := bg.labelPos[fnLabel]; ok {
-				bg.emit(OP_CLASS_METHOD, pos, inst.Src1+":"+inst.Src2)
+				bg.emit(OP_CLASS_METHOD, pos, inst.Dest+":"+inst.Src1+":"+inst.Src2)
 			} else {
-				bg.emit(OP_CLASS_METHOD, 0, inst.Src1+":"+inst.Src2)
+				// Emit a HALT-like address so the VM stops instead of jumping to 0
+				bg.emit(OP_HALT, 0, "ERROR: undefined method "+inst.Src2)
 			}
 		case "ARRAY_LIT":
 			bg.emit(OP_ARRAYLIT, 0, "")
@@ -259,6 +268,8 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 			bg.emit(OP_ARRAYGET, 0, "")
 		case "METHOD_CALL":
 			bg.emit(OP_METHOD_CALL, 0, inst.Src1+":"+inst.Src2)
+		case "CALL_INIT":
+			bg.emit(OP_CALL_INIT, 0, inst.Dest+":"+inst.Src2)
 		}
 	}
 
@@ -274,11 +285,18 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 	return bg.instrs
 }
 
-func isNum(s string) bool {
+func IsNumber(s string) bool {
 	if len(s) == 0 {
 		return false
 	}
-	for _, c := range s {
+	start := 0
+	if s[0] == '-' {
+		start = 1
+	}
+	if start >= len(s) {
+		return false
+	}
+	for _, c := range s[start:] {
 		if c < '0' || c > '9' {
 			return false
 		}

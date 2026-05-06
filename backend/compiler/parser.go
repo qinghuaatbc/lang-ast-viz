@@ -44,13 +44,6 @@ func (p *Parser) expect(tt TokenType) bool {
 	return false
 }
 
-func (p *Parser) expectPeek(tt TokenType) bool {
-	if p.cur.Type == tt {
-		return true
-	}
-	return false
-}
-
 func (p *Parser) Parse() *Node {
 	prog := NewNode(NProgram, "program", 0, 0)
 	for p.cur.Type != EOF {
@@ -73,7 +66,7 @@ func (p *Parser) parseStmt() *Node {
 		return p.parseLetStmt()
 	case PRINT:
 		return p.parsePrintStmt()
-	case IF:
+	case IF, ELIF:
 		return p.parseIfStmt()
 	case WHILE:
 		return p.parseWhileStmt()
@@ -98,9 +91,12 @@ func (p *Parser) parseStmt() *Node {
 		if p.cur.Type == IDENT && p.peek.Type == ASSIGN {
 			return p.parseAssignStmt()
 		}
+		if p.cur.Type == SELF && p.peek.Type == DOT {
+			return p.parseAssignStmt()
+		}
 		p.addErr(fmt.Sprintf("unexpected token: %s (%d)", p.cur.Literal, p.cur.Type))
-		// Error recovery: skip to next statement boundary
-		for p.cur.Type != SEMICOLON && p.cur.Type != RBRACE && p.cur.Type != EOF {
+		// Error recovery: skip to next statement boundary (max 100 tokens to prevent hangs)
+		for i := 0; i < 100 && p.cur.Type != SEMICOLON && p.cur.Type != RBRACE && p.cur.Type != EOF; i++ {
 			p.nextToken()
 		}
 		if p.cur.Type == SEMICOLON {
@@ -114,6 +110,7 @@ func (p *Parser) parseLetStmt() *Node {
 	n := NewNode(NLetStmt, p.config.DeclKeyword, p.cur.Line, p.cur.Col)
 	if p.peek.Type != IDENT {
 		p.addErr("expected identifier")
+		p.nextToken()
 		return n
 	}
 	p.nextToken()
@@ -133,6 +130,33 @@ func (p *Parser) parseLetStmt() *Node {
 }
 
 func (p *Parser) parseAssignStmt() *Node {
+	if p.cur.Type == SELF {
+		n := NewNode(NAssignStmt, "assign", p.cur.Line, p.cur.Col)
+		// self.x = expr  → treat as field assignment
+		selfNode := NewNode(NSelf, "self", p.cur.Line, p.cur.Col)
+		p.nextToken() // consume self
+		if p.cur.Type == DOT {
+			p.nextToken()
+			if p.cur.Type == IDENT {
+				field := NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
+				access := NewNode(NFieldAccess, ".", p.cur.Line, p.cur.Col)
+				access.AddChild(selfNode)
+				access.AddChild(field)
+				n.AddChild(access)
+				p.nextToken()
+			}
+		}
+		if p.cur.Type != ASSIGN {
+			p.addErr("expected =")
+			return n
+		}
+		p.nextToken() // advance past ASSIGN
+		expr := p.parseExpr(0)
+		if expr != nil {
+			n.AddChild(expr)
+		}
+		return n
+	}
 	if p.cur.Type != IDENT {
 		p.addErr(fmt.Sprintf("unexpected token: %s", p.cur.Literal))
 		return nil
@@ -186,25 +210,44 @@ func (p *Parser) parseIfStmt() *Node {
 	if !p.config.UseBraces && p.peek.Type == SEMICOLON {
 		p.nextToken()
 	}
+	if p.cur.Type == COLON {
+		p.nextToken()
+	}
 	if p.config.UseBraces {
 		if p.cur.Type != LBRACE {
 			p.addErr("expected {")
 			return n
 		}
 		p.nextToken()
-	} else {
-		if p.peek.Type == LBRACE {
-			p.nextToken()
-			if p.cur.Type == LBRACE {
-				p.nextToken()
-			}
-		} else if p.peek.Type == SEMICOLON {
+	} else if p.cur.Type == LBRACE {
+		p.nextToken()
+	} else if p.peek.Type == LBRACE {
+		p.nextToken()
+		if p.cur.Type == LBRACE {
 			p.nextToken()
 		}
 	}
 	conseq := p.parseBlock()
 	n.AddChild(conseq)
+	for p.cur.Type == ELIF {
+		// elif cond: { ... } → treated as else { if cond: { ... } }
+		elifNode := NewNode(NIfStmt, "elif", p.cur.Line, p.cur.Col)
+		p.nextToken()
+		cond := p.parseExpr(0)
+		if cond != nil { elifNode.AddChild(cond) }
+		if p.cur.Type == COLON { p.nextToken() }
+		if p.config.UseBraces {
+			if p.cur.Type != LBRACE { p.addErr("expected {"); return n }
+			p.nextToken()
+		} else if p.cur.Type == LBRACE { p.nextToken() }
+		body := p.parseBlock()
+		elifNode.AddChild(body)
+		n.AddChild(elifNode)
+	}
 	if p.cur.Type == ELSE {
+		if p.peek.Type == COLON {
+			p.nextToken()
+		}
 		if p.config.UseBraces {
 			if p.peek.Type != LBRACE {
 				p.addErr("expected { after else")
@@ -214,6 +257,11 @@ func (p *Parser) parseIfStmt() *Node {
 			p.nextToken()
 		} else if p.cur.Type == LBRACE {
 			p.nextToken()
+		} else if p.peek.Type == LBRACE {
+			p.nextToken()
+			if p.cur.Type == LBRACE {
+				p.nextToken()
+			}
 		}
 		alt := p.parseBlock()
 		n.AddChild(alt)
@@ -227,6 +275,9 @@ func (p *Parser) parseWhileStmt() *Node {
 	cond := p.parseExpr(0)
 	if cond != nil {
 		n.AddChild(cond)
+	}
+	if p.cur.Type == COLON {
+		p.nextToken()
 	}
 	if p.config.UseBraces {
 		if p.cur.Type != LBRACE {
@@ -383,230 +434,4 @@ func (p *Parser) parseBlock() *Node {
 		p.nextToken()
 	}
 	return n
-}
-
-const (
-	_ int = iota
-	LOWEST
-	EQUALS
-	COMPARISON
-	SUM
-	PRODUCT
-	PREFIX
-)
-
-var precedences = map[TokenType]int{
-	EQ:   EQUALS,
-	NEQ:  EQUALS,
-	LT:   COMPARISON,
-	GT:   COMPARISON,
-	LE:   COMPARISON,
-	GE:   COMPARISON,
-	PLUS:   SUM,
-	MINUS:  SUM,
-	STAR:   PRODUCT,
-	MOD:    PRODUCT,
-	SLASH:  PRODUCT,
-	DOT:    PREFIX,
-	LBRACKET: PREFIX, // highest precedence for field access
-}
-
-func (p *Parser) peekPrecedence() int {
-	if pr, ok := precedences[p.peek.Type]; ok {
-		return pr
-	}
-	return 0
-}
-
-func (p *Parser) curPrecedence() int {
-	if pr, ok := precedences[p.cur.Type]; ok {
-		return pr
-	}
-	return 0
-}
-
-func (p *Parser) parseExpr(prec int) *Node {
-	var left *Node
-	switch p.cur.Type {
-	case NUMBER:
-		left = NewNode(NNumberLit, p.cur.Literal, p.cur.Line, p.cur.Col)
-		p.nextToken()
-	case STRING:
-		left = NewNode(NStringLit, p.cur.Literal, p.cur.Line, p.cur.Col)
-		p.nextToken()
-	case TRUE, FALSE:
-		left = NewNode(NBoolLit, p.cur.Literal, p.cur.Line, p.cur.Col)
-		p.nextToken()
-	case IDENT:
-		left = NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
-		p.nextToken()
-		// function call: ident(...)
-		if p.cur.Type == LPAREN {
-			call := NewNode(NCallExpr, left.Value, left.Line, left.Col)
-			call.AddChild(left)
-			p.nextToken()
-			for p.cur.Type != RPAREN && p.cur.Type != EOF {
-				arg := p.parseExpr(0)
-				if arg != nil {
-					call.AddChild(arg)
-				}
-				if p.cur.Type == COMMA {
-					p.nextToken()
-				} else {
-					break
-				}
-			}
-			if p.cur.Type == RPAREN {
-				p.nextToken()
-			}
-			left = call
-		}
-	case SELF:
-		left = NewNode(NSelf, "self", p.cur.Line, p.cur.Col)
-		p.nextToken()
-	case NEW:
-		left = NewNode(NNewExpr, "new", p.cur.Line, p.cur.Col)
-		p.nextToken()
-		if p.cur.Type == IDENT {
-			className := NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
-			left.AddChild(className)
-			p.nextToken()
-			// parse arguments
-			if p.cur.Type == LPAREN {
-				p.nextToken()
-				for p.cur.Type != RPAREN && p.cur.Type != EOF {
-					arg := p.parseExpr(0)
-					if arg != nil {
-						left.AddChild(arg)
-					}
-					if p.cur.Type == COMMA {
-						p.nextToken()
-					} else {
-						break
-					}
-				}
-				if p.cur.Type == RPAREN {
-					p.nextToken()
-				}
-			}
-		}
-	case LPAREN:
-		p.nextToken()
-		left = p.parseExpr(0)
-		if p.cur.Type == RPAREN {
-			p.nextToken()
-		}
-	case LBRACKET:
-		p.nextToken()
-		// Check if it's an object literal [x=10, y=20] or array [1,2,3]
-		if p.cur.Type == IDENT && p.peek.Type == ASSIGN {
-			// Object literal: [x = 10, y = 20]
-			left = NewNode(NObjLit, "object", p.cur.Line, p.cur.Col)
-			for p.cur.Type != RBRACKET && p.cur.Type != EOF {
-				if p.cur.Type == IDENT && p.peek.Type == ASSIGN {
-					fident := NewNode(NIdent, p.cur.Literal, p.cur.Line, p.cur.Col)
-					p.nextToken()
-					p.nextToken()
-					val := p.parseExpr(0)
-					left.AddChild(fident)
-					if val != nil {
-						left.AddChild(val)
-					}
-				}
-				if p.cur.Type == COMMA {
-					p.nextToken()
-				} else {
-					break
-				}
-			}
-		} else {
-			// Array literal: [1, 2, 3]
-			left = NewNode(NArrayList, "array", p.cur.Line, p.cur.Col)
-			for p.cur.Type != RBRACKET && p.cur.Type != EOF {
-				val := p.parseExpr(0)
-				if val != nil {
-					left.AddChild(val)
-				}
-				if p.cur.Type == COMMA {
-					p.nextToken()
-				} else {
-					break
-				}
-			}
-		}
-		if p.cur.Type == RBRACKET {
-			p.nextToken()
-		}
-	default:
-		p.addErr(fmt.Sprintf("unexpected token in expression: %s (type=%d)", p.cur.Literal, p.cur.Type))
-		return nil
-	}
-
-	for prec < p.curPrecedence() {
-		if p.cur.Type == DOT {
-			p.nextToken()
-			if p.cur.Type == IDENT {
-				methodOrField := p.cur.Literal
-				p.nextToken()
-				if p.cur.Type == LPAREN {
-					// method call: obj.method(args)
-					mc := NewNode(NMethodCall, methodOrField, p.cur.Line, p.cur.Col)
-					mc.AddChild(left)
-					p.nextToken()
-					for p.cur.Type != RPAREN && p.cur.Type != EOF {
-						arg := p.parseExpr(0)
-						if arg != nil {
-							mc.AddChild(arg)
-						}
-						if p.cur.Type == COMMA {
-							p.nextToken()
-						} else {
-							break
-						}
-					}
-					if p.cur.Type == RPAREN {
-						p.nextToken()
-					}
-					left = mc
-				} else {
-					// field access: obj.field
-					field := NewNode(NIdent, methodOrField, p.cur.Line, p.cur.Col)
-					access := NewNode(NFieldAccess, ".", p.cur.Line, p.cur.Col)
-					access.AddChild(left)
-					access.AddChild(field)
-					left = access
-				}
-			} else {
-				p.addErr("expected field/method name after '.'")
-				break
-			}
-			continue
-		}
-		if p.cur.Type == LBRACKET {
-			// array access: arr[index]
-			p.nextToken()
-			idx := p.parseExpr(0)
-			access := NewNode(NArrayAccess, "[]", p.cur.Line, p.cur.Col)
-			access.AddChild(left)
-			if idx != nil {
-				access.AddChild(idx)
-			}
-			if p.cur.Type == RBRACKET {
-				p.nextToken()
-			}
-			left = access
-			continue
-		}
-		op := p.cur.Literal
-		bin := NewNode(NBinaryExpr, op, p.cur.Line, p.cur.Col)
-		bin.AddChild(left)
-		opPrec := p.curPrecedence()
-		p.nextToken()
-		right := p.parseExpr(opPrec)
-		if right != nil {
-			bin.AddChild(right)
-		}
-		left = bin
-	}
-	return left
 }

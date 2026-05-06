@@ -65,3 +65,19 @@ func GetConfig(l Lang) Config {
 	}
 	return Config{Lang: Rust, DeclKeyword: "let", RequireSemicolon: true, UseBraces: true, PrintFuncStyle: false}
 }
+
+type LangInfo struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	Desc string `json:"desc"`
+}
+
+func AllLanguages() []LangInfo {
+	return []LangInfo{
+		{ID: "rust", Name: "Rust-style", Desc: "let x = 10; print x;"},
+		{ID: "go", Name: "Go-style", Desc: "var x = 10; print x;"},
+		{ID: "python", Name: "Python-style", Desc: "x = 10\nprint(x)"},
+		{ID: "typescript", Name: "TypeScript-style", Desc: "let x = 10; print x;"},
+		{ID: "c", Name: "C-style", Desc: "int x = 10; printf x;"},
+	}
+}

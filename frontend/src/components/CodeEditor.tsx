@@ -1,4 +1,4 @@
-import { useState, useRef, useCallback } from 'react'
+import { useState, useRef, useCallback, useEffect } from 'react'
 import { Example } from '../api/compile'
 import { useLang } from '../i18n/lang'
 import { highlight } from '../utils/highlight'
@@ -7,16 +7,48 @@ interface CodeEditorProps {
   value: string
   onChange: (val: string) => void
   onCompile: () => void
+  onExampleSelect?: (code: string) => void
   loading: boolean
   language: string
   examples: Example[]
   errorLines?: Set<number>
 }
 
-export default function CodeEditor({ value, onChange, onCompile, loading, language, examples, errorLines }: CodeEditorProps) {
+const MAX_HISTORY = 100
+
+export default function CodeEditor({ value, onChange, onCompile, onExampleSelect, loading, language, examples, errorLines }: CodeEditorProps) {
   const { t } = useLang()
   const [showExamples, setShowExamples] = useState(false)
   const preRef = useRef<HTMLPreElement>(null)
+  const historyRef = useRef<string[]>([value])
+  const histIdxRef = useRef(0)
+  const ignoreNextRef = useRef(false)
+
+  useEffect(() => {
+    const h = historyRef.current
+    if (h[histIdxRef.current] !== value) {
+      h.splice(histIdxRef.current + 1)
+      h.push(value)
+      if (h.length > MAX_HISTORY) h.shift()
+      histIdxRef.current = h.length - 1
+    }
+  }, [value])
+
+  const undo = useCallback(() => {
+    if (histIdxRef.current > 0) {
+      histIdxRef.current--
+      ignoreNextRef.current = true
+      onChange(historyRef.current[histIdxRef.current])
+    }
+  }, [onChange])
+
+  const redo = useCallback(() => {
+    if (histIdxRef.current < historyRef.current.length - 1) {
+      histIdxRef.current++
+      ignoreNextRef.current = true
+      onChange(historyRef.current[histIdxRef.current])
+    }
+  }, [onChange])
 
   const syncScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
     if (preRef.current) {
@@ -31,6 +63,16 @@ export default function CodeEditor({ value, onChange, onCompile, loading, langua
       onCompile()
       return
     }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'z') {
+      e.preventDefault()
+      if (e.shiftKey) redo(); else undo()
+      return
+    }
+    if ((e.ctrlKey || e.metaKey) && e.key === 'y') {
+      e.preventDefault()
+      redo()
+      return
+    }
     if (e.key === 'Tab') {
       e.preventDefault()
       const ta = e.currentTarget
@@ -42,7 +84,7 @@ export default function CodeEditor({ value, onChange, onCompile, loading, langua
         ta.selectionStart = ta.selectionEnd = start + 2
       })
     }
-  }, [value, onChange, onCompile])
+  }, [value, onChange, onCompile, undo, redo])
 
   const highlighted = highlight(value, language, errorLines)
 
@@ -55,7 +97,7 @@ export default function CodeEditor({ value, onChange, onCompile, loading, langua
             {t('examples')} ▾
           </button>
           <button className="btn-compile" onClick={onCompile} disabled={loading || !value.trim()}>
-            {loading ? t('compiling') : t('compile')}
+            {loading ? t('compiling') : t('compile')} {navigator.platform.includes('Mac') ? '⌘⏎' : 'Ctrl+Enter'}
           </button>
         </div>
       </div>
@@ -65,7 +107,7 @@ export default function CodeEditor({ value, onChange, onCompile, loading, langua
             <div
               key={i}
               className="example-item"
-              onClick={() => { onChange(ex.code); setShowExamples(false) }}
+              onClick={() => { onChange(ex.code); setShowExamples(false); if (onExampleSelect) onExampleSelect(ex.code) }}
             >
               <span className="example-name">{ex.name}</span>
             </div>

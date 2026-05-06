@@ -101,6 +101,15 @@ func (db *DB) Get(id int) (*HistoryEntry, error) {
 	return &e, nil
 }
 
+func (db *DB) SaveRaw(source string, data json.RawMessage) (int, error) {
+	var id int
+	err := db.conn.QueryRow(
+		`INSERT INTO compilation_history (source, result) VALUES ($1, $2) RETURNING id`,
+		source, data,
+	).Scan(&id)
+	return id, err
+}
+
 func (db *DB) Close() {
 	if db.conn != nil {
 		db.conn.Close()

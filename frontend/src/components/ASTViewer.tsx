@@ -1,10 +1,39 @@
-import { useMemo, useState } from 'react'
+import { useMemo, useState, useCallback, useRef } from 'react'
 import { ASTNode, astTypeName } from '../api/compile'
+import { useLang } from '../i18n/lang'
 
 const NODE_W = 130
 const NODE_H = 34
 const H_GAP = 12
 const V_GAP = 40
+
+const NODE_COLORS: Record<number, string> = {
+  0: '#58a6ff',  // Program
+  1: '#d2a8ff',  // LetStatement
+  2: '#58a6ff',  // AssignStatement
+  3: '#3fb950',  // PrintStatement
+  4: '#ffa657',  // IfStatement
+  5: '#f85149',  // WhileStatement
+  6: '#58a6ff',  // BlockStatement
+  7: '#ffa657',  // BinaryExpression
+  8: '#58a6ff',  // NumberLiteral
+  9: '#58a6ff',  // StringLiteral
+  10: '#ffa657', // BoolLiteral
+  11: '#3fb950', // Identifier
+  12: '#58a6ff', // FieldAccess
+  13: '#d2a8ff', // ObjectLiteral
+  14: '#ffa657', // ClassDecl
+  15: '#58a6ff', // CallExpr
+  16: '#3fb950', // Self
+  17: '#ffa657', // NewExpr
+  18: '#d2a8ff', // FuncDecl
+  19: '#f85149', // ReturnStmt
+  20: '#58a6ff', // MethodCall
+  21: '#58a6ff', // ArrayList
+  22: '#58a6ff', // ArrayAccess
+  23: '#f85149', // BreakStmt
+  24: '#f85149', // ContinueStmt
+}
 
 // result of subtree layout
 interface SubTree {
@@ -50,6 +79,34 @@ function nodeKey(n: ASTNode): string {
 }
 
 function ASTTreeGraph({ ast, onSelect, selectedKey }: ASTTreeGraphProps) {
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [scale, setScale] = useState(1)
+  const dragRef = useRef<{ startX: number; startY: number; panX: number; panY: number } | null>(null)
+  const svgRef = useRef<SVGSVGElement>(null)
+
+  const handleWheel = useCallback((e: React.WheelEvent) => {
+    e.preventDefault()
+    const delta = e.deltaY > 0 ? 0.9 : 1.1
+    setScale(s => Math.max(0.2, Math.min(3, s * delta)))
+  }, [])
+
+  const handleMouseDown = useCallback((e: React.MouseEvent) => {
+    if (e.target === svgRef.current || (e.target as Element).tagName === 'rect' || (e.target as Element).tagName === 'svg') {
+      dragRef.current = { startX: e.clientX, startY: e.clientY, panX: pan.x, panY: pan.y }
+    }
+  }, [pan])
+
+  const handleMouseMove = useCallback((e: React.MouseEvent) => {
+    if (dragRef.current) {
+      setPan({
+        x: dragRef.current.panX + (e.clientX - dragRef.current.startX),
+        y: dragRef.current.panY + (e.clientY - dragRef.current.startY),
+      })
+    }
+  }, [])
+
+  const handleMouseUp = useCallback(() => { dragRef.current = null }, [])
+
   const data = useMemo(() => {
     const tree = layout(ast)
     const minX = Math.min(...tree.nodes.map(n => n.x))
@@ -97,7 +154,13 @@ function ASTTreeGraph({ ast, onSelect, selectedKey }: ASTTreeGraphProps) {
   if (!ast) return null
 
   return (
-    <svg width={data.width} height={data.height} className="ast-tree-svg">
+    <svg ref={svgRef} width={data.width * scale} height={data.height * scale}
+      className="ast-tree-svg"
+      style={{ cursor: dragRef.current ? 'grabbing' : 'grab' }}
+      onWheel={handleWheel} onMouseDown={handleMouseDown}
+      onMouseMove={handleMouseMove} onMouseUp={handleMouseUp}
+      onMouseLeave={handleMouseUp}>
+      <g transform={`translate(${pan.x}, ${pan.y}) scale(${scale})`}>
       {data.lines.map((l, i) => (
         <line key={i} x1={l.x1} y1={l.y1} x2={l.x2} y2={l.y2} stroke="#30363d" strokeWidth={1.5} />
       ))}
@@ -114,8 +177,8 @@ function ASTTreeGraph({ ast, onSelect, selectedKey }: ASTTreeGraphProps) {
               rx={6}
               ry={6}
               fill={selected ? '#1f3a5f' : '#161b22'}
-              stroke={selected ? '#58a6ff' : '#30363d'}
-              strokeWidth={selected ? 2 : 1}
+              stroke={NODE_COLORS[n.n.nodeType] || '#30363d'}
+              strokeWidth={selected ? 2.5 : 1.5}
             />
             <text
               x={n.x + NODE_W / 2}
@@ -144,6 +207,7 @@ function ASTTreeGraph({ ast, onSelect, selectedKey }: ASTTreeGraphProps) {
           </g>
         )
       })}
+      </g>
     </svg>
   )
 }
@@ -153,10 +217,11 @@ interface ASTViewerProps {
 }
 
 export default function ASTViewer({ ast }: ASTViewerProps) {
+  const { t } = useLang()
   const [selected, setSelected] = useState<ASTNode | null>(null)
 
   if (!ast) {
-    return <div className="viewer-empty">Compile some code to see the AST</div>
+    return <div className="viewer-empty">{t('compile.first')}</div>
   }
 
   const selKey = selected ? nodeKey(selected) : null

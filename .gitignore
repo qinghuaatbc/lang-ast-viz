@@ -6,5 +6,7 @@ dist/
 .DS_Store
 nohup.out
 backend/frontend/dist
-*.log
+bin/
 *.pid
+backend/server
+frontend/tsconfig.tsbuildinfo

@@ -1,6 +1,7 @@
 package vm
 
 import (
+	"context"
 	"fmt"
 	"strings"
 
@@ -15,31 +16,33 @@ type classInfo struct {
 }
 
 type VM struct {
-	stack      []Value
-	variables  map[string]Value
-	scopeStack []map[string]Value
-	objects    []map[string]Value
-	objRefs    []int // reference count per object
-	classes    map[string]*classInfo
-	callStack  []int
-	argStack   []Value
-	pc         int
-	program    []compiler.BytecodeInstr
-	output     []string
+	stack        []Value
+	variables    map[string]Value
+	scopeStack   []map[string]bool       // true = shadowed, false = new var
+	shadowedVars []map[string]Value      // old values of shadowed vars (parallel to scopeStack)
+	objects      []map[string]Value
+	objRefs      []int // reference count per object
+	classes      map[string]*classInfo
+	callStack    []int
+	argStack     []Value
+	pc           int
+	program      []compiler.BytecodeInstr
+	output       []string
 }
 
 func NewVM(program []compiler.BytecodeInstr) *VM {
 	return &VM{
-		stack:      []Value{},
-		variables:  map[string]Value{},
-		scopeStack: []map[string]Value{},
-		objects:    []map[string]Value{},
-		objRefs:    []int{},
-		classes:    map[string]*classInfo{},
-		callStack:  []int{},
-		argStack:   []Value{},
-		program:    program,
-		output:     []string{},
+		stack:        []Value{},
+		variables:    map[string]Value{},
+		scopeStack:   []map[string]bool{},
+		shadowedVars: []map[string]Value{},
+		objects:      []map[string]Value{},
+		objRefs:      []int{},
+		classes:      map[string]*classInfo{},
+		callStack:    []int{},
+		argStack:     []Value{},
+		program:      program,
+		output:       []string{},
 	}
 }
 
@@ -52,6 +55,7 @@ func (vm *VM) push(v Value) {
 
 func (vm *VM) pop() Value {
 	if len(vm.stack) == 0 {
+		vm.output = append(vm.output, "runtime error: stack underflow")
 		return VInt(0)
 	}
 	v := vm.stack[len(vm.stack)-1]
@@ -76,11 +80,18 @@ func (vm *VM) storeVar(name string, v Value) {
 }
 
 func (vm *VM) declareVar(name string, v Value) {
-	vm.storeVar(name, v)
-	// Track in current scope for cleanup on SCOPE_EXIT
 	if len(vm.scopeStack) > 0 {
-		vm.scopeStack[len(vm.scopeStack)-1][name] = VInt(0)
+		scope := vm.scopeStack[len(vm.scopeStack)-1]
+		if _, exists := scope[name]; !exists {
+			if old, ok := vm.variables[name]; ok {
+				scope[name] = true
+				vm.shadowedVars[len(vm.shadowedVars)-1][name] = old
+			} else {
+				scope[name] = false
+			}
+		}
 	}
+	vm.storeVar(name, v)
 }
 
 func (vm *VM) popInt() (int, error) {
@@ -96,11 +107,19 @@ func (vm *VM) popTwoInts() (int, int, error) {
 	return a, b, nil
 }
 
-func (vm *VM) Run() ([]string, error) {
+func (vm *VM) Run() ([]string, error) { return vm.RunWithCtx(context.Background()) }
+
+func (vm *VM) RunWithCtx(ctx context.Context) ([]string, error) {
 	vm.pc = 0
 	vm.output = nil
 
 	for vm.pc >= 0 && vm.pc < len(vm.program) {
+		select {
+		case <-ctx.Done():
+			vm.output = append(vm.output, "halted: "+ctx.Err().Error())
+			return vm.output, nil
+		default:
+		}
 		inst := vm.program[vm.pc]
 		vm.pc++
 
@@ -112,15 +131,25 @@ func (vm *VM) Run() ([]string, error) {
 		case compiler.OP_PUSHSTR:
 			vm.push(VStr(inst.ArgStr))
 		case compiler.OP_LOAD:
-			vm.push(vm.variables[inst.ArgStr])
+			if v, ok := vm.variables[inst.ArgStr]; ok {
+				vm.push(v)
+			} else {
+				vm.output = append(vm.output, fmt.Sprintf("runtime error: undefined variable '%s'", inst.ArgStr))
+				vm.push(VInt(0))
+			}
 		case compiler.OP_STORE:
 			vm.storeVar(inst.ArgStr, vm.pop())
 		case compiler.OP_DECLARE:
 			vm.declareVar(inst.ArgStr, vm.pop())
 		case compiler.OP_ADD:
-			a, b, err := vm.popTwoInts()
-			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
-			vm.push(VInt(a + b))
+			b, a := vm.pop(), vm.pop()
+			if a.Type == ValStr || b.Type == ValStr {
+				vm.push(VStr(a.String() + b.String()))
+			} else if a.Type == ValInt && b.Type == ValInt {
+				vm.push(VInt(a.Int + b.Int))
+			} else {
+				vm.push(VInt(0))
+			}
 		case compiler.OP_SUB:
 			a, b, err := vm.popTwoInts()
 			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
@@ -140,8 +169,8 @@ func (vm *VM) Run() ([]string, error) {
 			if b == 0 { return nil, fmt.Errorf("modulo by zero") }
 			vm.push(VInt(a % b))
 		case compiler.OP_CONCAT:
-			b, a := vm.pop(), vm.pop()
-			vm.push(VStr(a.String() + b.String()))
+			a, b := vm.pop(), vm.pop()
+			vm.push(VStr(b.String() + a.String()))
 		case compiler.OP_EQ:
 			a, b, err := vm.popTwoInts()
 			if err != nil { return nil, fmt.Errorf("line %d: %v", vm.pc, err) }
@@ -246,6 +275,7 @@ func (vm *VM) Run() ([]string, error) {
 			vm.pc += inst.Arg - 1
 		case compiler.OP_RETURN:
 			returnVal := vm.pop()
+			vm.argStack = nil // cleanup args
 			if len(vm.callStack) > 0 {
 				vm.pc = vm.callStack[len(vm.callStack)-1]
 				vm.callStack = vm.callStack[:len(vm.callStack)-1]
@@ -263,18 +293,24 @@ func (vm *VM) Run() ([]string, error) {
 				vm.declareVar(inst.ArgStr, val)
 			}
 		case compiler.OP_SCOPE_ENTER:
-			vm.scopeStack = append(vm.scopeStack, map[string]Value{})
+			vm.scopeStack = append(vm.scopeStack, map[string]bool{})
+			vm.shadowedVars = append(vm.shadowedVars, map[string]Value{})
 		case compiler.OP_SCOPE_EXIT:
 			if len(vm.scopeStack) > 0 {
 				scope := vm.scopeStack[len(vm.scopeStack)-1]
-				for k := range scope {
-					// decrement object ref before deleting
-					if old, ok := vm.variables[k]; ok && old.Type == ValObj {
-						vm.objRefs[old.Int]--
+				shadows := vm.shadowedVars[len(vm.shadowedVars)-1]
+				for name, wasShadowed := range scope {
+					if wasShadowed {
+						vm.storeVar(name, shadows[name])
+					} else {
+						if v, ok := vm.variables[name]; ok && v.Type == ValObj {
+							vm.objRefs[v.Int]--
+						}
+						delete(vm.variables, name)
 					}
-					delete(vm.variables, k)
 				}
 				vm.scopeStack = vm.scopeStack[:len(vm.scopeStack)-1]
+				vm.shadowedVars = vm.shadowedVars[:len(vm.shadowedVars)-1]
 			}
 		case compiler.OP_DUP:
 			if len(vm.stack) > 0 {
@@ -306,11 +342,12 @@ func (vm *VM) Run() ([]string, error) {
 				vm.push(VInt(0))
 			}
 		case compiler.OP_CLASS_METHOD:
-			// ArgStr = "methodName:ClassName_methodName", Arg = function entry address
-			parts := strings.SplitN(inst.ArgStr, ":", 2)
-			if len(parts) == 2 {
-				methodName := parts[0]
-				for _, ci := range vm.classes {
+			// ArgStr = "ClassName:methodName:ClassName_methodName", Arg = function entry address
+			parts := strings.SplitN(inst.ArgStr, ":", 3)
+			if len(parts) == 3 {
+				className := parts[0]
+				methodName := parts[1]
+				if ci, ok := vm.classes[className]; ok {
 					ci.methods[methodName] = inst.Arg
 				}
 			}
@@ -329,9 +366,8 @@ func (vm *VM) Run() ([]string, error) {
 						className := clsStr.Str
 						if ci, ok := vm.classes[className]; ok {
 							if fnAddr, ok := ci.methods[methodName]; ok {
-								// Save all args (self + explicit args)
-								// argStack already has [self, arg1, arg2, ...]
-								// Jump to function
+								// Ref count self before pushing to argStack
+								vm.objRefs[selfVal.Int]++
 								vm.callStack = append(vm.callStack, vm.pc)
 								vm.pc = fnAddr
 								break
@@ -343,6 +379,34 @@ func (vm *VM) Run() ([]string, error) {
 			// Fallback: method not found, push 0
 			vm.argStack = nil
 			vm.push(VInt(0))
+		case compiler.OP_CALL_INIT:
+			// ArgStr = "className:argCount", Dest = obj temp
+			parts := strings.SplitN(inst.ArgStr, ":", 2)
+			className := parts[0]
+			argCount := 0
+			fmt.Sscanf(parts[1], "%d", &argCount)
+
+			if ci, ok := vm.classes[className]; ok {
+				if addr, ok := ci.methods["__init__"]; ok {
+					// argStack has [self, arg1, arg2, ...]
+					// Increment self ref for the method call
+					if len(vm.argStack) > argCount {
+						selfVal := vm.argStack[0]
+						if selfVal.Type == ValObj {
+							vm.objRefs[selfVal.Int]++
+						}
+					}
+					vm.callStack = append(vm.callStack, vm.pc)
+					vm.pc = addr
+					break
+				}
+			}
+			// No __init__: clean up args
+			for i := 0; i <= argCount; i++ {
+				if len(vm.argStack) > 0 {
+					vm.argStack = vm.argStack[:len(vm.argStack)-1]
+				}
+			}
 		}
 	}
 	return vm.output, nil

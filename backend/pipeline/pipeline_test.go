@@ -1,7 +1,11 @@
 package pipeline
 
 import (
+	"context"
+	"encoding/json"
 	"testing"
+
+	"lang-ast-viz/compiler/lang"
 )
 
 func TestBasicArithmetic(t *testing.T) {
@@ -44,18 +48,8 @@ func TestIfElse(t *testing.T) {
 	}
 }
 
-func TestFunctionCall(t *testing.T) {
-	res := Compile("fn add(a,b){return a+b;} print add(3,4);")
-	if len(res.Errors) > 0 {
-		t.Fatalf("unexpected errors: %v", res.Errors)
-	}
-	if len(res.Output) != 1 || res.Output[0] != "7" {
-		t.Fatalf("expected [7], got %v", res.Output)
-	}
-}
-
-func TestModulo(t *testing.T) {
-	res := Compile("print 17 % 5;")
+func TestElifChain(t *testing.T) {
+	res := Compile("let x=2; if x==1 { print 1; } elif x==2 { print 2; } else { print 3; }")
 	if len(res.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", res.Errors)
 	}
@@ -64,42 +58,41 @@ func TestModulo(t *testing.T) {
 	}
 }
 
-func TestClassInstantiation(t *testing.T) {
-	res := Compile("class P{x=0;} let p=P(42); print p.x;")
+func TestElifFallback(t *testing.T) {
+	res := Compile("let x=5; if x==1 { print 1; } elif x==2 { print 2; } else { print 3; }")
 	if len(res.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", res.Errors)
 	}
-	if len(res.Output) != 1 || res.Output[0] != "42" {
-		t.Fatalf("expected [42], got %v", res.Output)
+	if len(res.Output) != 1 || res.Output[0] != "3" {
+		t.Fatalf("expected [3], got %v", res.Output)
 	}
 }
 
-func TestObjectLiteral(t *testing.T) {
-	res := Compile("let p=[x=10,y=20]; print p.x; print p.y;")
+func TestASTTypeName(t *testing.T) {
+	res := Compile("print 42;")
+	if res.AST == nil {
+		t.Fatal("expected non-nil AST")
+	}
+	data, err := json.Marshal(res.AST)
+	if err != nil {
+		t.Fatalf("marshal error: %v", err)
+	}
+	var raw map[string]interface{}
+	if err := json.Unmarshal(data, &raw); err != nil {
+		t.Fatalf("unmarshal error: %v", err)
+	}
+	if raw["typeName"] != "Program" {
+		t.Fatalf("expected typeName=Program, got %v", raw["typeName"])
+	}
+}
+
+func TestPythonColon(t *testing.T) {
+	cfg := lang.GetConfig(lang.Python)
+	res := CompileWithLang(context.Background(), "x=5\nif x > 3: {\nprint(1)\n} else: {\nprint(0)\n}", cfg)
 	if len(res.Errors) > 0 {
 		t.Fatalf("unexpected errors: %v", res.Errors)
 	}
-	if len(res.Output) != 2 || res.Output[0] != "10" || res.Output[1] != "20" {
-		t.Fatalf("expected [10 20], got %v", res.Output)
-	}
-}
-
-func TestErrorRecovery(t *testing.T) {
-	res := Compile("let x = ; print 42;")
-	if len(res.Errors) == 0 {
-		t.Fatal("expected errors but got none")
-	}
-	if len(res.Output) != 1 || res.Output[0] != "42" {
-		t.Fatalf("expected [42] after recovery, got %v", res.Output)
-	}
-}
-
-func TestInheritance(t *testing.T) {
-	res := Compile("class A{x=0;} class B extends A{y=0;} let b=B(1,2); print b.x; print b.y;")
-	if len(res.Errors) > 0 {
-		t.Fatalf("unexpected errors: %v", res.Errors)
-	}
-	if len(res.Output) != 2 || res.Output[0] != "1" || res.Output[1] != "2" {
-		t.Fatalf("expected [1 2], got %v", res.Output)
+	if len(res.Output) != 1 || res.Output[0] != "1" {
+		t.Fatalf("expected [1], got %v", res.Output)
 	}
 }

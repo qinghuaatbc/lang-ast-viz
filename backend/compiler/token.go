@@ -49,6 +49,8 @@ const (
 	RETURN
 	CONTINUE
 	BREAK
+	COLON
+	ELIF
 )
 
 type Token struct {

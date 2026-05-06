@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useReducer } from 'react'
 import { compileSource, CompileResult, LangInfo, fetchLanguages } from './api/compile'
 import { LangProvider, useLang } from './i18n/lang'
 import { ThemeProvider, useTheme } from './theme/theme'
@@ -18,17 +18,47 @@ function parseErrorLines(errors: string[]): Set<number> {
   return s
 }
 
+interface CompileState {
+  result: CompileResult | null
+  loading: boolean
+  error: string
+  errorLines: Set<number>
+}
+
+type CompileAction =
+  | { type: 'START' }
+  | { type: 'DONE'; result: CompileResult }
+  | { type: 'ERROR'; error: string }
+  | { type: 'ERRORS'; errors: string[] }
+  | { type: 'CLEAR' }
+
+function compileReducer(state: CompileState, action: CompileAction): CompileState {
+  switch (action.type) {
+    case 'START':
+      return { ...state, loading: true, error: '' }
+    case 'DONE':
+      return { result: action.result, loading: false, error: '', errorLines: new Set<number>() }
+    case 'ERROR':
+      return { ...state, loading: false, error: action.error }
+    case 'ERRORS':
+      return { result: null, loading: false, error: action.errors.join('\n'), errorLines: parseErrorLines(action.errors) }
+    case 'CLEAR':
+      return { result: null, loading: false, error: '', errorLines: new Set<number>() }
+  }
+}
+
 function AppInner() {
   const { t, lang, setLang } = useLang()
   const { theme, toggle: toggleTheme } = useTheme()
-  const [code, setCode] = useState(examplesByLang.rust[0].code)
-  const [result, setResult] = useState<CompileResult | null>(null)
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState('')
+  const [code, setCode] = useState(() => {
+    const savedLang = localStorage.getItem('lav-lang') || 'rust'
+    const ex = examplesByLang[savedLang]
+    return ex && ex.length > 0 ? ex[0].code : examplesByLang.rust[0].code
+  })
+  const [state, dispatch] = useReducer(compileReducer, { result: null, loading: false, error: '', errorLines: new Set<number>() })
   const [activeTab, setActiveTab] = useState<'ast' | 'ir' | 'asm' | 'bytecode'>('ast')
-  const [language, setLanguage] = useState('rust')
+  const [language, setLanguage] = useState(() => localStorage.getItem('lav-lang') || 'rust')
   const [languages, setLanguages] = useState<LangInfo[]>([])
-  const [errorLines, setErrorLines] = useState<Set<number>>(new Set())
 
   useEffect(() => {
     fetchLanguages().then(setLanguages).catch(() => {})
@@ -36,30 +66,32 @@ function AppInner() {
 
   const handleLanguageChange = (lang: string) => {
     setLanguage(lang)
+    localStorage.setItem('lav-lang', lang)
     const ex = examplesByLang[lang]
-    if (ex && ex.length > 0) {
-      setCode(ex[0].code)
-    }
-    setResult(null)
-    setError('')
+    if (ex && ex.length > 0) { setCode(ex[0].code) }
+    dispatch({ type: 'CLEAR' })
   }
 
+  const handleExampleSelect = useCallback((code: string) => {
+    setCode(code)
+    dispatch({ type: 'CLEAR' })
+    setTimeout(() => {
+      const btn = document.querySelector('.btn-compile') as HTMLButtonElement
+      if (btn && !btn.disabled) btn.click()
+    }, 50)
+  }, [])
+
   const handleCompile = useCallback(async () => {
-    setLoading(true)
-    setError('')
+    dispatch({ type: 'START' })
     try {
       const res = await compileSource(code, language)
-      setResult(res)
       if (res.errors?.length > 0) {
-        setError(res.errors.join('\n'))
-        setErrorLines(parseErrorLines(res.errors))
+        dispatch({ type: 'ERRORS', errors: res.errors })
       } else {
-        setErrorLines(new Set())
+        dispatch({ type: 'DONE', result: res })
       }
     } catch (err: any) {
-      setError(err.message || 'compile failed')
-    } finally {
-      setLoading(false)
+      dispatch({ type: 'ERROR', error: err.message || 'compile failed' })
     }
   }, [code, language])
 
@@ -102,21 +134,22 @@ function AppInner() {
             value={code}
             onChange={setCode}
             onCompile={handleCompile}
-            loading={loading}
+            onExampleSelect={handleExampleSelect}
+            loading={state.loading}
             language={language}
             examples={examplesByLang[language] || examplesByLang.rust}
-            errorLines={errorLines}
+            errorLines={state.errorLines}
           />
         </div>
 
         <div className="right-panel">
-          {error && <div className="error-bar">{error}</div>}
+          {state.error && <div className="error-bar">{state.error}</div>}
 
-          {result && result.output && result.output.length > 0 && (
+          {state.result && state.result.output && state.result.output.length > 0 && (
             <div className="output-bar">
-              <div className="output-label"><strong>{t('output')} ({result.language})</strong></div>
+              <div className="output-label"><strong>{t('output')} ({state.result.language})</strong></div>
               <div className="output-lines">
-                {result.output.map((line, i) => (
+                {state.result.output.map((line, i) => (
                   <div key={i} className="output-line">{line}</div>
                 ))}
               </div>
@@ -130,11 +163,16 @@ function AppInner() {
             <button className={`tab ${activeTab === 'bytecode' ? 'active' : ''}`} onClick={() => setActiveTab('bytecode')}>{t('bytecode')}</button>
           </div>
 
+          {state.loading && (
+            <div className="viewer-empty" style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
+              {t('compiling')}
+            </div>
+          )}
           <div className="tab-content">
-            {activeTab === 'ast' && <ASTViewer ast={result?.ast || null} />}
-            {activeTab === 'ir' && <IRViewer ir={result?.ir || null} />}
-            {activeTab === 'asm' && <ASMViewer assembly={result?.assembly || null} />}
-            {activeTab === 'bytecode' && <BytecodeViewer bytecode={result?.bytecode || null} />}
+            {activeTab === 'ast' && <ASTViewer ast={state.result?.ast || null} />}
+            {activeTab === 'ir' && <IRViewer ir={state.result?.ir || null} />}
+            {activeTab === 'asm' && <ASMViewer assembly={state.result?.assembly || null} />}
+            {activeTab === 'bytecode' && <BytecodeViewer bytecode={state.result?.bytecode || null} />}
           </div>
         </div>
       </div>
