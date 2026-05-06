@@ -31,6 +31,8 @@ export function astTypeName(nodeType: number): string {
     20: 'MethodCall',
     21: 'ArrayList',
     22: 'ArrayAccess',
+    23: 'BreakStmt',
+    24: 'ContinueStmt',
   }
   return names[nodeType] || 'Unknown'
 }
@@ -60,6 +62,8 @@ export function astTypeClass(nodeType: number): string {
     20: 'methodcall',
     21: 'arraylist',
     22: 'arrayaccess',
+    23: 'breakstmt',
+    24: 'continuestmt',
   }
   return classes[nodeType] || 'unknown'
 }

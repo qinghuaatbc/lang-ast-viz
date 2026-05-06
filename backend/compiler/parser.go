@@ -83,6 +83,10 @@ func (p *Parser) parseStmt() *Node {
 		return p.parseFuncDecl()
 	case RETURN:
 		return p.parseReturnStmt()
+	case CONTINUE:
+		return p.parseBreakContinue(CONTINUE)
+	case BREAK:
+		return p.parseBreakContinue(BREAK)
 	case RBRACE:
 		return nil
 	case EOF:
@@ -352,6 +356,18 @@ func (p *Parser) parseReturnStmt() *Node {
 	return n
 }
 
+func (p *Parser) parseBreakContinue(tt TokenType) *Node {
+	astType := NBreakStmt
+	name := "break"
+	if tt == CONTINUE {
+		astType = NContinueStmt
+		name = "continue"
+	}
+	n := NewNode(astType, name, p.cur.Line, p.cur.Col)
+	p.nextToken()
+	return n
+}
+
 func (p *Parser) parseBlock() *Node {
 	n := NewNode(NBlockStmt, "block", p.cur.Line, p.cur.Col)
 	for p.cur.Type != RBRACE && p.cur.Type != EOF {
@@ -391,7 +407,6 @@ var precedences = map[TokenType]int{
 	STAR:   PRODUCT,
 	MOD:    PRODUCT,
 	SLASH:  PRODUCT,
-	PERCENT: PRODUCT,
 	DOT:    PREFIX,
 	LBRACKET: PREFIX, // highest precedence for field access
 }

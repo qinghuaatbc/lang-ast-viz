@@ -67,15 +67,47 @@ func (l *Lexer) NextToken() Token {
 			tok = l.makeToken(ASSIGN, "=")
 		}
 	case '+':
-		tok = l.makeToken(PLUS, "+")
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = l.makeToken(PLUS_ASSIGN, "+=")
+		} else {
+			tok = l.makeToken(PLUS, "+")
+		}
 	case '-':
-		tok = l.makeToken(MINUS, "-")
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = l.makeToken(MINUS_ASSIGN, "-=")
+		} else {
+			tok = l.makeToken(MINUS, "-")
+		}
 	case '*':
-		tok = l.makeToken(STAR, "*")
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = l.makeToken(STAR_ASSIGN, "*=")
+		} else {
+			tok = l.makeToken(STAR, "*")
+		}
 	case '%':
-		tok = l.makeToken(MOD, "%")
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = l.makeToken(MOD_ASSIGN, "%=")
+		} else {
+			tok = l.makeToken(MOD, "%")
+		}
 	case '/':
-		tok = l.makeToken(SLASH, "/")
+		if l.peekChar() == '/' {
+			// line comment: skip until end of line
+			for l.ch != '\n' && l.ch != 0 {
+				l.readChar()
+			}
+			return l.NextToken() // restart tokenization
+		}
+		if l.peekChar() == '=' {
+			l.readChar()
+			tok = l.makeToken(SLASH_ASSIGN, "/=")
+		} else {
+			tok = l.makeToken(SLASH, "/")
+		}
 	case '!':
 		if l.peekChar() == '=' {
 			l.readChar()
@@ -210,6 +242,10 @@ func (l *Lexer) lookupIdent(ident string) TokenType {
 		return FN
 	case "return":
 		return RETURN
+	case "continue":
+		return CONTINUE
+	case "break":
+		return BREAK
 	case "if":
 		return IF
 	case "else":

@@ -11,14 +11,23 @@ type IRInstr struct {
 }
 
 type IRGen struct {
-	instrs   []IRInstr
-	tmpCnt   int
-	labelCnt int
-	classFields map[string][]string // className -> field names
+	instrs    []IRInstr
+	tmpCnt    int
+	labelCnt  int
+	classFields map[string][]string
+	loopStack []loopLabels
+}
+
+type loopLabels struct {
+	start string
+	end   string
 }
 
 func NewIRGen() *IRGen {
-	return &IRGen{classFields: map[string][]string{}}
+	return &IRGen{
+		classFields: map[string][]string{},
+		loopStack:   []loopLabels{},
+	}
 }
 
 func (ir *IRGen) Gen(ast *Node) []IRInstr {
@@ -100,12 +109,24 @@ func (ir *IRGen) genNode(n *Node) string {
 	case NWhileStmt:
 		startLabel := ir.newLabel()
 		endLabel := ir.newLabel()
+		ir.loopStack = append(ir.loopStack, loopLabels{start: startLabel, end: endLabel})
 		ir.emitLabel(startLabel)
 		cond := ir.genNode(n.Children[0])
 		ir.emit("JZ", "", cond, endLabel)
 		ir.genNode(n.Children[1])
 		ir.emit("JMP", "", "", startLabel)
 		ir.emitLabel(endLabel)
+		ir.loopStack = ir.loopStack[:len(ir.loopStack)-1]
+		return ""
+	case NBreakStmt:
+		if len(ir.loopStack) > 0 {
+			ir.emit("JMP", "", "", ir.loopStack[len(ir.loopStack)-1].end)
+		}
+		return ""
+	case NContinueStmt:
+		if len(ir.loopStack) > 0 {
+			ir.emit("JMP", "", "", ir.loopStack[len(ir.loopStack)-1].start)
+		}
 		return ""
 	case NBlockStmt:
 		ir.emit("SCOPE_ENTER", "", "", "")

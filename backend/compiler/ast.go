@@ -28,6 +28,8 @@ const (
 	NMethodCall
 	NArrayList
 	NArrayAccess
+	NBreakStmt
+	NContinueStmt
 )
 
 type Node struct {
@@ -94,6 +96,10 @@ func (n *Node) TypeName() string {
 		return "ArrayList"
 	case NArrayAccess:
 		return "ArrayAccess"
+	case NBreakStmt:
+		return "BreakStmt"
+	case NContinueStmt:
+		return "ContinueStmt"
 	default:
 		return "Unknown"
 	}
