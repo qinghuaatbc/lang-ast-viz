@@ -72,10 +72,10 @@ func (l *Lexer) NextToken() Token {
 		tok = l.makeToken(MINUS, "-")
 	case '*':
 		tok = l.makeToken(STAR, "*")
+	case '%':
+		tok = l.makeToken(MOD, "%")
 	case '/':
 		tok = l.makeToken(SLASH, "/")
-	case '%':
-		tok = l.makeToken(PERCENT, "%")
 	case '!':
 		if l.peekChar() == '=' {
 			l.readChar()

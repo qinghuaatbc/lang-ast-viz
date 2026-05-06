@@ -47,6 +47,15 @@ func (vm *VM) pop() int {
 	return v
 }
 
+func (vm *VM) safePop() (int, bool) {
+	if len(vm.stack) == 0 {
+		return 0, false
+	}
+	v := vm.stack[len(vm.stack)-1]
+	vm.stack = vm.stack[:len(vm.stack)-1]
+	return v, true
+}
+
 func (vm *VM) Run() ([]string, error) {
 	vm.pc = 0
 	vm.output = nil
@@ -161,24 +170,7 @@ func (vm *VM) Run() ([]string, error) {
 			val := vm.pop()
 			objIdx := vm.pop()
 			if objIdx >= 0 && objIdx < len(vm.objects) {
-				// Find the field name by searching all class definitions
-				for _, ci := range vm.classes {
-					allFields := []string{}
-					if ci.parent != "" {
-						if pci, pok := vm.classes[ci.parent]; pok {
-							allFields = append(allFields, pci.fields...)
-						}
-					}
-					allFields = append(allFields, ci.fields...)
-					if inst.Arg >= 0 && inst.Arg < len(allFields) {
-						fname := allFields[inst.Arg]
-						// Only set if this object has the field
-						if _, exists := vm.objects[objIdx][fname]; exists {
-							vm.objects[objIdx][fname] = val
-							break
-						}
-					}
-				}
+				vm.objects[objIdx][inst.ArgStr] = val
 			}
 		}
 	}

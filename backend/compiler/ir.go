@@ -11,13 +11,14 @@ type IRInstr struct {
 }
 
 type IRGen struct {
-	instrs []IRInstr
-	tmpCnt int
+	instrs   []IRInstr
+	tmpCnt   int
 	labelCnt int
+	classFields map[string][]string // className -> field names
 }
 
 func NewIRGen() *IRGen {
-	return &IRGen{}
+	return &IRGen{classFields: map[string][]string{}}
 }
 
 func (ir *IRGen) Gen(ast *Node) []IRInstr {
@@ -135,14 +136,41 @@ func (ir *IRGen) genNode(n *Node) string {
 		dest := ir.newTemp()
 		ir.emit("LOAD_SELF", dest, "", "")
 		return dest
+	case NClassDecl:
+		startIdx := 0
+		parentClass := ""
+		if len(n.Children)%2 == 1 {
+			parentClass = n.Children[0].Value
+			startIdx = 1
+		}
+		ir.emit("CLASS_DEF", n.Value, parentClass, "")
+		var fieldNames []string
+		for i := startIdx; i+1 < len(n.Children); i += 2 {
+			fname := n.Children[i].Value
+			fval := ir.genNode(n.Children[i+1])
+			ir.emit("CLASS_FIELD", n.Value, fname, fval)
+			fieldNames = append(fieldNames, fname)
+		}
+		ir.classFields[n.Value] = fieldNames
+		return ""
+	case NFieldAccess:
+		obj := ir.genNode(n.Children[0])
+		field := n.Children[1].Value
+		dest := ir.newTemp()
+		ir.emit("GETFIELD", dest, obj, field)
+		return dest
 	case NCallExpr:
-		// className(arg1, arg2, ...)
 		className := n.Children[0].Value
 		obj := ir.newTemp()
 		ir.emit("INSTANTIATE", obj, className, fmt.Sprintf("%d", len(n.Children)-1))
+		fieldNames := ir.classFields[className]
 		for i := 1; i < len(n.Children); i++ {
 			arg := ir.genNode(n.Children[i])
-			ir.emit("SETFIELD", obj, fmt.Sprintf("_arg%d", i-1), arg)
+			fname := fmt.Sprintf("_arg%d", i-1)
+			if i-1 < len(fieldNames) {
+				fname = fieldNames[i-1]
+			}
+			ir.emit("SETFIELD", obj, fname, arg)
 		}
 		return obj
 	case NNewExpr:
@@ -152,42 +180,14 @@ func (ir *IRGen) genNode(n *Node) string {
 		}
 		obj := ir.newTemp()
 		ir.emit("INSTANTIATE", obj, className, fmt.Sprintf("%d", len(n.Children)-1))
+		fieldNames := ir.classFields[className]
 		for i := 1; i < len(n.Children); i++ {
 			arg := ir.genNode(n.Children[i])
-			ir.emit("SETFIELD", obj, fmt.Sprintf("_arg%d", i-1), arg)
-		}
-		return obj
-	case NClassDecl:
-		// Parser adds parent NIdent as first child when extends is used,
-		// resulting in an odd number of children (parent + field pairs).
-		startIdx := 0
-		parentClass := ""
-		if len(n.Children)%2 == 1 {
-			parentClass = n.Children[0].Value
-			startIdx = 1
-		}
-		ir.emit("CLASS_DEF", n.Value, parentClass, "")
-		for i := startIdx; i+1 < len(n.Children); i += 2 {
-			fname := n.Children[i].Value
-			fval := ir.genNode(n.Children[i+1])
-			ir.emit("CLASS_FIELD", n.Value, fname, fval)
-		}
-		return ""
-	case NFieldAccess:
-		obj := ir.genNode(n.Children[0])
-		field := n.Children[1].Value
-		dest := ir.newTemp()
-		ir.emit("GETFIELD", dest, obj, field)
-		return dest
-	case NObjLit:
-		obj := ir.newTemp()
-		ir.emit("OBJ_LIT", obj, "", "")
-		for i := 0; i < len(n.Children); i += 2 {
-			if i+1 < len(n.Children) {
-				fname := n.Children[i].Value
-				fval := ir.genNode(n.Children[i+1])
-				ir.emit("OBJ_SET", obj, fname, fval)
+			fname := fmt.Sprintf("_arg%d", i-1)
+			if i-1 < len(fieldNames) {
+				fname = fieldNames[i-1]
 			}
+			ir.emit("SETFIELD", obj, fname, arg)
 		}
 		return obj
 	}

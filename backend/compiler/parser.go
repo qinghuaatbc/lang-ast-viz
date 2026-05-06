@@ -316,8 +316,9 @@ var precedences = map[TokenType]int{
 	GE:   COMPARISON,
 	PLUS:   SUM,
 	MINUS:  SUM,
-	STAR:    PRODUCT,
-	SLASH:   PRODUCT,
+	STAR:   PRODUCT,
+	MOD:    PRODUCT,
+	SLASH:  PRODUCT,
 	PERCENT: PRODUCT,
 	DOT:    PREFIX, // highest precedence for field access
 }

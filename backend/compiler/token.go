@@ -13,6 +13,7 @@ const (
 	PLUS
 	MINUS
 	STAR
+	MOD
 	SLASH
 	PERCENT
 	EQ

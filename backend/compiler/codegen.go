@@ -181,10 +181,7 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 			// ArgStr = className, creates object with class fields at defaults
 			bg.emit(OP_INSTANTIATE, 0, inst.Src1)
 		case "SETFIELD":
-			// Arg = positional field index parsed from "_argN"
-			argIdx := 0
-			fmt.Sscanf(inst.Src1, "_arg%d", &argIdx)
-			bg.emit(OP_SETFIELD, argIdx, "")
+			bg.emit(OP_SETFIELD, 0, inst.Src1)
 		}
 	}
 
