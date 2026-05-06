@@ -39,6 +39,10 @@ const (
 	OP_RETURN
 	OP_PUSHARG
 	OP_POPARG
+	OP_DECLARE
+	OP_SCOPE_ENTER
+	OP_SCOPE_EXIT
+	OP_DUP
 )
 
 func (op Opcode) String() string {
@@ -74,6 +78,9 @@ func (op Opcode) String() string {
 	case OP_RETURN:      return "RETURN"
 	case OP_PUSHARG:     return "PUSHARG"
 	case OP_POPARG:      return "POPARG"
+	case OP_DECLARE:     return "DECLARE"
+	case OP_SCOPE_ENTER: return "SCOPE_ENTER"
+	case OP_DUP:          return "DUP"
 	default:             return "UNKNOWN"
 	}
 }
@@ -156,7 +163,19 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 		case "LOAD":
 			bg.emit(OP_LOAD, 0, inst.Src1)
 		case "ASSIGN":
+			if isNum(inst.Src1) {
+				val := 0
+				fmt.Sscanf(inst.Src1, "%d", &val)
+				bg.emit(OP_PUSH, val, inst.Src1)
+			}
 			bg.emit(OP_STORE, 0, inst.Dest)
+		case "DECLARE":
+			if isNum(inst.Src1) {
+				val := 0
+				fmt.Sscanf(inst.Src1, "%d", &val)
+				bg.emit(OP_PUSH, val, inst.Src1)
+			}
+			bg.emit(OP_DECLARE, 0, inst.Dest)
 		case "PRINT":
 			bg.emit(OP_PRINT, 0, "")
 		case "ADD":
@@ -210,6 +229,10 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 			bg.emit(OP_PUSHARG, 0, "")
 		case "POP_ARG":
 			bg.emit(OP_POPARG, 0, inst.Dest)
+		case "SCOPE_ENTER":
+			bg.emit(OP_SCOPE_ENTER, 0, "")
+		case "SCOPE_EXIT":
+			bg.emit(OP_SCOPE_EXIT, 0, "")
 		}
 	}
 
@@ -223,4 +246,16 @@ func (bg *BytecodeGen) Gen(ir []IRInstr) []BytecodeInstr {
 	}
 
 	return bg.instrs
+}
+
+func isNum(s string) bool {
+	if len(s) == 0 {
+		return false
+	}
+	for _, c := range s {
+		if c < '0' || c > '9' {
+			return false
+		}
+	}
+	return true
 }

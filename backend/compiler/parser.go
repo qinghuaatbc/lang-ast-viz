@@ -95,6 +95,13 @@ func (p *Parser) parseStmt() *Node {
 			return p.parseAssignStmt()
 		}
 		p.addErr(fmt.Sprintf("unexpected token: %s (%d)", p.cur.Literal, p.cur.Type))
+		// Error recovery: skip to next statement boundary
+		for p.cur.Type != SEMICOLON && p.cur.Type != RBRACE && p.cur.Type != EOF {
+			p.nextToken()
+		}
+		if p.cur.Type == SEMICOLON {
+			p.nextToken()
+		}
 		return nil
 	}
 }

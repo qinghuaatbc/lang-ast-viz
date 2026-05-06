@@ -57,15 +57,25 @@ func (ir *IRGen) genNode(n *Node) string {
 	case NLetStmt:
 		if len(n.Children) >= 2 {
 			ident := n.Children[0].Value
-			val := ir.genNode(n.Children[1])
-			ir.emit("ASSIGN", ident, val, "")
+			ch := n.Children[1]
+			if ch.Type == NNumberLit || ch.Type == NBoolLit || ch.Type == NStringLit || ch.Type == NIdent {
+				ir.emit("DECLARE", ident, ch.Value, "")
+			} else {
+				val := ir.genNode(ch)
+				ir.emit("DECLARE", ident, val, "")
+			}
 		}
 		return ""
 	case NAssignStmt:
 		if len(n.Children) >= 2 {
 			ident := n.Children[0].Value
-			val := ir.genNode(n.Children[1])
-			ir.emit("ASSIGN", ident, val, "")
+			ch := n.Children[1]
+			if ch.Type == NNumberLit || ch.Type == NBoolLit || ch.Type == NStringLit || ch.Type == NIdent {
+				ir.emit("ASSIGN", ident, ch.Value, "")
+			} else {
+				val := ir.genNode(ch)
+				ir.emit("ASSIGN", ident, val, "")
+			}
 		}
 		return ""
 	case NPrintStmt:
@@ -98,9 +108,11 @@ func (ir *IRGen) genNode(n *Node) string {
 		ir.emitLabel(endLabel)
 		return ""
 	case NBlockStmt:
+		ir.emit("SCOPE_ENTER", "", "", "")
 		for _, c := range n.Children {
 			ir.genNode(c)
 		}
+		ir.emit("SCOPE_EXIT", "", "", "")
 		return ""
 	case NBinaryExpr:
 		left := ir.genNode(n.Children[0])
@@ -166,6 +178,15 @@ func (ir *IRGen) genNode(n *Node) string {
 		dest := ir.newTemp()
 		ir.emit("GETFIELD", dest, obj, field)
 		return dest
+	case NObjLit:
+		obj := ir.newTemp()
+		ir.emit("OBJ_LIT", obj, "", "")
+		for i := 0; i+1 < len(n.Children); i += 2 {
+			fname := n.Children[i].Value
+			fval := ir.genNode(n.Children[i+1])
+			ir.emit("OBJ_SET", obj, fname, fval)
+		}
+		return obj
 	case NCallExpr:
 		name := n.Children[0].Value
 		if _, isClass := ir.classFields[name]; isClass {
@@ -246,17 +267,18 @@ func (ir *IRGen) genNode(n *Node) string {
 		}
 		return ""
 	case NMethodCall:
-		// obj.method(args...)
+		// obj.method(args...) -> push self(obj), then args
 		obj := ir.genNode(n.Children[0])
 		methodName := n.Value
 		fnLabel := "fn_" + methodName
-		// Pass self and args
+		// self is the first implicit argument
 		ir.emit("PUSH_ARG", "", obj, "")
 		for i := 1; i < len(n.Children); i++ {
 			arg := ir.genNode(n.Children[i])
 			ir.emit("PUSH_ARG", "", arg, "")
 		}
 		dest := ir.newTemp()
+		// Total args = self + explicit args
 		ir.emit("CALL", dest, fnLabel, fmt.Sprintf("%d", len(n.Children)))
 		return dest
 	}

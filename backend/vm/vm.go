@@ -15,10 +15,11 @@ type classInfo struct {
 type VM struct {
 	stack     []Value
 	variables map[string]Value
+	scopeStack []map[string]Value
 	objects   []map[string]Value
 	classes   map[string]*classInfo
-	callStack []int // return addresses
-	argStack  []Value // function arguments
+	callStack []int
+	argStack  []Value
 	pc        int
 	program   []compiler.BytecodeInstr
 	output    []string
@@ -73,6 +74,12 @@ func (vm *VM) Run() ([]string, error) {
 			vm.push(vm.variables[inst.ArgStr])
 		case compiler.OP_STORE:
 			vm.variables[inst.ArgStr] = vm.pop()
+		case compiler.OP_DECLARE:
+			vm.variables[inst.ArgStr] = vm.pop()
+			// Track in current scope for cleanup on SCOPE_EXIT
+			if len(vm.scopeStack) > 0 {
+				vm.scopeStack[len(vm.scopeStack)-1][inst.ArgStr] = VInt(0)
+			}
 		case compiler.OP_ADD:
 			b, a := vm.popInt(), vm.popInt()
 			vm.push(VInt(a + b))
@@ -123,9 +130,11 @@ func (vm *VM) Run() ([]string, error) {
 			vm.push(VInt(len(vm.objects) - 1))
 		case compiler.OP_OBJSET:
 			val := vm.pop()
-			objIdx := vm.popInt()
-			if objIdx >= 0 && objIdx < len(vm.objects) {
-				vm.objects[objIdx][inst.ArgStr] = val
+			if len(vm.stack) > 0 {
+				objIdx := vm.stack[len(vm.stack)-1].Int // peek
+				if objIdx >= 0 && objIdx < len(vm.objects) {
+					vm.objects[objIdx][inst.ArgStr] = val
+				}
 			}
 		case compiler.OP_OBJGET:
 			objIdx := vm.popInt()
@@ -189,8 +198,24 @@ func (vm *VM) Run() ([]string, error) {
 			vm.argStack = append(vm.argStack, vm.pop())
 		case compiler.OP_POPARG:
 			if len(vm.argStack) > 0 {
-				vm.variables[inst.ArgStr] = vm.argStack[len(vm.argStack)-1]
+				val := vm.argStack[len(vm.argStack)-1]
 				vm.argStack = vm.argStack[:len(vm.argStack)-1]
+				// Save as local variable, also save as 'self' if first arg
+				vm.variables[inst.ArgStr] = val
+			}
+		case compiler.OP_SCOPE_ENTER:
+			vm.scopeStack = append(vm.scopeStack, map[string]Value{})
+		case compiler.OP_SCOPE_EXIT:
+			if len(vm.scopeStack) > 0 {
+				scope := vm.scopeStack[len(vm.scopeStack)-1]
+				for k := range scope {
+					delete(vm.variables, k)
+				}
+				vm.scopeStack = vm.scopeStack[:len(vm.scopeStack)-1]
+			}
+		case compiler.OP_DUP:
+			if len(vm.stack) > 0 {
+				vm.push(vm.stack[len(vm.stack)-1])
 			}
 		}
 	}
