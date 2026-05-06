@@ -790,3 +790,145 @@ body {
   color: var(--accent-blue);
   font-weight: 600;
 }
+
+/* ====== Mobile Responsive ====== */
+
+@media (max-width: 900px) {
+  .main-layout {
+    grid-template-columns: 1fr;
+    height: auto;
+    min-height: calc(100vh - 100px);
+  }
+  .left-panel, .right-panel {
+    min-height: 300px;
+  }
+  .code-editor {
+    min-height: 180px;
+  }
+  .header-top {
+    flex-direction: column;
+    gap: 8px;
+  }
+  .header-controls {
+    width: 100%;
+    flex-wrap: wrap;
+  }
+  .lang-selector {
+    flex: 1;
+    min-width: 0;
+  }
+  .lang-selector select {
+    width: 100%;
+  }
+  .asm-main {
+    flex-direction: column;
+  }
+  .asm-state-panel {
+    width: 100%;
+    border-left: none;
+    border-top: 1px solid var(--border);
+  }
+  .ast-tree-svg {
+    max-width: 100%;
+    height: auto;
+  }
+}
+
+@media (max-width: 600px) {
+  .app {
+    padding: 8px;
+  }
+  .app-header h1 {
+    font-size: 18px;
+  }
+  .subtitle {
+    font-size: 11px;
+  }
+  .tab-bar {
+    flex-wrap: wrap;
+  }
+  .tab {
+    font-size: 10px;
+    padding: 6px 4px;
+  }
+  .btn-examples, .btn-compile {
+    font-size: 10px;
+    padding: 4px 8px;
+  }
+  .examples-dropdown {
+    max-height: 200px;
+  }
+  .example-item pre {
+    font-size: 10px;
+  }
+  .editor-header h2 {
+    font-size: 12px;
+  }
+  .code-editor {
+    font-size: 11px;
+    padding: 8px;
+  }
+  .asm-controls {
+    flex-wrap: wrap;
+    gap: 4px;
+  }
+  .asm-btn {
+    padding: 3px 8px;
+    font-size: 12px;
+  }
+  .reg-header {
+    min-width: 30px;
+    font-size: 8px;
+  }
+  .code-table td, .code-table th {
+    padding: 2px 4px;
+    font-size: 10px;
+  }
+  .line-num {
+    width: 24px;
+    font-size: 9px;
+  }
+  .reg-cell {
+    font-size: 8px;
+  }
+  .asm-state-panel {
+    padding: 4px;
+  }
+  .state-section h3 {
+    font-size: 9px;
+  }
+  .reg-item, .mem-item {
+    font-size: 10px;
+    padding: 2px 4px;
+  }
+  .shortcut-hint {
+    display: none;
+  }
+  .ast-node-label {
+    font-size: 10px;
+    padding: 1px 4px;
+  }
+  .ast-children {
+    padding-left: 12px;
+  }
+}
+
+@media (max-width: 400px) {
+  .toggle-group {
+    width: 100%;
+  }
+  .toggle-btn {
+    flex: 1;
+    text-align: center;
+  }
+  .editor-actions {
+    gap: 4px;
+  }
+  .btn-examples, .btn-compile {
+    font-size: 9px;
+    padding: 3px 6px;
+  }
+  .asm-code {
+    font-size: 10px;
+  }
+}
