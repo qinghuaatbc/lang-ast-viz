@@ -10,3 +10,6 @@ bin/
 *.pid
 backend/server
 frontend/tsconfig.tsbuildinfo
+server
+frontend/dist/assets/*.js
+frontend/dist/assets/*.css
