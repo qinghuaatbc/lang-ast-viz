@@ -108,11 +108,13 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/history", h.handleHistory)
 	mux.HandleFunc("/api/history/", h.handleHistoryByID)
 	mux.HandleFunc("/api/languages", h.handleLanguages)
+	mux.HandleFunc("/api/run", h.handleRun)
 	// Versioned API
 	mux.HandleFunc("/api/v1/compile", h.handleCompile)
 	mux.HandleFunc("/api/v1/history", h.handleHistory)
 	mux.HandleFunc("/api/v1/history/", h.handleHistoryByID)
 	mux.HandleFunc("/api/v1/languages", h.handleLanguages)
+	mux.HandleFunc("/api/v1/run", h.handleRun)
 }
 
 type compileRequest struct {

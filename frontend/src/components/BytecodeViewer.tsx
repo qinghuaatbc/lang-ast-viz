@@ -1,3 +1,4 @@
+import { useState, useCallback } from 'react'
 import { BytecodeInstr } from '../api/compile'
 import { useLang } from '../i18n/lang'
 
@@ -55,6 +56,24 @@ function hexColor(idx: number): string {
 
 export default function BytecodeViewer({ bytecode }: BytecodeViewerProps) {
   const { t } = useLang()
+  const [copied, setCopied] = useState(false)
+
+  const handleCopy = useCallback(() => {
+    if (!bytecode) return
+    const lines = bytecode.map((inst, i) => {
+      const hex = bcBytes(inst).join(' ')
+      return `${i}: ${hex.padEnd(20)} ${inst.op} ${inst.argStr || (inst.arg !== undefined ? inst.arg : '')}`
+    }).join('\n')
+    navigator.clipboard.writeText(lines).then(() => {
+      setCopied(true)
+      setTimeout(() => setCopied(false), 1500)
+    }).catch(() => {})
+  }, [bytecode])
+
+  const handleHexClick = useCallback((text: string) => {
+    navigator.clipboard.writeText(text).catch(() => {})
+  }, [])
+
   if (!bytecode || bytecode.length === 0) {
     return <div className="viewer-empty">{t('compile.first')}</div>
   }
@@ -63,6 +82,11 @@ export default function BytecodeViewer({ bytecode }: BytecodeViewerProps) {
     <div className="viewer bytecode-viewer">
       <h2>{t('bytecode')}</h2>
       <div className="viewer-content">
+        <div style={{ textAlign: 'right', marginBottom: 4 }}>
+          <button className="asm-btn" onClick={handleCopy} style={{ fontSize: 11, padding: '2px 8px' }}>
+            {copied ? 'Copied!' : 'Copy'}
+          </button>
+        </div>
         <table className="code-table">
           <thead>
             <tr>
@@ -73,14 +97,19 @@ export default function BytecodeViewer({ bytecode }: BytecodeViewerProps) {
             </tr>
           </thead>
           <tbody>
-            {bytecode.map((inst, i) => (
-              <tr key={i} className="bytecode-row">
-                <td className="line-num">{i}</td>
-                <td className="bc-bytes">{bcBytes(inst).map((b, j) => <span key={j} style={{ color: hexColor(j) }}>{b}&thinsp;</span>)}</td>
-                <td className="bc-op">{inst.op}</td>
-                <td className="bc-arg">{inst.argStr || (inst.arg !== undefined ? inst.arg : '')}</td>
-              </tr>
-            ))}
+            {bytecode.map((inst, i) => {
+              const hex = bcBytes(inst)
+              return (
+                <tr key={i} className="bytecode-row">
+                  <td className="line-num">{i}</td>
+                  <td className="bc-bytes" onClick={() => handleHexClick(hex.join(' '))} style={{ cursor: 'pointer' }} title="Click to copy">
+                    {hex.map((b, j) => <span key={j} style={{ color: hexColor(j) }}>{b}&thinsp;</span>)}
+                  </td>
+                  <td className="bc-op">{inst.op}</td>
+                  <td className="bc-arg">{inst.argStr || (inst.arg !== undefined ? inst.arg : '')}</td>
+                </tr>
+              )
+            })}
           </tbody>
         </table>
       </div>

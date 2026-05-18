@@ -358,6 +358,8 @@ func (g *Generator) Gen(ir []compiler.IRInstr) []AsmInstr {
 		case "METHOD_CALL":
 			g.regContent[inst.Dest] = fmt.Sprintf("%s.%s()", inst.Src1, inst.Src2)
 			emitPlain(fmt.Sprintf("\tcall\t%s.%s", inst.Src1, inst.Src2))
+		case "CALL_INIT":
+			emitPlain(fmt.Sprintf("\tcall\t__init__(%s.%s)", inst.Dest, inst.Src2))
 
 		case "OBJ_LIT":
 			r := g.allocReg(inst.Dest)

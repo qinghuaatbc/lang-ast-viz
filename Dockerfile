@@ -14,7 +14,7 @@ RUN go build -o /server .
 
 # Runtime
 FROM alpine:3.19
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates gcc musl-dev libgcc
 COPY --from=frontend /app/dist /frontend/dist
 COPY --from=backend /server /server
 WORKDIR /

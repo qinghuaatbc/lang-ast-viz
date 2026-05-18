@@ -6,17 +6,21 @@ import (
 	"lang-ast-viz/asm"
 	"lang-ast-viz/compiler"
 	"lang-ast-viz/compiler/lang"
+	"lang-ast-viz/optimizer"
 	"lang-ast-viz/vm"
 )
 
 type CompileResult struct {
-	AST      *compiler.Node          `json:"ast"`
-	IR       []compiler.IRInstr      `json:"ir"`
-	Assembly []asm.AsmInstr          `json:"assembly"`
-	Bytecode []compiler.BytecodeInstr `json:"bytecode"`
-	Output   []string                `json:"output"`
-	Errors   []string                `json:"errors"`
-	Language string                  `json:"language"`
+	AST          *compiler.Node          `json:"ast"`
+	IR           []compiler.IRInstr      `json:"ir"`
+	OptIR        []compiler.IRInstr      `json:"optIR,omitempty"`
+	Assembly     []asm.AsmInstr          `json:"assembly"`
+	OptAssembly  []asm.AsmInstr          `json:"optAssembly,omitempty"`
+	Bytecode     []compiler.BytecodeInstr `json:"bytecode"`
+	OptBytecode  []compiler.BytecodeInstr `json:"optBytecode,omitempty"`
+	Output       []string                `json:"output"`
+	Errors       []string                `json:"errors"`
+	Language     string                  `json:"language"`
 }
 
 func Compile(source string) *CompileResult {
@@ -39,13 +43,22 @@ func CompileWithLang(ctx context.Context, source string, cfg lang.Config) *Compi
 	irGen := compiler.NewIRGen()
 	res.IR = irGen.Gen(ast)
 
+	// Constant folding optimization
+	res.OptIR = optimizer.FoldConstants(res.IR)
+
 	asmGen := asm.NewGenerator()
 	res.Assembly = asmGen.Gen(res.IR)
+
+	optAsmGen := asm.NewGenerator()
+	res.OptAssembly = optAsmGen.Gen(res.OptIR)
 
 	bcGen := compiler.NewBytecodeGen()
 	res.Bytecode = bcGen.Gen(res.IR)
 
-	v := vm.NewVM(res.Bytecode)
+	optBcGen := compiler.NewBytecodeGen()
+	res.OptBytecode = optBcGen.Gen(res.OptIR)
+
+	v := vm.NewVM(res.OptBytecode)
 	output, err := v.RunWithCtx(ctx)
 	if err != nil {
 		res.Errors = append(res.Errors, err.Error())

@@ -11,8 +11,9 @@ import ASMViewer from './components/ASMViewer'
 import BytecodeViewer from './components/BytecodeViewer'
 import DataStructuresView from './components/DataStructuresView'
 import LinuxView from './components/LinuxView'
+import TLPIView from './components/TLPIView'
 
-type TopMode = 'ast' | 'ds' | 'linux'
+type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi'
 
 function parseErrorLines(errors: string[]): Set<number> {
   const s = new Set<number>()
@@ -127,6 +128,7 @@ function AppInner() {
     { id: 'ast',   label: 'AST 编译器',   icon: '🔬' },
     { id: 'ds',    label: '数据结构',      icon: '🗂' },
     { id: 'linux', label: 'Linux 操作系统', icon: '🐧' },
+    { id: 'tlpi',  label: 'TLPI 系统编程', icon: '📖' },
   ]
 
   return (
@@ -205,6 +207,13 @@ function AppInner() {
       {topMode === 'linux' && (
         <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
           <LinuxView />
+        </div>
+      )}
+
+      {/* ── TLPI book view ────────────────────────────────────────────────────── */}
+      {topMode === 'tlpi' && (
+        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+          <TLPIView />
         </div>
       )}
 

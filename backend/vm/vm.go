@@ -114,11 +114,14 @@ func (vm *VM) RunWithCtx(ctx context.Context) ([]string, error) {
 	vm.output = nil
 
 	for vm.pc >= 0 && vm.pc < len(vm.program) {
-		select {
-		case <-ctx.Done():
-			vm.output = append(vm.output, "halted: "+ctx.Err().Error())
-			return vm.output, nil
-		default:
+		// Check context every 128 instructions to reduce overhead
+		if vm.pc&127 == 0 {
+			select {
+			case <-ctx.Done():
+				vm.output = append(vm.output, "halted: "+ctx.Err().Error())
+				return vm.output, nil
+			default:
+			}
 		}
 		inst := vm.program[vm.pc]
 		vm.pc++

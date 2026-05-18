@@ -10,6 +10,31 @@ type Lexer struct {
 	line, col      int
 	tokLine, tokCol int
 	config         lang.Config
+	lines          []string // cached source lines for error display
+}
+
+func (l *Lexer) SourceLine(n int) string {
+	if n < 1 || n > len(l.lines) {
+		return ""
+	}
+	return l.lines[n-1]
+}
+
+func (l *Lexer) cacheLines() {
+	l.lines = splitLines(l.input)
+}
+
+func splitLines(s string) []string {
+	var lines []string
+	start := 0
+	for i := 0; i < len(s); i++ {
+		if s[i] == '\n' {
+			lines = append(lines, s[start:i])
+			start = i + 1
+		}
+	}
+	lines = append(lines, s[start:])
+	return lines
 }
 
 func NewLexer(input string) *Lexer {
@@ -18,6 +43,7 @@ func NewLexer(input string) *Lexer {
 
 func NewLexerWithLang(input string, cfg lang.Config) *Lexer {
 	l := &Lexer{input: input, line: 1, col: 0, config: cfg}
+	l.cacheLines()
 	l.readChar()
 	return l
 }

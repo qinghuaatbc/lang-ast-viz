@@ -20,9 +20,18 @@ export default function CodeEditor({ value, onChange, onCompile, onExampleSelect
   const { t } = useLang()
   const [showExamples, setShowExamples] = useState(false)
   const preRef = useRef<HTMLPreElement>(null)
+  const gutterRef = useRef<HTMLPreElement>(null)
   const historyRef = useRef<string[]>([value])
   const histIdxRef = useRef(0)
   const ignoreNextRef = useRef(false)
+
+  useEffect(() => {
+    // Reset history when value changes externally (example select, language switch)
+    if (historyRef.current[histIdxRef.current] !== value) {
+      historyRef.current = [value]
+      histIdxRef.current = 0
+    }
+  }, [language]) // eslint-disable-line
 
   useEffect(() => {
     const h = historyRef.current
@@ -51,9 +60,14 @@ export default function CodeEditor({ value, onChange, onCompile, onExampleSelect
   }, [onChange])
 
   const syncScroll = useCallback((e: React.UIEvent<HTMLTextAreaElement>) => {
+    const st = e.currentTarget.scrollTop
+    const sl = e.currentTarget.scrollLeft
     if (preRef.current) {
-      preRef.current.scrollTop = e.currentTarget.scrollTop
-      preRef.current.scrollLeft = e.currentTarget.scrollLeft
+      preRef.current.scrollTop = st
+      preRef.current.scrollLeft = sl
+    }
+    if (gutterRef.current) {
+      gutterRef.current.scrollTop = st
     }
   }, [])
 
@@ -86,6 +100,8 @@ export default function CodeEditor({ value, onChange, onCompile, onExampleSelect
     }
   }, [value, onChange, onCompile, undo, redo])
 
+  const lineCount = value.split('\n').length
+  const lineNums = Array.from({ length: lineCount }, (_, i) => i + 1).join('\n')
   const highlighted = highlight(value, language, errorLines)
 
   return (
@@ -115,6 +131,9 @@ export default function CodeEditor({ value, onChange, onCompile, onExampleSelect
         </div>
       )}
       <div className="editor-wrapper">
+          <div className="editor-gutter">
+            <pre ref={gutterRef} aria-hidden="true" className="editor-lines">{lineNums}</pre>
+          </div>
         <pre
           ref={preRef}
           className="editor-highlight"
@@ -134,7 +153,7 @@ export default function CodeEditor({ value, onChange, onCompile, onExampleSelect
         />
       </div>
       <div className="editor-footer">
-        <span className="shortcut-hint">{t('ctrl.enter')} &nbsp;·&nbsp; Tab: indent</span>
+        <span className="shortcut-hint">{t('ctrl.enter')} &nbsp;·&nbsp; Tab: indent &nbsp;·&nbsp; Ctrl+Z/Y: undo/redo</span>
       </div>
     </div>
   )

@@ -2,6 +2,8 @@ package compiler
 
 import (
 	"fmt"
+	"strings"
+
 	"lang-ast-viz/compiler/lang"
 )
 
@@ -24,7 +26,16 @@ func NewParser(lex *Lexer) *Parser {
 func (p *Parser) Errors() []string { return p.errs }
 
 func (p *Parser) addErr(msg string) {
-	p.errs = append(p.errs, fmt.Sprintf("line %d:%d: %s", p.cur.Line, p.cur.Col, msg))
+	line := p.cur.Line
+	col := p.cur.Col
+	ctx := ""
+	if line > 0 {
+		if src := p.lex.SourceLine(line); src != "" {
+			caret := strings.Repeat(" ", col-1) + "^"
+			ctx = "\n  " + src + "\n  " + caret
+		}
+	}
+	p.errs = append(p.errs, fmt.Sprintf("line %d:%d: %s%s", line, col, msg, ctx))
 }
 
 func (p *Parser) nextToken() {

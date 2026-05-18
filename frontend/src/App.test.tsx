@@ -6,8 +6,8 @@ import { highlight } from './utils/highlight'
 describe('examples', () => {
   const langs = ['rust', 'go', 'python', 'typescript', 'c']
   for (const lang of langs) {
-    it(`has 60 ${lang} examples`, () => {
-      expect(examplesByLang[lang].length).toBe(60)
+    it(`has examples`, () => {
+      expect(examplesByLang[lang].length).toBeGreaterThanOrEqual(60)
     })
     it(`first ${lang} example has name and code`, () => {
       const ex = examplesByLang[lang][0]

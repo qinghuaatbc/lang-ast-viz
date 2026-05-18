@@ -325,14 +325,23 @@ func (ir *IRGen) genNode(n *Node) string {
 		}
 		obj := ir.newTemp()
 		ir.emit("INSTANTIATE", obj, className, fmt.Sprintf("%d", len(n.Children)-1))
-		fieldNames := ir.classFields[className]
-		for i := 1; i < len(n.Children); i++ {
-			arg := ir.genNode(n.Children[i])
-			fname := fmt.Sprintf("_arg%d", i-1)
-			if i-1 < len(fieldNames) {
-				fname = fieldNames[i-1]
+		if ir.hasInit[className] {
+			ir.emit("PUSH_ARG", "", obj, "")
+			for i := 1; i < len(n.Children); i++ {
+				arg := ir.genNode(n.Children[i])
+				ir.emit("PUSH_ARG", "", arg, "")
 			}
-			ir.emit("SETFIELD", obj, fname, arg)
+			ir.emit("CALL_INIT", obj, className, fmt.Sprintf("%d", len(n.Children)-1))
+		} else {
+			fieldNames := ir.classFields[className]
+			for i := 1; i < len(n.Children); i++ {
+				arg := ir.genNode(n.Children[i])
+				fname := fmt.Sprintf("_arg%d", i-1)
+				if i-1 < len(fieldNames) {
+					fname = fieldNames[i-1]
+				}
+				ir.emit("SETFIELD", obj, fname, arg)
+			}
 		}
 		return obj
 	case NArrayList:

@@ -259,11 +259,34 @@ body {
   white-space: pre-wrap;
 }
 
+/* Editor line number gutter */
+.editor-gutter {
+  width: 36px;
+  flex-shrink: 0;
+  background: var(--bg-primary);
+  border-right: 1px solid var(--border);
+  overflow: hidden;
+}
+.editor-lines {
+  padding: 12px 0;
+  margin: 0;
+  font-family: 'JetBrains Mono', 'Fira Code', monospace;
+  font-size: 13px;
+  line-height: 1.6;
+  text-align: right;
+  color: var(--text-muted);
+  user-select: none;
+  pointer-events: none;
+  white-space: pre;
+  tab-size: 2;
+}
+
 /* Syntax-highlighted editor overlay */
 .editor-wrapper {
   position: relative;
   flex: 1;
   display: flex;
+  flex-direction: row;
   border: 1px solid var(--border);
   border-radius: 6px;
   background: var(--bg-secondary);
@@ -881,6 +904,32 @@ body {
   .asm-code {
     font-size: 9px;
   }
+}
+
+/* Help overlay */
+.help-overlay {
+  position: fixed; inset: 0; background: rgba(0,0,0,0.5);
+  display: flex; align-items: center; justify-content: center;
+  z-index: 1000;
+}
+.help-panel {
+  background: var(--bg-secondary); border: 1px solid var(--border);
+  border-radius: 10px; padding: 24px 28px; max-width: 420px;
+  box-shadow: 0 8px 32px rgba(0,0,0,0.3);
+}
+.help-panel h3 {
+  margin-bottom: 16px; font-size: 15px;
+  background: var(--accent-gradient);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent;
+}
+.help-table { width: 100%; border-collapse: collapse; }
+.help-table td { padding: 6px 0; font-size: 13px; color: var(--text-primary); }
+.help-key { white-space: nowrap; padding-right: 20px; }
+.help-key kbd {
+  background: var(--bg-elevated); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px; font-size: 11px;
+  font-family: monospace; color: var(--text);
+  -webkit-text-fill-color: var(--text);
 }
 
 /* ====== Mobile Responsive ====== */

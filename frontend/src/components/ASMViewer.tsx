@@ -120,6 +120,17 @@ export default function ASMViewer({ assembly }: ASMViewerProps) {
     setStep(s => Math.max(0, Math.min(total - 1, s + delta)))
   }, [total])
 
+  const [asmCopied, setAsmCopied] = useState(false)
+
+  const handleCopyAsm = useCallback(() => {
+    if (!assembly) return
+    const text = assembly.map((inst, i) => `${i}: ${asmBytes(inst.text).padEnd(25)} ${inst.text}`).join('\n')
+    navigator.clipboard.writeText(text).then(() => {
+      setAsmCopied(true)
+      setTimeout(() => setAsmCopied(false), 1500)
+    }).catch(() => {})
+  }, [assembly])
+
   const handleKeyDown = useCallback((e: React.KeyboardEvent) => {
     if (e.key === 'ArrowUp' || e.key === 'ArrowLeft') { e.preventDefault(); goStep(-1) }
     if (e.key === 'ArrowDown' || e.key === 'ArrowRight') { e.preventDefault(); goStep(1) }
@@ -145,6 +156,10 @@ export default function ASMViewer({ assembly }: ASMViewerProps) {
         </button>
         <button className="asm-btn" onClick={() => goStep(1)} disabled={step >= total - 1}>▶</button>
         <span className="asm-step-info">{step + 1} / {total}</span>
+        <span style={{ flex: 1 }} />
+        <button className="asm-btn" onClick={handleCopyAsm} style={{ fontSize: 11, padding: '2px 8px' }}>
+          {asmCopied ? 'Copied!' : 'Copy'}
+        </button>
       </div>
 
       <div className="asm-main">
