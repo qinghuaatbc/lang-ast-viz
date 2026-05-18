@@ -42,7 +42,9 @@ function buildSimpleNFA(pattern: string): { states: NFAState[]; edges: NFAEdge[]
       cur = alt; i++; continue
     }
     const label = ch === '.' ? 'any' : ch === '\\' && next ? `\\${next}` : ch === '[' ? '[…]' : ch
-    const skip = ch === '\\' ? 2 : ch === '[' ? (clean.indexOf(']', i + 1) - i + 1) : 1
+    const closeBracket = ch === '[' ? clean.indexOf(']', i + 1) : -1
+    const skip = ch === '\\' ? 2 : ch === '[' ? (closeBracket >= 0 ? closeBracket - i + 1 : clean.length - i) : 1
+    if (skip <= 0) break
     const q = newState(`q${id}`)
     const quantifier = clean[i + skip]
     if (quantifier === '*') {
