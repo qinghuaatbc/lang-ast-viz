@@ -1,4 +1,4 @@
-import { useState, useCallback, useEffect, useReducer, useRef } from 'react'
+import { useState, useCallback, useEffect, useReducer, useRef, lazy, Suspense } from 'react'
 import { compileSource, CompileResult, LangInfo, fetchLanguages } from './api/compile'
 import { LangProvider, useLang } from './i18n/lang'
 import { ThemeProvider, useTheme } from './theme/theme'
@@ -9,16 +9,17 @@ import ASTViewer from './components/ASTViewer'
 import IRViewer from './components/IRViewer'
 import ASMViewer from './components/ASMViewer'
 import BytecodeViewer from './components/BytecodeViewer'
-import DataStructuresView from './components/DataStructuresView'
-import LinuxView from './components/LinuxView'
-import TLPIView from './components/TLPIView'
-import AlgoView from './components/AlgoView'
-import MemoryView from './components/MemoryView'
-import RegexView from './components/RegexView'
-import IEEE754View from './components/IEEE754View'
-import NetworkView from './components/NetworkView'
-import CPUView from './components/CPUView'
-import X86View from './components/X86View'
+
+const DataStructuresView = lazy(() => import('./components/DataStructuresView'))
+const LinuxView          = lazy(() => import('./components/LinuxView'))
+const TLPIView           = lazy(() => import('./components/TLPIView'))
+const AlgoView           = lazy(() => import('./components/AlgoView'))
+const MemoryView         = lazy(() => import('./components/MemoryView'))
+const RegexView          = lazy(() => import('./components/RegexView'))
+const IEEE754View        = lazy(() => import('./components/IEEE754View'))
+const NetworkView        = lazy(() => import('./components/NetworkView'))
+const CPUView            = lazy(() => import('./components/CPUView'))
+const X86View            = lazy(() => import('./components/X86View'))
 
 type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi' | 'algo' | 'memory' | 'regex' | 'ieee754' | 'network' | 'cpu' | 'x86'
 
@@ -210,73 +211,23 @@ function AppInner() {
         </div>
       </header>
 
-      {/* ── Data Structures view ──────────────────────────────────────────────── */}
-      {topMode === 'ds' && (
+      {/* ── Lazy-loaded views ─────────────────────────────────────────────────── */}
+      {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86'] as TopMode[]).includes(topMode) && (
         <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <DataStructuresView />
-        </div>
-      )}
-
-      {/* ── Linux OS view ─────────────────────────────────────────────────────── */}
-      {topMode === 'linux' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <LinuxView />
-        </div>
-      )}
-
-      {/* ── TLPI book view ────────────────────────────────────────────────────── */}
-      {topMode === 'tlpi' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <TLPIView />
-        </div>
-      )}
-
-      {/* ── Algorithm Visualizer ──────────────────────────────────────────────── */}
-      {topMode === 'algo' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <AlgoView />
-        </div>
-      )}
-
-      {/* ── Memory Layout ─────────────────────────────────────────────────────── */}
-      {topMode === 'memory' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <MemoryView />
-        </div>
-      )}
-
-      {/* ── Regex NFA ─────────────────────────────────────────────────────────── */}
-      {topMode === 'regex' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <RegexView />
-        </div>
-      )}
-
-      {/* ── IEEE 754 ──────────────────────────────────────────────────────────── */}
-      {topMode === 'ieee754' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <IEEE754View />
-        </div>
-      )}
-
-      {/* ── Network Protocol Stack ────────────────────────────────────────────── */}
-      {topMode === 'network' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <NetworkView />
-        </div>
-      )}
-
-      {/* ── CPU Pipeline ──────────────────────────────────────────────────────── */}
-      {topMode === 'cpu' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <CPUView />
-        </div>
-      )}
-
-      {/* ── x86 Assembly ──────────────────────────────────────────────────────── */}
-      {topMode === 'x86' && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <X86View />
+          <Suspense fallback={<div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--text-muted)', fontSize:14 }}>加载中…</div>}>
+            <ErrorBoundary>
+              {topMode === 'ds'      && <DataStructuresView />}
+              {topMode === 'linux'   && <LinuxView />}
+              {topMode === 'tlpi'    && <TLPIView />}
+              {topMode === 'algo'    && <AlgoView />}
+              {topMode === 'memory'  && <MemoryView />}
+              {topMode === 'regex'   && <RegexView />}
+              {topMode === 'ieee754' && <IEEE754View />}
+              {topMode === 'network' && <NetworkView />}
+              {topMode === 'cpu'     && <CPUView />}
+              {topMode === 'x86'     && <X86View />}
+            </ErrorBoundary>
+          </Suspense>
         </div>
       )}
 
