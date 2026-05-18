@@ -64,8 +64,11 @@ export interface AsmInstr {
 export interface CompileResult {
   ast: ASTNode
   ir: IRInstr[]
+  optIR?: IRInstr[]
   assembly: AsmInstr[]
+  optAssembly?: AsmInstr[]
   bytecode: BytecodeInstr[]
+  optBytecode?: BytecodeInstr[]
   output: string[]
   errors: string[]
   language: string
