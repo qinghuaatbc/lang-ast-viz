@@ -1,6 +1,7 @@
 import React, { useState } from 'react'
 import { useLang } from '../i18n/lang'
 import { useMobile } from '../hooks/useMobile'
+import CodeBlock from './CodeBlock'
 
 // ─── Data ────────────────────────────────────────────────────────────────────
 
@@ -768,27 +769,7 @@ export default function GitView() {
 
       {/* Code block */}
       <div style={{ marginBottom: 20 }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: 0.5, textTransform: 'uppercase' }}>
-          {codeTitle(topic)}
-        </div>
-        <pre style={{
-          margin: 0, padding: '14px 16px',
-          background: '#0d1117', borderRadius: 8,
-          border: '1px solid var(--border)',
-          fontSize: 12, lineHeight: 1.7, color: '#e6edf3',
-          overflowX: 'auto', whiteSpace: 'pre',
-          fontFamily: 'ui-monospace, SFMono-Regular, Menlo, Monaco, monospace',
-        }}>
-          {topic.code.split('\n').map((line, i) => {
-            const trimmed = line.trimStart()
-            const isComment = trimmed.startsWith('#')
-            return (
-              <span key={i} style={{ display: 'block', color: isComment ? '#8b949e' : '#e6edf3' }}>
-                {line}
-              </span>
-            )
-          })}
-        </pre>
+        <CodeBlock code={topic.code} title={codeTitle(topic)} />
       </div>
 
       {/* Notes */}
