@@ -12,8 +12,15 @@ import BytecodeViewer from './components/BytecodeViewer'
 import DataStructuresView from './components/DataStructuresView'
 import LinuxView from './components/LinuxView'
 import TLPIView from './components/TLPIView'
+import AlgoView from './components/AlgoView'
+import MemoryView from './components/MemoryView'
+import RegexView from './components/RegexView'
+import IEEE754View from './components/IEEE754View'
+import NetworkView from './components/NetworkView'
+import CPUView from './components/CPUView'
+import X86View from './components/X86View'
 
-type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi'
+type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi' | 'algo' | 'memory' | 'regex' | 'ieee754' | 'network' | 'cpu' | 'x86'
 
 function parseErrorLines(errors: string[]): Set<number> {
   const s = new Set<number>()
@@ -125,10 +132,17 @@ function AppInner() {
   }, [showHelp])
 
   const topTabs: { id: TopMode; label: string; icon: string }[] = [
-    { id: 'ast',   label: 'AST 编译器',   icon: '🔬' },
-    { id: 'ds',    label: '数据结构',      icon: '🗂' },
-    { id: 'linux', label: 'Linux 操作系统', icon: '🐧' },
-    { id: 'tlpi',  label: 'TLPI 系统编程', icon: '📖' },
+    { id: 'ast',     label: 'AST 编译器',   icon: '🔬' },
+    { id: 'ds',      label: '数据结构',      icon: '🗂' },
+    { id: 'linux',   label: 'Linux OS',     icon: '🐧' },
+    { id: 'tlpi',    label: 'TLPI',         icon: '📖' },
+    { id: 'algo',    label: '排序算法',      icon: '📊' },
+    { id: 'memory',  label: '内存布局',      icon: '🧠' },
+    { id: 'regex',   label: '正则表达式',    icon: '🔍' },
+    { id: 'ieee754', label: 'IEEE 754',     icon: '🔢' },
+    { id: 'network', label: '网络协议栈',    icon: '🌐' },
+    { id: 'cpu',     label: 'CPU 流水线',   icon: '⚡' },
+    { id: 'x86',     label: 'x86 汇编',    icon: '🖥' },
   ]
 
   return (
@@ -141,17 +155,17 @@ function AppInner() {
               <p className="subtitle" style={{ margin: 0 }}>{t('app.subtitle')}</p>
             </div>
             {/* Top-level mode switcher */}
-            <div style={{ display: 'flex', gap: 4, background: 'var(--bg-secondary, rgba(255,255,255,0.06))', borderRadius: 10, padding: 4 }}>
+            <div style={{ display: 'flex', gap: 4, background: 'var(--bg-secondary, rgba(255,255,255,0.06))', borderRadius: 10, padding: 4, overflowX: 'auto', maxWidth: 'calc(100vw - 340px)', flexShrink: 1 }}>
               {topTabs.map(tab => (
                 <button
                   key={tab.id}
                   onClick={() => switchTop(tab.id)}
                   style={{
-                    padding: '6px 14px', border: 'none', borderRadius: 7, cursor: 'pointer',
+                    padding: '6px 10px', border: 'none', borderRadius: 7, cursor: 'pointer', flexShrink: 0,
                     background: topMode === tab.id ? 'var(--accent, #3fb950)' : 'transparent',
                     color: topMode === tab.id ? '#fff' : 'var(--text-muted, #888)',
                     fontWeight: topMode === tab.id ? 700 : 400,
-                    fontSize: 13, display: 'flex', alignItems: 'center', gap: 5,
+                    fontSize: 12, display: 'flex', alignItems: 'center', gap: 4,
                     transition: 'all 0.15s',
                   }}
                 >
@@ -214,6 +228,55 @@ function AppInner() {
       {topMode === 'tlpi' && (
         <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
           <TLPIView />
+        </div>
+      )}
+
+      {/* ── Algorithm Visualizer ──────────────────────────────────────────────── */}
+      {topMode === 'algo' && (
+        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+          <AlgoView />
+        </div>
+      )}
+
+      {/* ── Memory Layout ─────────────────────────────────────────────────────── */}
+      {topMode === 'memory' && (
+        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+          <MemoryView />
+        </div>
+      )}
+
+      {/* ── Regex NFA ─────────────────────────────────────────────────────────── */}
+      {topMode === 'regex' && (
+        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+          <RegexView />
+        </div>
+      )}
+
+      {/* ── IEEE 754 ──────────────────────────────────────────────────────────── */}
+      {topMode === 'ieee754' && (
+        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+          <IEEE754View />
+        </div>
+      )}
+
+      {/* ── Network Protocol Stack ────────────────────────────────────────────── */}
+      {topMode === 'network' && (
+        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+          <NetworkView />
+        </div>
+      )}
+
+      {/* ── CPU Pipeline ──────────────────────────────────────────────────────── */}
+      {topMode === 'cpu' && (
+        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+          <CPUView />
+        </div>
+      )}
+
+      {/* ── x86 Assembly ──────────────────────────────────────────────────────── */}
+      {topMode === 'x86' && (
+        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+          <X86View />
         </div>
       )}
 
