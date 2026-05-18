@@ -2,8 +2,8 @@ import { useState } from 'react'
 
 interface SyscallEx {
   name: string; icon: string; chapter: string; vol: 1|2; desc: string
-  syscalls: { name: string; sig: string }[]
-  code: string; notes: string; demoCode: string
+  syscalls?: { name: string; sig: string }[]
+  code?: string; notes?: string; demoCode?: string
 }
 
 async function runCode(code: string): Promise<{ output: string[]; stderr?: string; error?: string }> {
@@ -83,6 +83,16 @@ const CHAPTERS: { id: string; label: string; icon: string; color: string; vol: 1
   { id: 'termios',       label: 'Ch.62  Terminals',           icon: '🖥️',  color: '#e3b341', vol: 2 },
   { id: 'eventfd',       label: 'Ch.63+ eventfd',             icon: '🔔',  color: '#3fb950', vol: 2 },
   { id: 'select',        label: 'Ch.63  select/poll/epoll',   icon: '⚡',  color: '#39d353', vol: 2 },
+  { id: 'inotify',       label: 'Ch.19  inotify',             icon: '👁',  color: '#4d8fff', vol: 1 },
+  { id: 'epoll',         label: 'Ch.62  epoll server',        icon: '⚡',  color: '#58a6ff', vol: 2 },
+  { id: 'timerfd',       label: 'Ch.25+ timerfd',             icon: '⏱',  color: '#a371f7', vol: 1 },
+  { id: 'posix_shm',     label: 'Ch.54  POSIX shm',           icon: '🤝',  color: '#ffa657', vol: 2 },
+  { id: 'posix_sem',     label: 'Ch.53  POSIX sem',           icon: '🚦',  color: '#ff6b6b', vol: 2 },
+  { id: 'select_poll',   label: 'Ch.63  select/poll',         icon: '🎯',  color: '#3fb950', vol: 2 },
+  { id: 'setuid',        label: 'Ch.9   setuid/creds',        icon: '🪪',  color: '#e3b341', vol: 1 },
+  { id: 'ptrace_demo',   label: 'Ch.41  ptrace',              icon: '🔭',  color: '#74c0fc', vol: 2 },
+  { id: 'seccomp',       label: 'Ch.38+ seccomp',             icon: '🔒',  color: '#ff6b6b', vol: 2 },
+  { id: 'io_uring',      label: 'Ch.13+ io_uring',            icon: '🌀',  color: '#cc5de8', vol: 1 },
 ]
 
 // ─── Examples ─────────────────────────────────────────────────────────────────
@@ -4856,6 +4866,481 @@ int main(void) {
     return 0;
 }`,
   },
+  epoll: {
+    name: 'epoll', icon: '⚡', chapter: 'Ch. 62', vol: 2,
+    desc: 'I/O 多路复用高效实现，O(1) 事件通知，适合高并发服务器',
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/epoll.h>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <fcntl.h>
+
+#define MAX_EVENTS 64
+#define PORT 9000
+
+static void set_nonblock(int fd) {
+    int flags = fcntl(fd, F_GETFL, 0);
+    fcntl(fd, F_SETFL, flags | O_NONBLOCK);
+}
+
+int main(void) {
+    /* 创建监听 socket */
+    int lfd = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(lfd, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+    struct sockaddr_in addr = {
+        .sin_family = AF_INET, .sin_port = htons(PORT),
+        .sin_addr.s_addr = INADDR_ANY
+    };
+    bind(lfd, (struct sockaddr *)&addr, sizeof(addr));
+    listen(lfd, 128);
+    set_nonblock(lfd);
+
+    /* 创建 epoll 实例 */
+    int epfd = epoll_create1(EPOLL_CLOEXEC);
+    struct epoll_event ev = { .events = EPOLLIN, .data.fd = lfd };
+    epoll_ctl(epfd, EPOLL_CTL_ADD, lfd, &ev);
+
+    printf("epoll server listening on :%d\\n", PORT);
+
+    struct epoll_event events[MAX_EVENTS];
+    for (;;) {
+        int n = epoll_wait(epfd, events, MAX_EVENTS, -1);
+        for (int i = 0; i < n; i++) {
+            int fd = events[i].data.fd;
+            if (fd == lfd) {          /* 新连接 */
+                int cfd = accept4(lfd, NULL, NULL, SOCK_NONBLOCK);
+                ev.events = EPOLLIN | EPOLLET;  /* 边缘触发 */
+                ev.data.fd = cfd;
+                epoll_ctl(epfd, EPOLL_CTL_ADD, cfd, &ev);
+                printf("accept fd=%d\\n", cfd);
+            } else {                  /* 可读事件 */
+                char buf[1024];
+                ssize_t r = read(fd, buf, sizeof(buf));
+                if (r <= 0) {
+                    epoll_ctl(epfd, EPOLL_CTL_DEL, fd, NULL);
+                    close(fd);
+                    printf("close fd=%d\\n", fd);
+                } else {
+                    write(fd, buf, r);  /* echo 回去 */
+                }
+            }
+        }
+    }
+}`,
+  },
+  posix_shm: {
+    name: 'POSIX shm', icon: '🤝', chapter: 'Ch. 54', vol: 2,
+    desc: 'POSIX 共享内存，进程间零拷贝数据共享',
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
+#include <sys/wait.h>
+
+#define SHM_NAME "/demo_shm"
+#define SHM_SIZE 4096
+
+typedef struct { int counter; char message[256]; } SharedData;
+
+int main(void) {
+    /* 创建共享内存对象 */
+    int fd = shm_open(SHM_NAME, O_CREAT | O_RDWR, 0600);
+    if (fd == -1) { perror("shm_open"); exit(1); }
+    ftruncate(fd, SHM_SIZE);
+
+    /* 映射到进程地址空间 */
+    SharedData *shm = mmap(NULL, SHM_SIZE,
+                           PROT_READ | PROT_WRITE,
+                           MAP_SHARED, fd, 0);
+    close(fd);
+
+    shm->counter = 0;
+    strcpy(shm->message, "hello from parent");
+
+    pid_t pid = fork();
+    if (pid == 0) {  /* 子进程 */
+        for (int i = 0; i < 5; i++) {
+            shm->counter++;                    /* 直接写共享内存 */
+            printf("child: counter=%d\\n", shm->counter);
+            usleep(100000);
+        }
+        snprintf(shm->message, 256, "written by child (pid=%d)", getpid());
+        munmap(shm, SHM_SIZE);
+        exit(0);
+    }
+
+    wait(NULL);  /* 等子进程完成 */
+    printf("parent: final counter=%d\\n", shm->counter);
+    printf("parent: message='%s'\\n", shm->message);
+
+    munmap(shm, SHM_SIZE);
+    shm_unlink(SHM_NAME);   /* 删除共享内存对象 */
+    printf("\\nPOSIX shm: zero-copy IPC, persists until shm_unlink()\\n");
+    return 0;
+}`,
+  },
+  posix_sem: {
+    name: 'POSIX sem', icon: '🚦', chapter: 'Ch. 53', vol: 2,
+    desc: 'POSIX 命名/匿名信号量，进程/线程同步原语',
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <pthread.h>
+#include <semaphore.h>
+#include <unistd.h>
+
+#define ITEMS 8
+
+sem_t empty_slots, filled_slots;
+int buffer[4], head = 0, tail = 0;
+
+void *producer(void *arg) {
+    for (int i = 0; i < ITEMS; i++) {
+        int item = i * 10;
+        sem_wait(&empty_slots);          /* 等待空槽 */
+        buffer[head % 4] = item;
+        head++;
+        printf("produce: item=%d (head=%d)\\n", item, head);
+        sem_post(&filled_slots);         /* 通知消费者 */
+        usleep(50000);
+    }
+    return NULL;
+}
+
+void *consumer(void *arg) {
+    for (int i = 0; i < ITEMS; i++) {
+        sem_wait(&filled_slots);         /* 等待数据 */
+        int item = buffer[tail % 4];
+        tail++;
+        printf("consume: item=%d (tail=%d)\\n", item, tail);
+        sem_post(&empty_slots);          /* 释放槽位 */
+        usleep(120000);
+    }
+    return NULL;
+}
+
+int main(void) {
+    sem_init(&empty_slots, 0, 4);    /* 4个空槽 */
+    sem_init(&filled_slots, 0, 0);   /* 0个数据 */
+
+    pthread_t prod, cons;
+    pthread_create(&prod, NULL, producer, NULL);
+    pthread_create(&cons, NULL, consumer, NULL);
+    pthread_join(prod, NULL);
+    pthread_join(cons, NULL);
+
+    sem_destroy(&empty_slots);
+    sem_destroy(&filled_slots);
+    printf("\\nPOSIX sem: producer-consumer with bounded buffer done!\\n");
+    return 0;
+}`,
+  },
+  select_poll: {
+    name: 'select/poll', icon: '🎯', chapter: 'Ch. 63', vol: 2,
+    desc: 'I/O 多路复用基础：select 和 poll 监视多个文件描述符',
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/select.h>
+#include <poll.h>
+#include <string.h>
+
+void demo_select(int fd0, int fd1) {
+    fd_set rfds;
+    struct timeval tv = { .tv_sec = 2, .tv_usec = 0 };
+
+    FD_ZERO(&rfds);
+    FD_SET(fd0, &rfds);
+    FD_SET(fd1, &rfds);
+    int maxfd = fd0 > fd1 ? fd0 : fd1;
+
+    int n = select(maxfd + 1, &rfds, NULL, NULL, &tv);
+    if (n == 0) { printf("select: timeout\\n"); return; }
+    if (n < 0)  { perror("select"); return; }
+
+    if (FD_ISSET(fd0, &rfds)) printf("select: fd0=%d readable\\n", fd0);
+    if (FD_ISSET(fd1, &rfds)) printf("select: fd1=%d readable\\n", fd1);
+}
+
+void demo_poll(int fd0, int fd1) {
+    struct pollfd fds[2] = {
+        { .fd = fd0, .events = POLLIN },
+        { .fd = fd1, .events = POLLIN },
+    };
+    int n = poll(fds, 2, 2000);   /* 2000ms timeout */
+    if (n == 0) { printf("poll: timeout\\n"); return; }
+    if (n < 0)  { perror("poll"); return; }
+
+    for (int i = 0; i < 2; i++) {
+        if (fds[i].revents & POLLIN)
+            printf("poll: fds[%d].fd=%d readable\\n", i, fds[i].fd);
+        if (fds[i].revents & POLLERR)
+            printf("poll: fds[%d] error\\n", i);
+    }
+}
+
+int main(void) {
+    int pfd0[2], pfd1[2];
+    pipe(pfd0); pipe(pfd1);
+
+    write(pfd0[1], "hello", 5);   /* 让 fd0 可读 */
+
+    printf("--- select demo ---\\n");
+    demo_select(pfd0[0], pfd1[0]);
+
+    printf("--- poll demo ---\\n");
+    demo_poll(pfd0[0], pfd1[0]);
+
+    close(pfd0[0]); close(pfd0[1]);
+    close(pfd1[0]); close(pfd1[1]);
+    printf("\\nselect O(n), poll O(n), epoll O(1) for large fd sets\\n");
+    return 0;
+}`,
+  },
+  setuid: {
+    name: 'setuid/creds', icon: '🪪', chapter: 'Ch. 9', vol: 1,
+    desc: '进程凭证管理：UID/GID、saved-set-UID、seteuid 权限模型',
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sys/types.h>
+
+void print_ids(const char *label) {
+    printf("[%s]\\n", label);
+    printf("  real UID=%d  effective UID=%d\\n", getuid(),  geteuid());
+    printf("  real GID=%d  effective GID=%d\\n", getgid(),  getegid());
+}
+
+int main(void) {
+    print_ids("initial");
+
+    /* seteuid: 临时降低权限（常见于 set-user-ID 程序） */
+    uid_t saved = geteuid();
+    if (seteuid(getuid()) == -1) {
+        perror("seteuid");
+        /* 非 root 无法切换，仅演示接口 */
+    }
+    print_ids("after seteuid(getuid())");
+
+    /* 恢复原 effective UID */
+    if (seteuid(saved) == -1) {
+        perror("restore seteuid");
+    }
+    print_ids("after restore");
+
+    /* setreuid: 同时改 real 和 effective UID */
+    printf("\\nKey rules:\\n");
+    printf("  unprivileged: can set eUID to rUID or saved-set-UID\\n");
+    printf("  root (eUID=0): can set rUID/eUID to any value\\n");
+    printf("  /etc/passwd 'x': password in shadow, not here\\n");
+
+    printf("\\nset-user-ID bit (chmod u+s):\\n");
+    printf("  when exec'd, eUID = file owner's UID\\n");
+    printf("  used by: passwd(1), ping(8), su(1)\\n");
+    return 0;
+}`,
+  },
+  ptrace_demo: {
+    name: 'ptrace', icon: '🔭', chapter: 'Ch. 41', vol: 2,
+    desc: 'ptrace 系统调用跟踪：strace/gdb 的底层机制',
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/ptrace.h>
+#include <sys/wait.h>
+#include <sys/user.h>
+#include <sys/syscall.h>
+
+int main(void) {
+    pid_t child = fork();
+    if (child == 0) {
+        /* 子进程：允许父进程 trace */
+        ptrace(PTRACE_TRACEME, 0, NULL, NULL);
+        raise(SIGSTOP);            /* 通知父进程已就绪 */
+        /* 做几个系统调用供父进程捕获 */
+        write(1, "hello\\n", 6);
+        getpid();
+        exit(0);
+    }
+
+    int status;
+    waitpid(child, &status, 0);   /* 等待 SIGSTOP */
+
+    /* 设置追踪选项：在每次 syscall 进入/退出时暂停 */
+    ptrace(PTRACE_SETOPTIONS, child, 0, PTRACE_O_TRACESYSGOOD);
+    ptrace(PTRACE_SYSCALL, child, NULL, NULL);  /* 继续 */
+
+    int syscall_count = 0;
+    while (1) {
+        waitpid(child, &status, 0);
+        if (WIFEXITED(status)) break;
+        if (!WIFSTOPPED(status)) continue;
+
+        /* 读取寄存器（syscall 号在 orig_rax） */
+        struct user_regs_struct regs;
+        ptrace(PTRACE_GETREGS, child, NULL, &regs);
+        long nr = regs.orig_rax;
+
+        const char *name = "unknown";
+        if (nr == SYS_write)  name = "write";
+        else if (nr == SYS_getpid) name = "getpid";
+        else if (nr == SYS_exit_group) name = "exit_group";
+
+        printf("syscall #%ld (%s) rax=%lld\\n",
+               nr, name, (long long)regs.rax);
+        syscall_count++;
+
+        ptrace(PTRACE_SYSCALL, child, NULL, NULL);
+    }
+    printf("\\ncaptured %d syscall events (ptrace powers strace/gdb)\\n",
+           syscall_count);
+    return 0;
+}`,
+  },
+  seccomp: {
+    name: 'seccomp', icon: '🔒', chapter: 'Ch. 38+', vol: 2,
+    desc: '安全计算模式：限制进程可用的系统调用（Docker/Chrome 沙箱基础）',
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <errno.h>
+#include <sys/prctl.h>
+#include <sys/syscall.h>
+#include <linux/seccomp.h>
+#include <linux/filter.h>
+#include <linux/audit.h>
+#include <stddef.h>
+
+/* BPF 过滤器：只允许 read/write/exit/exit_group/sigreturn */
+static struct sock_filter filter[] = {
+    /* 验证架构 */
+    BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
+             offsetof(struct seccomp_data, arch)),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, AUDIT_ARCH_X86_64, 1, 0),
+    BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_KILL),
+
+    /* 读取 syscall 号 */
+    BPF_STMT(BPF_LD | BPF_W | BPF_ABS,
+             offsetof(struct seccomp_data, nr)),
+
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_read,       4, 0),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_write,       3, 0),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_exit,        2, 0),
+    BPF_JUMP(BPF_JMP | BPF_JEQ | BPF_K, SYS_exit_group,  1, 0),
+    /* 不在白名单：返回 EPERM */
+    BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ERRNO | EPERM),
+    BPF_STMT(BPF_RET | BPF_K, SECCOMP_RET_ALLOW),
+};
+
+int main(void) {
+    printf("before seccomp: getpid()=%d\\n", getpid());
+
+    /* 安装 seccomp 过滤器 */
+    prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+    struct sock_fprog prog = {
+        .len = sizeof(filter) / sizeof(filter[0]),
+        .filter = filter,
+    };
+    if (syscall(SYS_seccomp, SECCOMP_SET_MODE_FILTER, 0, &prog) != 0) {
+        perror("seccomp"); exit(1);
+    }
+
+    printf("seccomp active: write() allowed\\n");
+
+    /* getpid() 被禁止：SIGKILL 或返回 EPERM */
+    long r = syscall(SYS_getpid);
+    if (r == -1 && errno == EPERM)
+        printf("getpid() blocked by seccomp (EPERM)\\n");
+
+    printf("\\nseccomp: Docker/Chrome/Firefox sandbox foundation\\n");
+    return 0;
+}`,
+  },
+  io_uring: {
+    name: 'io_uring', icon: '🌀', chapter: 'Ch. 13+', vol: 1,
+    desc: 'Linux 5.1+ 异步 I/O 框架，共享环形队列，零系统调用数据路径',
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/syscall.h>
+#include <linux/io_uring.h>
+#include <sys/mman.h>
+#include <stdatomic.h>
+
+/* io_uring 系统调用包装 */
+static int io_uring_setup(unsigned entries, struct io_uring_params *p) {
+    return syscall(__NR_io_uring_setup, entries, p);
+}
+static int io_uring_enter(int fd, unsigned to_submit,
+                          unsigned min_complete, unsigned flags) {
+    return syscall(__NR_io_uring_enter, fd, to_submit,
+                   min_complete, flags, NULL, 0);
+}
+
+int main(void) {
+    /* 初始化 io_uring */
+    struct io_uring_params params = {};
+    int ring_fd = io_uring_setup(8, &params);
+    if (ring_fd < 0) { perror("io_uring_setup"); exit(1); }
+
+    /* 映射 submission queue (SQ) 和 completion queue (CQ) */
+    size_t sq_sz = params.sq_off.array +
+                   params.sq_entries * sizeof(unsigned);
+    void *sq_ring = mmap(0, sq_sz, PROT_READ | PROT_WRITE,
+                         MAP_SHARED | MAP_POPULATE, ring_fd,
+                         IORING_OFF_SQ_RING);
+    size_t cq_sz = params.cq_off.cqes +
+                   params.cq_entries * sizeof(struct io_uring_cqe);
+    void *cq_ring = mmap(0, cq_sz, PROT_READ | PROT_WRITE,
+                         MAP_SHARED | MAP_POPULATE, ring_fd,
+                         IORING_OFF_CQ_RING);
+    struct io_uring_sqe *sqes = mmap(0,
+                         params.sq_entries * sizeof(struct io_uring_sqe),
+                         PROT_READ | PROT_WRITE,
+                         MAP_SHARED | MAP_POPULATE, ring_fd,
+                         IORING_OFF_SQES);
+
+    /* 提交一个 nop 操作 */
+    unsigned *sq_tail = (unsigned *)((char *)sq_ring + params.sq_off.tail);
+    unsigned *sq_array= (unsigned *)((char *)sq_ring + params.sq_off.array);
+    unsigned idx = *sq_tail & (params.sq_entries - 1);
+    memset(&sqes[idx], 0, sizeof(sqes[idx]));
+    sqes[idx].opcode = IORING_OP_NOP;
+    sqes[idx].user_data = 0xdeadbeef;
+    sq_array[idx] = idx;
+    atomic_store((_Atomic unsigned *)sq_tail, *sq_tail + 1);
+
+    int ret = io_uring_enter(ring_fd, 1, 1, IORING_ENTER_GETEVENTS);
+    printf("io_uring_enter returned %d\\n", ret);
+
+    /* 检查 completion queue */
+    unsigned *cq_head = (unsigned *)((char *)cq_ring + params.cq_off.head);
+    unsigned *cq_tail = (unsigned *)((char *)cq_ring + params.cq_off.tail);
+    struct io_uring_cqe *cqes =
+        (struct io_uring_cqe *)((char *)cq_ring + params.cq_off.cqes);
+    if (*cq_head != *cq_tail) {
+        struct io_uring_cqe *cqe = &cqes[*cq_head & (params.cq_entries-1)];
+        printf("CQE: user_data=0x%llx res=%d\\n",
+               (unsigned long long)cqe->user_data, cqe->res);
+        atomic_store((_Atomic unsigned *)cq_head, *cq_head + 1);
+    }
+
+    printf("\\nio_uring: shared ring buffers, kernel batch processing,\\n");
+    printf("         zero-copy when used with registered buffers\\n");
+    munmap(sq_ring, sq_sz); munmap(cq_ring, cq_sz);
+    munmap(sqes, params.sq_entries * sizeof(*sqes));
+    close(ring_fd);
+    return 0;
+}`,
+  },
 }
 
 // ─── Syscall boundary diagram ─────────────────────────────────────────────────
@@ -5076,7 +5561,7 @@ export default function TLPIView() {
           <div style={{padding:'7px 14px',borderBottom:'1px solid var(--border)',fontSize:11,fontWeight:700,color:'var(--text-muted)'}}>
             SYSCALL SIGNATURES
           </div>
-          {ex.syscalls.map(s=>(
+          {(ex.syscalls ?? []).map(s=>(
             <div key={s.name} style={{display:'flex',gap:0,padding:'6px 14px',
               borderBottom:'1px solid var(--border)',alignItems:'baseline',flexWrap:'wrap'}}>
               <code style={{color:ch.color,fontSize:12,fontWeight:700,marginRight:10,whiteSpace:'nowrap'}}>{s.name}()</code>
@@ -5086,7 +5571,7 @@ export default function TLPIView() {
         </div>
 
         {/* Code + Run */}
-        <RunPanel key={sel} bookCode={ex.code} demoCode={ex.demoCode} color={ch.color}/>
+        <RunPanel key={sel} bookCode={ex.code ?? ''} demoCode={ex.demoCode ?? ''} color={ch.color}/>
 
         {/* Notes */}
         <div style={{marginTop:12,padding:'10px 14px',borderRadius:8,fontSize:12,lineHeight:1.65,
