@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 interface SyscallEx {
   name: string; icon: string; chapter: string; vol: 1|2; desc: string
@@ -93,6 +93,13 @@ const CHAPTERS: { id: string; label: string; icon: string; color: string; vol: 1
   { id: 'ptrace_demo',   label: 'Ch.41  ptrace',              icon: '🔭',  color: '#74c0fc', vol: 2 },
   { id: 'seccomp',       label: 'Ch.38+ seccomp',             icon: '🔒',  color: '#ff6b6b', vol: 2 },
   { id: 'io_uring',      label: 'Ch.13+ io_uring',            icon: '🌀',  color: '#cc5de8', vol: 1 },
+  { id: 'futex',         label: 'Ch.30+ futex',               icon: '⚙️',  color: '#a371f7', vol: 1 },
+  { id: 'sendfile',      label: 'Ch.61+ sendfile',            icon: '📤',  color: '#4d8fff', vol: 2 },
+  { id: 'namespace',     label: 'Ch.28+ Namespaces',          icon: '📦',  color: '#3fb950', vol: 1 },
+  { id: 'prctl',         label: 'Ch.28+ prctl',               icon: '🎛️',  color: '#ffa657', vol: 1 },
+  { id: 'sigqueue',      label: 'Ch.22+ sigqueue/RT',         icon: '📬',  color: '#e3b341', vol: 1 },
+  { id: 'cgroup',        label: 'Ch.39+ cgroups v2',          icon: '🗂️',  color: '#58a6ff', vol: 2 },
+  { id: 'tls_thread',    label: 'Ch.31  Thread-Local Storage',icon: '🧵',  color: '#d2a8ff', vol: 1 },
 ]
 
 // ─── Examples ─────────────────────────────────────────────────────────────────
@@ -5341,6 +5348,646 @@ int main(void) {
     return 0;
 }`,
   },
+
+  futex: {
+    name: 'futex', icon: '⚙️', chapter: 'Ch. 30+', vol: 1,
+    desc: 'futex (fast userspace mutex) 是 Linux 独有的低级同步原语。在无竞争时完全在用户空间完成（通过原子 CAS），只有在有竞争时才陷入内核。pthreads 的 mutex、semaphore、条件变量都建立在 futex 之上。',
+    syscalls: [
+      { name: 'futex', sig: 'int futex(uint32_t *uaddr, int futex_op, uint32_t val, ...)' },
+      { name: 'FUTEX_WAIT', sig: '/* sleep if *uaddr == val */' },
+      { name: 'FUTEX_WAKE', sig: '/* wake N waiters on uaddr */' },
+    ],
+    code: `#include <stdio.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <linux/futex.h>
+#include <pthread.h>
+#include <stdatomic.h>
+
+/* 简易 futex mutex */
+typedef struct { atomic_int state; } FutexMutex;
+
+static void fm_lock(FutexMutex *m) {
+    int expected = 0;
+    /* 无竞争: CAS 0→1 成功，不进内核 */
+    while (!atomic_compare_exchange_weak(&m->state, &expected, 1)) {
+        expected = 0;
+        /* 有竞争: 进入内核等待 */
+        syscall(SYS_futex, &m->state, FUTEX_WAIT, 1, NULL, NULL, 0);
+    }
+}
+
+static void fm_unlock(FutexMutex *m) {
+    atomic_store(&m->state, 0);
+    /* 唤醒至多 1 个等待者 */
+    syscall(SYS_futex, &m->state, FUTEX_WAKE, 1, NULL, NULL, 0);
+}
+
+static FutexMutex g_lock = { .state = 0 };
+static long counter = 0;
+
+static void *worker(void *arg) {
+    for (int i = 0; i < 100000; i++) {
+        fm_lock(&g_lock);
+        counter++;
+        fm_unlock(&g_lock);
+    }
+    return NULL;
+}
+
+int main(void) {
+    pthread_t t1, t2;
+    pthread_create(&t1, NULL, worker, NULL);
+    pthread_create(&t2, NULL, worker, NULL);
+    pthread_join(t1, NULL); pthread_join(t2, NULL);
+    printf("counter = %ld (expected 200000)\\n", counter);
+}`,
+    notes: 'futex 的关键优化：mutex 无竞争时完全是用户空间的原子操作（约 10ns），只有在 CAS 失败（即有其他线程持有锁）时才调用 FUTEX_WAIT 陷入内核（约 1μs）。这也是 glibc pthread_mutex_lock 的实现原理。',
+    demoCode: `/* Demo: futex-based mutex vs atomic spinlock 性能对比 */
+#include <stdio.h>
+#include <stdint.h>
+#include <unistd.h>
+#include <sys/syscall.h>
+#include <linux/futex.h>
+#include <pthread.h>
+#include <stdatomic.h>
+#include <time.h>
+
+typedef struct { atomic_int state; } FutexMutex;
+static void fm_lock(FutexMutex *m) {
+    int e=0;
+    while(!atomic_compare_exchange_weak(&m->state,&e,1)){
+        e=0; syscall(SYS_futex,&m->state,FUTEX_WAIT,1,NULL,NULL,0);
+    }
+}
+static void fm_unlock(FutexMutex *m) {
+    atomic_store(&m->state,0);
+    syscall(SYS_futex,&m->state,FUTEX_WAKE,1,NULL,NULL,0);
+}
+
+static FutexMutex lock={.state=0};
+static long cnt=0;
+
+static void *run(void *arg) {
+    for(int i=0;i<500000;i++){ fm_lock(&lock); cnt++; fm_unlock(&lock); }
+    return NULL;
+}
+
+int main(){
+    struct timespec t0,t1;
+    pthread_t a,b;
+    clock_gettime(CLOCK_MONOTONIC,&t0);
+    pthread_create(&a,NULL,run,NULL);
+    pthread_create(&b,NULL,run,NULL);
+    pthread_join(a,NULL); pthread_join(b,NULL);
+    clock_gettime(CLOCK_MONOTONIC,&t1);
+    long ns=(t1.tv_sec-t0.tv_sec)*1000000000L+(t1.tv_nsec-t0.tv_nsec);
+    printf("futex mutex: cnt=%ld, time=%ldms\\n",cnt,ns/1000000);
+    printf("per-lock: ~%ldns\\n",ns/1000000);
+    return 0;
+}`,
+  },
+
+  sendfile: {
+    name: 'sendfile', icon: '📤', chapter: 'Ch. 61+', vol: 2,
+    desc: 'sendfile(2) 实现零拷贝文件传输：数据直接从文件系统 page cache 传到 socket 发送缓冲区，无需经过用户空间。相比 read+write 减少两次内存拷贝和两次上下文切换。HTTP 静态文件服务器的核心优化。',
+    syscalls: [
+      { name: 'sendfile', sig: 'ssize_t sendfile(int out_fd, int in_fd, off_t *offset, size_t count)' },
+      { name: 'splice',   sig: 'ssize_t splice(int fd_in, off_t *off_in, int fd_out, off_t *off_out, size_t len, unsigned int flags)' },
+    ],
+    code: `#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <sys/socket.h>
+#include <arpa/inet.h>
+
+/* 零拷贝文件发送：file_fd → socket_fd */
+int send_file(int sock, const char *path) {
+    int fd = open(path, O_RDONLY);
+    if (fd < 0) return -1;
+    struct stat st;
+    fstat(fd, &st);
+    off_t offset = 0;
+    ssize_t sent = sendfile(sock, fd, &offset, st.st_size);
+    close(fd);
+    return sent;
+}
+
+/* 对比：传统 read+write（两次拷贝）*/
+int copy_rw(int dst, const char *path) {
+    int src = open(path, O_RDONLY);
+    char buf[65536];
+    ssize_t n, total = 0;
+    while ((n = read(src, buf, sizeof(buf))) > 0) {
+        write(dst, buf, n);
+        total += n;
+    }
+    close(src);
+    return total;
+}`,
+    notes: '传统 read+write 路径：磁盘→page cache (DMA)→用户缓冲区 (CPU copy)→socket buffer (CPU copy)→网卡 (DMA)，共 2 次 CPU 拷贝。sendfile 路径：磁盘→page cache (DMA)→socket buffer (CPU copy or DMA直传)→网卡 (DMA)，减少一次或两次 CPU 拷贝。Linux 3.14+ 支持 SPLICE_F_MOVE 进一步优化。',
+    demoCode: `#define _GNU_SOURCE
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/sendfile.h>
+#include <sys/stat.h>
+#include <time.h>
+
+static long now_ns() {
+    struct timespec t; clock_gettime(CLOCK_MONOTONIC,&t);
+    return t.tv_sec*1000000000L+t.tv_nsec;
+}
+
+int main() {
+    /* 创建 4MB 测试文件 */
+    const char *src="/tmp/sf_src.bin", *dst1="/tmp/sf_dst1.bin", *dst2="/tmp/sf_dst2.bin";
+    {
+        int f=open(src,O_WRONLY|O_CREAT|O_TRUNC,0644);
+        char buf[4096]; memset(buf,'A',sizeof(buf));
+        for(int i=0;i<1024;i++) write(f,buf,sizeof(buf));
+        close(f);
+    }
+    struct stat st; stat(src,&st);
+    printf("File size: %ld bytes (%.1f MB)\\n",(long)st.st_size,st.st_size/1048576.0);
+
+    /* sendfile */
+    long t0=now_ns();
+    {
+        int in=open(src,O_RDONLY), out=open(dst1,O_WRONLY|O_CREAT|O_TRUNC,0644);
+        off_t off=0;
+        sendfile(out,in,&off,st.st_size);
+        close(in); close(out);
+    }
+    long t1=now_ns();
+    printf("sendfile:  %ldμs\\n",(t1-t0)/1000);
+
+    /* read+write */
+    t0=now_ns();
+    {
+        int in=open(src,O_RDONLY), out=open(dst2,O_WRONLY|O_CREAT|O_TRUNC,0644);
+        char buf[65536]; ssize_t n;
+        while((n=read(in,buf,sizeof(buf)))>0) write(out,buf,n);
+        close(in); close(out);
+    }
+    t1=now_ns();
+    printf("read+write:%ldμs\\n",(t1-t0)/1000);
+
+    unlink(src); unlink(dst1); unlink(dst2);
+    return 0;
+}`,
+  },
+
+  namespace: {
+    name: 'Linux Namespaces', icon: '📦', chapter: 'Ch. 28+', vol: 1,
+    desc: 'Linux 命名空间是容器技术（Docker/podman）的核心。每种命名空间隔离一类资源：PID ns 隔离进程树，Net ns 隔离网络栈，Mount ns 隔离文件系统视图，UTS ns 隔离主机名，User ns 隔离 UID/GID，IPC ns 隔离 SysV/POSIX IPC。',
+    syscalls: [
+      { name: 'unshare', sig: 'int unshare(int flags)  /* 进入新命名空间 */' },
+      { name: 'setns',   sig: 'int setns(int fd, int nstype)  /* 加入已有命名空间 */' },
+      { name: 'clone',   sig: 'int clone(fn, stack, flags|CLONE_NEW*, arg)' },
+    ],
+    code: `#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sched.h>
+#include <sys/wait.h>
+#include <sys/types.h>
+
+/* 在新 PID 命名空间中运行 child */
+static int child_fn(void *arg) {
+    printf("Child PID inside ns: %d (always 1 = init)\\n", getpid());
+    printf("Child PPID inside ns: %d\\n", getppid());
+    return 0;
+}
+
+int main(void) {
+    printf("Parent PID: %d\\n", getpid());
+
+    /* 克隆一个新的 PID 命名空间 */
+    char stack[1024*64];
+    pid_t child = clone(child_fn, stack + sizeof(stack),
+                        CLONE_NEWPID | SIGCHLD, NULL);
+    if (child == -1) { perror("clone"); return 1; }
+
+    printf("Child host-PID: %d\\n", child);  /* 主机命名空间中的 PID */
+    waitpid(child, NULL, 0);
+
+    /* 查看自己的命名空间 */
+    char path[64];
+    snprintf(path, sizeof(path), "/proc/%d/ns/pid", getpid());
+    char link[256]; ssize_t n = readlink(path, link, sizeof(link)-1);
+    if (n>0) { link[n]=0; printf("Parent ns: %s\\n", link); }
+    return 0;
+}`,
+    notes: '容器 = cgroups (资源限制) + namespaces (资源隔离) + seccomp (syscall 过滤)。unshare(1) 命令行工具底层就是调用 unshare(2)。/proc/PID/ns/ 目录下的每个文件是该进程所属命名空间的描述符，可以用 setns(2) + 该 fd 进入同一命名空间（Docker exec 的原理）。',
+    demoCode: `#define _GNU_SOURCE
+#include <stdio.h>
+#include <stdlib.h>
+#include <unistd.h>
+#include <sched.h>
+#include <sys/utsname.h>
+
+int main() {
+    /* 当前主机名 */
+    struct utsname u; uname(&u);
+    printf("Before: hostname=%s, pid=%d\\n", u.nodename, getpid());
+
+    /* 进入新的 UTS + PID 命名空间 */
+    if (unshare(CLONE_NEWUTS) == -1) {
+        /* 可能需要 root 权限或 user ns */
+        perror("unshare NEWUTS (need root or user ns)");
+    } else {
+        sethostname("container-demo", 14);
+        uname(&u);
+        printf("After:  hostname=%s\\n", u.nodename);
+    }
+
+    /* 打印所有命名空间 inode */
+    const char *ns[] = {"pid","net","mnt","uts","ipc","user","time",NULL};
+    printf("\\nNamespace inodes for PID %d:\\n", getpid());
+    for(int i=0; ns[i]; i++) {
+        char p[64], lnk[256];
+        snprintf(p,sizeof(p),"/proc/self/ns/%s",ns[i]);
+        ssize_t n=readlink(p,lnk,sizeof(lnk)-1);
+        if(n>0){lnk[n]=0;printf("  %-6s -> %s\\n",ns[i],lnk);}
+    }
+    return 0;
+}`,
+  },
+
+  prctl: {
+    name: 'prctl', icon: '🎛️', chapter: 'Ch. 28+', vol: 1,
+    desc: 'prctl(2) 是进程属性控制的瑞士军刀：设置进程名称、控制 core dump、管理子死亡信号、开启/关闭 seccomp、控制 no_new_privs 等。Docker 容器运行时、Go runtime、Chrome 沙箱大量使用。',
+    syscalls: [
+      { name: 'prctl', sig: 'int prctl(int option, unsigned long arg2, arg3, arg4, arg5)' },
+      { name: 'PR_SET_NAME',     sig: '/* set thread name, max 15 chars */' },
+      { name: 'PR_SET_DUMPABLE', sig: '/* 0=no core, 1=core, 2=root-readable */' },
+      { name: 'PR_SET_NO_NEW_PRIVS', sig: '/* cannot exec setuid after this */' },
+    ],
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/prctl.h>
+#include <pthread.h>
+
+static void *named_thread(void *arg) {
+    const char *name = (char *)arg;
+    /* 设置线程名（top/htop 可见，max 15 chars）*/
+    prctl(PR_SET_NAME, name, 0, 0, 0);
+
+    char got[32] = {0};
+    prctl(PR_GET_NAME, got, 0, 0, 0);
+    printf("Thread name: '%s'\\n", got);
+
+    /* 禁止 core dump */
+    prctl(PR_SET_DUMPABLE, 0, 0, 0, 0);
+
+    sleep(1);
+    return NULL;
+}
+
+int main(void) {
+    /* 设置主进程名 */
+    prctl(PR_SET_NAME, "tlpi-demo", 0, 0, 0);
+    char name[32] = {0};
+    prctl(PR_GET_NAME, name, 0, 0, 0);
+    printf("Process name: '%s'\\n", name);
+
+    /* 禁止该进程及其子进程获取新权限 */
+    prctl(PR_SET_NO_NEW_PRIVS, 1, 0, 0, 0);
+    printf("no_new_privs: %d\\n", prctl(PR_GET_NO_NEW_PRIVS,0,0,0,0));
+
+    pthread_t t;
+    pthread_create(&t, NULL, named_thread, "worker-1");
+    pthread_join(t, NULL);
+    return 0;
+}`,
+    notes: 'PR_SET_NO_NEW_PRIVS 是单向操作：一旦设置，fork/exec 的子进程也无法获得新权限（setuid 程序不生效）。这是 seccomp 的前置条件之一。Go 程序中每个 goroutine 对应的 OS 线程名默认是 "goroutine X"，通过 prctl(PR_SET_NAME) 设置可见于 top/htop 的 TASK 列。',
+    demoCode: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <sys/prctl.h>
+#include <pthread.h>
+
+static void *thr(void *arg){
+    char *nm=(char*)arg;
+    prctl(PR_SET_NAME,nm,0,0,0);
+    char got[32]={0}; prctl(PR_GET_NAME,got,0,0,0);
+    printf("  thread id=%ld name='%s'\\n",(long)pthread_self()%10000,got);
+    return NULL;
+}
+
+int main(){
+    prctl(PR_SET_NAME,"main-proc",0,0,0);
+    char nm[32]={0}; prctl(PR_GET_NAME,nm,0,0,0);
+    printf("Process name: '%s'\\n",nm);
+    printf("PID: %d\\n",getpid());
+
+    /* 创建多个具名线程 */
+    const char *names[]={"io-worker","net-poller","gc-thread",NULL};
+    pthread_t ts[3];
+    for(int i=0;names[i];i++)
+        pthread_create(&ts[i],NULL,thr,(void*)names[i]);
+    for(int i=0;names[i];i++) pthread_join(ts[i],NULL);
+
+    /* no_new_privs */
+    prctl(PR_SET_NO_NEW_PRIVS,1,0,0,0);
+    int v=prctl(PR_GET_NO_NEW_PRIVS,0,0,0,0);
+    printf("no_new_privs=%d (cannot exec setuid now)\\n",v);
+
+    printf("\\n$ cat /proc/%d/status | grep -i 'name\\\\|NoNewPrivs'\\n",getpid());
+    char cmd[64]; snprintf(cmd,sizeof(cmd),
+        "cat /proc/%d/status 2>/dev/null | grep -iE 'Name|NoNewPrivs'",getpid());
+    system(cmd);
+    return 0;
+}`,
+  },
+
+  sigqueue: {
+    name: 'sigqueue / Real-Time Signals', icon: '📬', chapter: 'Ch. 22+', vol: 1,
+    desc: '实时信号（SIGRTMIN–SIGRTMAX，Linux 约 32 个）与普通信号的区别：①不丢失——多次发送会排队而非合并；②携带数据（sigval union）；③有序投递（按信号编号升序）。sigqueue(2) 是发送带数据实时信号的专用接口。',
+    syscalls: [
+      { name: 'sigqueue',    sig: 'int sigqueue(pid_t pid, int sig, const union sigval value)' },
+      { name: 'sigwaitinfo', sig: 'int sigwaitinfo(const sigset_t *set, siginfo_t *info)' },
+      { name: 'sigaction',   sig: 'int sigaction(int sig, const struct sigaction *act, ...)  /* SA_SIGINFO */' },
+    ],
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <unistd.h>
+
+static void rt_handler(int sig, siginfo_t *si, void *ctx) {
+    printf("Got signal %d  value=%d  pid=%d\\n",
+           sig, si->si_value.sival_int, si->si_pid);
+}
+
+int main(void) {
+    /* 注册 SA_SIGINFO 处理器（接收附加数据）*/
+    struct sigaction sa = {
+        .sa_sigaction = rt_handler,
+        .sa_flags     = SA_SIGINFO,
+    };
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGRTMIN, &sa, NULL);
+    sigaction(SIGRTMIN+1, &sa, NULL);
+
+    /* 向自己发送带数据的实时信号 */
+    union sigval val;
+    val.sival_int = 42;
+    sigqueue(getpid(), SIGRTMIN,   val);
+    val.sival_int = 99;
+    sigqueue(getpid(), SIGRTMIN+1, val);
+    val.sival_int = 7;
+    sigqueue(getpid(), SIGRTMIN,   val);  /* 不丢失，排队 */
+
+    /* 三个信号都会按序投递 */
+    pause(); pause(); pause();
+    printf("All signals delivered\\n");
+    return 0;
+}`,
+    notes: '普通信号（SIGINT/SIGTERM 等）如果发送多次而进程未处理，只记录"有待处理信号"这一位，因此不排队。实时信号每次 sigqueue 都单独排队，siginfo_t.si_value 携带用户数据（4字节 int 或指针）。Go、Java 运行时用实时信号做内部协调（SIGRTMIN+x 触发 goroutine/GC 抢占）。',
+    demoCode: `#include <stdio.h>
+#include <stdlib.h>
+#include <signal.h>
+#include <unistd.h>
+#include <string.h>
+
+static volatile int received=0;
+static void handler(int s,siginfo_t *si,void *u){
+    printf("  sig=%d val=%d from pid=%d\\n",s,si->si_value.sival_int,si->si_pid);
+    received++;
+}
+
+int main(){
+    printf("SIGRTMIN=%d  SIGRTMAX=%d  (有%d个实时信号)\\n",
+           SIGRTMIN,SIGRTMAX,SIGRTMAX-SIGRTMIN+1);
+
+    struct sigaction sa={.sa_sigaction=handler,.sa_flags=SA_SIGINFO};
+    sigemptyset(&sa.sa_mask);
+    for(int s=SIGRTMIN;s<=SIGRTMIN+3;s++) sigaction(s,&sa,NULL);
+
+    /* 屏蔽所有实时信号，先积累 */
+    sigset_t mask,old;
+    sigemptyset(&mask);
+    for(int s=SIGRTMIN;s<=SIGRTMAX;s++) sigaddset(&mask,s);
+    sigprocmask(SIG_BLOCK,&mask,&old);
+
+    /* 发送多个实时信号（含重复）*/
+    union sigval v;
+    printf("\\nQueuing signals:\\n");
+    for(int i=0;i<3;i++){v.sival_int=100+i;sigqueue(getpid(),SIGRTMIN+1,v);}
+    v.sival_int=42; sigqueue(getpid(),SIGRTMIN,v);   /* 低编号先投递 */
+    v.sival_int=99; sigqueue(getpid(),SIGRTMIN+3,v);
+
+    printf("\\nDelivering (lowest sig first):\\n");
+    sigprocmask(SIG_UNBLOCK,&mask,NULL);  /* 解除屏蔽，触发投递 */
+    printf("\\nTotal received: %d\\n",received);
+    return 0;
+}`,
+  },
+
+  tls_thread: {
+    name: 'Thread-Local Storage', icon: '🧵', chapter: 'Ch. 31', vol: 1,
+    desc: '线程局部存储（TLS）让每个线程拥有变量的独立副本，无需互斥锁。有三种方式：①__thread GCC 扩展（最高效，编译时分配）；②pthread_key_create 动态 TLS（可携带析构函数）；③C11 _Thread_local。errno 本身就是 TLS 变量。',
+    syscalls: [
+      { name: '__thread',            sig: '__thread int tls_var;  /* GCC/Clang 编译器扩展 */' },
+      { name: 'pthread_key_create',  sig: 'int pthread_key_create(pthread_key_t *key, void (*destr)(void*))' },
+      { name: 'pthread_setspecific', sig: 'int pthread_setspecific(pthread_key_t key, const void *value)' },
+      { name: 'pthread_getspecific', sig: 'void *pthread_getspecific(pthread_key_t key)' },
+    ],
+    code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+
+/* ① __thread — 每个线程独立副本，无锁 */
+static __thread int tls_counter = 0;
+
+/* ② pthread key — 动态 TLS，可挂析构函数 */
+static pthread_key_t buf_key;
+
+static void buf_destructor(void *p) {
+    printf("TID %lu: destructor freeing buffer\\n", pthread_self() % 10000);
+    free(p);
+}
+
+static void *worker(void *arg) {
+    long id = (long)arg;
+    /* 修改 __thread 变量 — 不影响其他线程 */
+    tls_counter = id * 100;
+
+    /* 分配线程私有 buffer */
+    char *buf = malloc(64);
+    snprintf(buf, 64, "thread-%ld-buffer", id);
+    pthread_setspecific(buf_key, buf);
+
+    printf("Thread %ld: tls_counter=%d, buf='%s'\\n",
+           id, tls_counter, (char *)pthread_getspecific(buf_key));
+    return NULL;
+}
+
+int main(void) {
+    pthread_key_create(&buf_key, buf_destructor);
+    pthread_t t[3];
+    for (long i = 0; i < 3; i++)
+        pthread_create(&t[i], NULL, worker, (void *)i);
+    for (int i = 0; i < 3; i++)
+        pthread_join(t[i], NULL);
+    pthread_key_delete(buf_key);
+    return 0;
+}`,
+    notes: '__thread 变量存储在 ELF TLS 段（.tdata/.tbss），每次 pthread_create 时内核/libc 为新线程复制一份；访问通过 %fs 寄存器偏移，与普通变量访问速度相同，无锁开销。pthread_key 最多 PTHREAD_KEYS_MAX 个（Linux 1024）。析构函数在线程退出时按 LIFO 顺序调用。',
+    demoCode: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <pthread.h>
+#include <errno.h>
+
+/* errno 本身就是 TLS：每个线程独立 */
+static __thread char tls_name[32]="(unset)";
+
+static pthread_key_t ctx_key;
+typedef struct { int id; char msg[64]; } ThreadCtx;
+
+static void ctx_free(void *p){ free(p); }
+
+static void *run(void *arg){
+    int id=(int)(long)arg;
+    /* __thread 变量 */
+    snprintf(tls_name,sizeof(tls_name),"worker-%d",id);
+
+    /* pthread_key 动态 TLS */
+    ThreadCtx *ctx=malloc(sizeof(*ctx));
+    ctx->id=id;
+    snprintf(ctx->msg,sizeof(ctx->msg),"hello from thread %d",id);
+    pthread_setspecific(ctx_key,ctx);
+
+    /* 触发 errno（TLS 示例）*/
+    int fd=open("/no/such/file",0);
+    int saved_errno=errno;
+
+    printf("[t%d] tls_name='%s' msg='%s' errno=%d(%s)\\n",
+        id,tls_name,
+        ((ThreadCtx*)pthread_getspecific(ctx_key))->msg,
+        saved_errno,strerror(saved_errno));
+    return NULL;
+}
+
+int main(){
+    pthread_key_create(&ctx_key,ctx_free);
+    pthread_t ts[4];
+    for(int i=0;i<4;i++) pthread_create(&ts[i],NULL,run,(void*)(long)i);
+    for(int i=0;i<4;i++) pthread_join(ts[i],NULL);
+    pthread_key_delete(ctx_key);
+    printf("Main tls_name='%s' (unchanged)\\n",tls_name);
+    return 0;
+}`,
+  },
+
+  cgroup: {
+    name: 'cgroups v2', icon: '🗂️', chapter: 'Ch. 39+', vol: 2,
+    desc: 'cgroups v2（Linux 4.5+）是资源限制的统一层次结构。通过写 /sys/fs/cgroup/ 下的伪文件来限制 CPU、内存、IO、进程数等资源。Docker/Kubernetes 用 cgroups 实现容器资源隔离。',
+    syscalls: [
+      { name: 'write("/sys/fs/cgroup/")', sig: '/* 写 cgroup 控制文件 */' },
+      { name: 'openat',  sig: '/* 操作 cgroupfs 文件系统 */' },
+    ],
+    code: `/* cgroups v2 via cgroupfs — 不需要额外链接库 */
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/types.h>
+#include <errno.h>
+
+/* 将字符串写入 cgroup 控制文件 */
+static int cg_write(const char *path, const char *val) {
+    int fd = open(path, O_WRONLY);
+    if (fd < 0) return -1;
+    ssize_t n = write(fd, val, strlen(val));
+    close(fd);
+    return n > 0 ? 0 : -1;
+}
+
+int main(void) {
+    const char *cg = "/sys/fs/cgroup/demo_cgroup";
+
+    /* 1. 创建 cgroup 目录 */
+    if (mkdir(cg, 0755) && errno != EEXIST)
+        perror("mkdir cgroup");
+
+    /* 2. 限制内存 (64MB) */
+    char mem_path[256]; snprintf(mem_path, sizeof(mem_path),
+        "%s/memory.max", cg);
+    if (cg_write(mem_path, "67108864\\n") == 0)  /* 64 * 1024 * 1024 */
+        printf("memory.max set to 64MB\\n");
+
+    /* 3. 限制 CPU 权重 */
+    char cpu_path[256]; snprintf(cpu_path, sizeof(cpu_path),
+        "%s/cpu.weight", cg);
+    if (cg_write(cpu_path, "100\\n") == 0)
+        printf("cpu.weight set to 100\\n");
+
+    /* 4. 将自身加入 cgroup */
+    char procs_path[256]; snprintf(procs_path, sizeof(procs_path),
+        "%s/cgroup.procs", cg);
+    char pid_str[32]; snprintf(pid_str, sizeof(pid_str), "%d\\n", getpid());
+    if (cg_write(procs_path, pid_str) == 0)
+        printf("PID %d added to cgroup\\n", getpid());
+    else
+        printf("Add to cgroup failed (need root): %s\\n", strerror(errno));
+
+    return 0;
+}`,
+    notes: 'cgroups v2 统一层次结构：每个目录代表一个 cgroup，通过写 controllers 文件启用子系统（memory、cpu、io）。与 v1 的关键区别：v2 只有一个层次，每个 cgroup 必须是叶节点才能包含进程（no internal process constraint 在 v2.1+ 中放宽）。读 /proc/self/cgroup 查看当前进程所在的 cgroup 路径。',
+    demoCode: `/* Demo: 读取当前 cgroup 信息（不需要 root）*/
+#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <unistd.h>
+#include <fcntl.h>
+
+int main(){
+    printf("=== /proc/self/cgroup ===\\n");
+    FILE *f=fopen("/proc/self/cgroup","r");
+    if(f){char ln[256];while(fgets(ln,sizeof(ln),f))printf("%s",ln);fclose(f);}
+
+    printf("\\n=== /sys/fs/cgroup/cgroup.controllers ===\\n");
+    f=fopen("/sys/fs/cgroup/cgroup.controllers","r");
+    if(f){char ln[256];fgets(ln,sizeof(ln),f);printf("%s\\n",ln);fclose(f);}
+    else printf("(not mounted as cgroup v2)\\n");
+
+    /* 读取自己的内存使用 */
+    printf("\\n=== memory stats ===\\n");
+    char path[128];
+    /* 从 /proc/self/cgroup 解析出 cgroup 路径 */
+    FILE *cg=fopen("/proc/self/cgroup","r");
+    char line[256];
+    if(cg&&fgets(line,sizeof(line),cg)){
+        /* cgroups v2 格式: 0::<path> */
+        char *p=strchr(line+2,':');
+        if(p){
+            p++; p[strlen(p)-1]=0;
+            snprintf(path,sizeof(path),"/sys/fs/cgroup%s/memory.current",p);
+            FILE *mf=fopen(path,"r");
+            if(mf){long v;fscanf(mf,"%ld",&v);printf("memory.current: %ld bytes (%.1fMB)\\n",v,v/1048576.0);fclose(mf);}
+        }
+        fclose(cg);
+    }
+    return 0;
+}`,
+  },
 }
 
 // ─── Syscall boundary diagram ─────────────────────────────────────────────────
@@ -5388,6 +6035,72 @@ function SyscallBoundaryDiagram() {
   )
 }
 
+// ─── Header modal ─────────────────────────────────────────────────────────────
+
+function HeaderModal({name,onClose}:{name:string;onClose:()=>void}) {
+  const [content,setContent]=useState<string|null>(null)
+  const [err,setErr]=useState('')
+  useEffect(()=>{
+    setContent(null); setErr('')
+    fetch(`/api/header?name=${encodeURIComponent(name)}`)
+      .then(r=>r.json())
+      .then(d=>{ if(d.content) setContent(d.content); else setErr(d.error||'not found') })
+      .catch(()=>setErr('network error'))
+  },[name])
+  useEffect(()=>{
+    const h=(e:KeyboardEvent)=>{ if(e.key==='Escape') onClose() }
+    window.addEventListener('keydown',h)
+    return ()=>window.removeEventListener('keydown',h)
+  },[onClose])
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:2000,
+      display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'var(--bg-secondary)',
+        border:'1px solid var(--border)',borderRadius:10,width:'min(900px,95vw)',
+        maxHeight:'85vh',display:'flex',flexDirection:'column',overflow:'hidden',
+        boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',
+          borderBottom:'1px solid var(--border)',background:'var(--bg-elevated)',flexShrink:0}}>
+          <span style={{fontSize:14,color:'#58a6ff'}}>📄</span>
+          <code style={{color:'#58a6ff',fontWeight:700,fontSize:13}}>&lt;{name}&gt;</code>
+          <span style={{fontSize:11,color:'var(--text-muted)',marginLeft:4}}>— system header</span>
+          <button onClick={onClose} style={{marginLeft:'auto',border:'none',background:'transparent',
+            color:'var(--text-muted)',cursor:'pointer',fontSize:18,lineHeight:1,padding:'0 4px'}}>✕</button>
+        </div>
+        <pre style={{margin:0,flex:1,overflow:'auto',padding:'14px 18px',
+          fontFamily:'monospace',fontSize:11,lineHeight:1.7,
+          color:'var(--text-primary)',background:'var(--bg-tertiary)'}}>
+          {content ?? (err ? `Error: ${err}` : 'Loading…')}
+        </pre>
+      </div>
+    </div>
+  )
+}
+
+// ─── Code display with clickable #include lines ────────────────────────────
+
+function ClickableCode({code,onHeaderClick}:{code:string;onHeaderClick:(n:string)=>void}) {
+  const lines = code.split('\n')
+  return (
+    <pre style={{margin:0,padding:'14px 16px',overflow:'auto',fontSize:12,lineHeight:1.65,
+      fontFamily:'monospace',background:'var(--bg-tertiary)',color:'var(--text-primary)',maxHeight:560}}>
+      {lines.map((line,i)=>{
+        const m = line.match(/^(\s*#include\s*<)([^>]+)(>.*)$/)
+        if(m) return (
+          <div key={i}>
+            <span style={{color:'#d2a8ff'}}>{m[1]}</span>
+            <span onClick={()=>onHeaderClick(m[2])}
+              style={{color:'#79c0ff',cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted'}}
+              title={`View <${m[2]}>`}>{m[2]}</span>
+            <span style={{color:'#d2a8ff'}}>{m[3]}</span>
+          </div>
+        )
+        return <div key={i}>{line}</div>
+      })}
+    </pre>
+  )
+}
+
 // ─── Run panel ────────────────────────────────────────────────────────────────
 
 type RunState={status:'idle'}|{status:'running'}|{status:'ok';output:string[];stderr?:string}|{status:'err';msg:string;stderr?:string}
@@ -5396,6 +6109,7 @@ function RunPanel({bookCode,demoCode,color}:{bookCode:string;demoCode:string;col
   const [tab,setTab]=useState<'book'|'demo'>('book')
   const [code,setCode]=useState(demoCode)
   const [run,setRun]=useState<RunState>({status:'idle'})
+  const [headerModal,setHeaderModal]=useState<string|null>(null)
 
   const handleRun=async()=>{
     setRun({status:'running'})
@@ -5427,10 +6141,7 @@ function RunPanel({bookCode,demoCode,color}:{bookCode:string;demoCode:string;col
       </div>
 
       {tab==='book'?(
-        <pre style={{margin:0,padding:'14px 16px',overflow:'auto',fontSize:12,lineHeight:1.65,
-          fontFamily:'monospace',background:'var(--bg-tertiary)',color:'var(--text-primary)',maxHeight:560}}>
-          {bookCode}
-        </pre>
+        <ClickableCode code={bookCode} onHeaderClick={setHeaderModal}/>
       ):(
         <textarea value={code} onChange={e=>{setCode(e.target.value);setRun({status:'idle'})}}
           spellCheck={false}
@@ -5463,6 +6174,7 @@ function RunPanel({bookCode,demoCode,color}:{bookCode:string;demoCode:string;col
           )}
         </div>
       )}
+      {headerModal && <HeaderModal name={headerModal} onClose={()=>setHeaderModal(null)}/>}
     </div>
   )
 }
