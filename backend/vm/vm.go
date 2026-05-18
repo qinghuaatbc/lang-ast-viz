@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"strings"
 
-	"lang-ast-viz/compiler"
+	"deepcode/compiler"
 )
 
 type classInfo struct {

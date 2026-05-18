@@ -5,7 +5,7 @@ import (
 	"encoding/json"
 	"testing"
 
-	"lang-ast-viz/compiler/lang"
+	"deepcode/compiler/lang"
 )
 
 func TestBasicArithmetic(t *testing.T) {

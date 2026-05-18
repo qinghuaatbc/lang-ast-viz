@@ -9,7 +9,7 @@ import (
 
 	_ "github.com/lib/pq"
 
-	"lang-ast-viz/pipeline"
+	"deepcode/pipeline"
 )
 
 type DB struct {

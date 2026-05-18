@@ -3,7 +3,7 @@ package optimizer
 import (
 	"strconv"
 
-	"lang-ast-viz/compiler"
+	"deepcode/compiler"
 )
 
 // FoldConstants performs constant folding on IR instructions.

@@ -9,8 +9,8 @@ import (
 	"syscall"
 	"time"
 
-	"lang-ast-viz/db"
-	"lang-ast-viz/handler"
+	"deepcode/db"
+	"deepcode/handler"
 )
 
 func main() {

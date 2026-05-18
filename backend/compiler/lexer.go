@@ -1,6 +1,6 @@
 package compiler
 
-import "lang-ast-viz/compiler/lang"
+import "deepcode/compiler/lang"
 
 type Lexer struct {
 	input          string

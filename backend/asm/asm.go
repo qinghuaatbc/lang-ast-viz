@@ -5,7 +5,7 @@ import (
 	"sort"
 	"strings"
 
-	"lang-ast-viz/compiler"
+	"deepcode/compiler"
 )
 
 type AsmInstr struct {

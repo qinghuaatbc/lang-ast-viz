@@ -3,7 +3,7 @@ package optimizer
 import (
 	"testing"
 
-	"lang-ast-viz/compiler"
+	"deepcode/compiler"
 )
 
 func TestFoldAdd(t *testing.T) {

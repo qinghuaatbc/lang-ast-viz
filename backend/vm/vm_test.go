@@ -4,7 +4,7 @@ import (
 	"strings"
 	"testing"
 
-	cc "lang-ast-viz/compiler"
+	cc "deepcode/compiler"
 )
 
 func compile(source string) []cc.BytecodeInstr {

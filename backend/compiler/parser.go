@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"lang-ast-viz/compiler/lang"
+	"deepcode/compiler/lang"
 )
 
 type Parser struct {

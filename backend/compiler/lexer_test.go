@@ -3,7 +3,7 @@ package compiler
 import (
 	"testing"
 
-	"lang-ast-viz/compiler/lang"
+	"deepcode/compiler/lang"
 )
 
 func lex(s string) []Token {

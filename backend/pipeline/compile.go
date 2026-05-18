@@ -3,11 +3,11 @@ package pipeline
 import (
 	"context"
 
-	"lang-ast-viz/asm"
-	"lang-ast-viz/compiler"
-	"lang-ast-viz/compiler/lang"
-	"lang-ast-viz/optimizer"
-	"lang-ast-viz/vm"
+	"deepcode/asm"
+	"deepcode/compiler"
+	"deepcode/compiler/lang"
+	"deepcode/optimizer"
+	"deepcode/vm"
 )
 
 type CompileResult struct {

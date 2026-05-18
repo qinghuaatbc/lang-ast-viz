@@ -1,4 +1,4 @@
-module lang-ast-viz
+module deepcode
 
 go 1.22
 

@@ -10,9 +10,9 @@ import (
 	"sync"
 	"time"
 
-	"lang-ast-viz/compiler/lang"
-	"lang-ast-viz/db"
-	"lang-ast-viz/pipeline"
+	"deepcode/compiler/lang"
+	"deepcode/db"
+	"deepcode/pipeline"
 )
 
 const maxBodySize = 1 << 16 // 64KB max request body
