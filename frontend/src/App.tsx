@@ -214,8 +214,14 @@ function AppInner() {
       {/* ── Lazy-loaded views ─────────────────────────────────────────────────── */}
       {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86'] as TopMode[]).includes(topMode) && (
         <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
-          <Suspense fallback={<div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--text-muted)', fontSize:14 }}>加载中…</div>}>
-            <ErrorBoundary>
+          <ErrorBoundary fallback={
+            <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:12, color:'var(--text-muted)' }}>
+              <div style={{ fontSize:32 }}>⚠</div>
+              <div style={{ fontSize:14 }}>加载失败，请刷新页面重试</div>
+              <button onClick={() => window.location.reload()} style={{ padding:'6px 16px', borderRadius:6, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:13 }}>刷新</button>
+            </div>
+          }>
+            <Suspense fallback={<div style={{ display:'flex', alignItems:'center', justifyContent:'center', height:'100%', color:'var(--text-muted)', fontSize:14 }}>加载中…</div>}>
               {topMode === 'ds'      && <DataStructuresView />}
               {topMode === 'linux'   && <LinuxView />}
               {topMode === 'tlpi'    && <TLPIView />}
@@ -226,8 +232,8 @@ function AppInner() {
               {topMode === 'network' && <NetworkView />}
               {topMode === 'cpu'     && <CPUView />}
               {topMode === 'x86'     && <X86View />}
-            </ErrorBoundary>
-          </Suspense>
+            </Suspense>
+          </ErrorBoundary>
         </div>
       )}
 
