@@ -9,8 +9,8 @@ const LangContext = createContext<{
 }>({ lang: 'zh', setLang: () => {}, t: (k) => k })
 
 const zh: Record<string, string> = {
-  'app.title': 'MiniLang AST 可视化',
-  'app.subtitle': '写代码 → AST → IR → 汇编 → 字节码 → 输出',
+  'app.title': 'DeepCode',
+  'app.subtitle': '编译器 · 数据结构 · 操作系统 · 系统编程 · 算法 · 网络 · 体系结构',
   'source.code': '源代码',
   'examples': '示例',
   'compile': '编译',
@@ -31,8 +31,8 @@ const zh: Record<string, string> = {
 }
 
 const en: Record<string, string> = {
-  'app.title': 'MiniLang AST Visualizer',
-  'app.subtitle': 'Code → AST → IR → ASM → Bytecode → Output',
+  'app.title': 'DeepCode',
+  'app.subtitle': 'Compiler · Data Structures · OS · Systems · Algorithms · Networks · Architecture',
   'source.code': 'Source Code',
   'examples': 'Examples',
   'compile': 'Compile',
