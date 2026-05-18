@@ -13,6 +13,15 @@ import (
 	"deepcode/handler"
 )
 
+func noCacheHTML(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.URL.Path == "/" || r.URL.Path == "/index.html" {
+			w.Header().Set("Cache-Control", "no-cache, no-store, must-revalidate")
+		}
+		next.ServeHTTP(w, r)
+	})
+}
+
 func main() {
 	connStr := os.Getenv("DATABASE_URL")
 
@@ -36,7 +45,7 @@ func main() {
 	h.Register(mux)
 
 	fs := http.FileServer(http.Dir("./frontend/dist"))
-	mux.Handle("/", fs)
+	mux.Handle("/", noCacheHTML(fs))
 
 	port := os.Getenv("PORT")
 	if port == "" {
