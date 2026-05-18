@@ -132,17 +132,17 @@ function AppInner() {
   }, [showHelp])
 
   const topTabs: { id: TopMode; label: string; icon: string }[] = [
-    { id: 'ast',     label: 'AST 编译器',   icon: '🔬' },
-    { id: 'ds',      label: '数据结构',      icon: '🗂' },
-    { id: 'linux',   label: 'Linux OS',     icon: '🐧' },
-    { id: 'tlpi',    label: 'TLPI',         icon: '📖' },
-    { id: 'algo',    label: '排序算法',      icon: '📊' },
-    { id: 'memory',  label: '内存布局',      icon: '🧠' },
-    { id: 'regex',   label: '正则表达式',    icon: '🔍' },
-    { id: 'ieee754', label: 'IEEE 754',     icon: '🔢' },
-    { id: 'network', label: '网络协议栈',    icon: '🌐' },
-    { id: 'cpu',     label: 'CPU 流水线',   icon: '⚡' },
-    { id: 'x86',     label: 'x86 汇编',    icon: '🖥' },
+    { id: 'ast',     label: t('tab.ast'),     icon: '🔬' },
+    { id: 'ds',      label: t('tab.ds'),      icon: '🗂' },
+    { id: 'linux',   label: t('tab.linux'),   icon: '🐧' },
+    { id: 'tlpi',    label: t('tab.tlpi'),    icon: '📖' },
+    { id: 'algo',    label: t('tab.algo'),    icon: '📊' },
+    { id: 'memory',  label: t('tab.memory'),  icon: '🧠' },
+    { id: 'regex',   label: t('tab.regex'),   icon: '🔍' },
+    { id: 'ieee754', label: t('tab.ieee754'), icon: '🔢' },
+    { id: 'network', label: t('tab.network'), icon: '🌐' },
+    { id: 'cpu',     label: t('tab.cpu'),     icon: '⚡' },
+    { id: 'x86',     label: t('tab.x86'),    icon: '🖥' },
   ]
 
   return (
