@@ -149,41 +149,17 @@ function AppInner() {
   return (
     <div className="app">
       <header className="app-header">
+        {/* Row 1: title + controls */}
         <div className="header-top">
-          <div style={{ display: 'flex', alignItems: 'center', gap: 24 }}>
-            <div>
-              <h1 style={{ margin: 0 }}>{t('app.title')}</h1>
-              <p className="subtitle" style={{ margin: 0 }}>{t('app.subtitle')}</p>
-            </div>
-            {/* Top-level mode switcher */}
-            <div style={{ display: 'flex', gap: 4, background: 'var(--bg-secondary, rgba(255,255,255,0.06))', borderRadius: 10, padding: 4, overflowX: 'auto', maxWidth: 'calc(100vw - 340px)', flexShrink: 1 }}>
-              {topTabs.map(tab => (
-                <button
-                  key={tab.id}
-                  onClick={() => switchTop(tab.id)}
-                  style={{
-                    padding: '6px 10px', border: 'none', borderRadius: 7, cursor: 'pointer', flexShrink: 0,
-                    background: topMode === tab.id ? 'var(--accent, #3fb950)' : 'transparent',
-                    color: topMode === tab.id ? '#fff' : 'var(--text-muted, #888)',
-                    fontWeight: topMode === tab.id ? 700 : 400,
-                    fontSize: 12, display: 'flex', alignItems: 'center', gap: 4,
-                    transition: 'all 0.15s',
-                  }}
-                >
-                  <span>{tab.icon}</span>{tab.label}
-                </button>
-              ))}
-            </div>
+          <div>
+            <h1 style={{ margin: 0 }}>{t('app.title')}</h1>
+            <p className="subtitle" style={{ margin: 0 }}>{t('app.subtitle')}</p>
           </div>
           <div className="header-controls">
             {topMode === 'ast' && (
               <div className="lang-selector">
                 <label htmlFor="lang-select">{t('language')}:</label>
-                <select
-                  id="lang-select"
-                  value={language}
-                  onChange={(e) => handleLanguageChange(e.target.value)}
-                >
+                <select id="lang-select" value={language} onChange={(e) => handleLanguageChange(e.target.value)}>
                   {languages.map((l) => (
                     <option key={l.id} value={l.id}>{l.name}</option>
                   ))}
@@ -209,11 +185,24 @@ function AppInner() {
             </div>
           </div>
         </div>
+        {/* Row 2: tab bar — full width, scrollable */}
+        <div className="top-tab-bar">
+          {topTabs.map(tab => (
+            <button
+              key={tab.id}
+              onClick={() => switchTop(tab.id)}
+              className={`top-tab-btn${topMode === tab.id ? ' active' : ''}`}
+            >
+              <span className="top-tab-icon">{tab.icon}</span>
+              <span className="top-tab-label">{tab.label}</span>
+            </button>
+          ))}
+        </div>
       </header>
 
       {/* ── Lazy-loaded views ─────────────────────────────────────────────────── */}
       {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86'] as TopMode[]).includes(topMode) && (
-        <div style={{ height: 'calc(100vh - var(--header-h, 72px))', overflow: 'hidden' }}>
+        <div style={{ height: 'calc(100vh - var(--header-h, 130px))', overflow: 'hidden' }}>
           <ErrorBoundary fallback={
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:12, color:'var(--text-muted)' }}>
               <div style={{ fontSize:32 }}>⚠</div>
