@@ -8,9 +8,9 @@ interface StructField { name: string; type: string; desc: string }
 
 // ─── Linux Commands ───────────────────────────────────────────────────────────
 
-const CMD_GROUPS: { label: string; icon: string; cmds: CmdEntry[] }[] = [
+const CMD_GROUPS: { label: string; icon: string; color: string; cmds: CmdEntry[] }[] = [
   {
-    label: 'Process', icon: '⚙️',
+    label: 'Process', icon: '⚙️', color: '#4d8fff',
     cmds: [
       { cmd: 'ps aux',          desc: 'List all running processes (BSD style)',           example: 'ps aux | grep nginx' },
       { cmd: 'top / htop',      desc: 'Live process monitor with CPU/mem stats',          example: 'htop -u root' },
@@ -25,7 +25,7 @@ const CMD_GROUPS: { label: string; icon: string; cmds: CmdEntry[] }[] = [
     ],
   },
   {
-    label: 'File System', icon: '📁',
+    label: 'File System', icon: '📁', color: '#ffa657',
     cmds: [
       { cmd: 'ls -lah',        desc: 'List files with size, permissions, human-readable', example: 'ls -lah /proc/1/' },
       { cmd: 'find',           desc: 'Search files by name, type, size, time',           example: 'find / -name "*.conf" -type f' },
@@ -40,7 +40,7 @@ const CMD_GROUPS: { label: string; icon: string; cmds: CmdEntry[] }[] = [
     ],
   },
   {
-    label: 'Network', icon: '🌐',
+    label: 'Network', icon: '🌐', color: '#3fb950',
     cmds: [
       { cmd: 'ip addr / ifconfig', desc: 'Show / configure network interfaces',          example: 'ip addr show eth0' },
       { cmd: 'ss / netstat',       desc: 'Socket statistics, open ports',                example: 'ss -tlnp' },
@@ -53,7 +53,7 @@ const CMD_GROUPS: { label: string; icon: string; cmds: CmdEntry[] }[] = [
     ],
   },
   {
-    label: 'Memory', icon: '🧠',
+    label: 'Memory', icon: '🧠', color: '#a371f7',
     cmds: [
       { cmd: 'free -h',          desc: 'Show RAM / swap usage',                          example: 'free -h' },
       { cmd: 'vmstat',           desc: 'Virtual memory, I/O, CPU stats',                 example: 'vmstat 1 5' },
@@ -65,7 +65,7 @@ const CMD_GROUPS: { label: string; icon: string; cmds: CmdEntry[] }[] = [
     ],
   },
   {
-    label: 'Kernel / System', icon: '🔧',
+    label: 'Kernel / System', icon: '🔧', color: '#e3b341',
     cmds: [
       { cmd: 'uname -a',    desc: 'Kernel version, arch, hostname',                    example: 'uname -r' },
       { cmd: 'sysctl',      desc: 'Read/write kernel parameters at runtime',           example: 'sysctl vm.swappiness=10' },
@@ -315,6 +315,173 @@ const MM_FIELDS: StructField[] = [
   { name: 'rss',        type: 'atomic_long_t',           desc: 'Resident Set Size — pages actually in physical RAM' },
 ]
 
+// ─── Visual: IPC Flow Diagram ─────────────────────────────────────────────────
+
+type IpcFlowDef = { mid: string; color: string; bidir: boolean; detail: string }
+const IPC_FLOWS: Record<string, IpcFlowDef> = {
+  'Pipe (|)':          { mid: 'kernel\nbuffer', color: '#4d8fff', bidir: false, detail: 'fd[1] write → fd[0] read' },
+  'Named Pipe (FIFO)': { mid: '/tmp/myfifo\n(filesystem)', color: '#3fb950', bidir: false, detail: 'open → write / read → close' },
+  'Signal':            { mid: 'SIGUSR1\n(async notify)', color: '#f85149', bidir: false, detail: 'kill(pid, sig) → handler()' },
+  'Shared Memory':     { mid: 'shared\nmemory page', color: '#a371f7', bidir: true,  detail: 'mmap → read/write → munmap' },
+  'Message Queue':     { mid: 'kernel\nmsg queue', color: '#ffa657', bidir: false, detail: 'mq_send → mq_receive' },
+  'Socket':            { mid: 'TCP / Unix\nstream', color: '#39d353', bidir: true,  detail: 'connect ↔ accept → read/write' },
+  'Semaphore':         { mid: 'sem counter\n(sync only)', color: '#e3b341', bidir: true,  detail: 'sem_wait (P) / sem_post (V)' },
+}
+
+function IpcFlowDiagram({ name }: { name: string }) {
+  const def = IPC_FLOWS[name]
+  if (!def) return null
+  const { mid, color, bidir, detail } = def
+  const W = 420, H = 110
+  const pW = 90, pH = 44, midW = 110, midH = 44
+  const pAy = H/2, midX = (W - midW)/2, midY = H/2
+  const p1X = 30, p2X = W - pW - 30
+
+  const midLines = mid.split('\n')
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, display: 'block' }}>
+      <defs>
+        <marker id={`iaf-${name}`} markerWidth={8} markerHeight={8} refX={7} refY={3.5} orient="auto">
+          <path d="M0,0 L0,7 L8,3.5z" fill={color} />
+        </marker>
+        <marker id={`iar-${name}`} markerWidth={8} markerHeight={8} refX={1} refY={3.5} orient="auto">
+          <path d="M8,0 L8,7 L0,3.5z" fill={color} />
+        </marker>
+      </defs>
+
+      {/* Process A */}
+      <rect x={p1X} y={pAy-pH/2} width={pW} height={pH} rx={8}
+        fill="rgba(77,143,255,0.14)" stroke="#4d8fff" strokeWidth={1.8} />
+      <text x={p1X+pW/2} y={pAy-6} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--text-primary)">Process A</text>
+      <text x={p1X+pW/2} y={pAy+10} textAnchor="middle" fontSize={9} fill="var(--text-muted)">sender</text>
+
+      {/* Mechanism box */}
+      <rect x={midX} y={midY-midH/2} width={midW} height={midH} rx={8}
+        fill={`${color}22`} stroke={color} strokeWidth={1.8} strokeDasharray="5 3" />
+      {midLines.map((l,i) => (
+        <text key={i} x={midX+midW/2} y={midY - (midLines.length-1)*7 + i*14}
+          textAnchor="middle" fontSize={10} fontWeight={700} fill={color}>{l}</text>
+      ))}
+
+      {/* Process B */}
+      <rect x={p2X} y={pAy-pH/2} width={pW} height={pH} rx={8}
+        fill="rgba(63,185,80,0.14)" stroke="#3fb950" strokeWidth={1.8} />
+      <text x={p2X+pW/2} y={pAy-6} textAnchor="middle" fontSize={11} fontWeight={700} fill="var(--text-primary)">Process B</text>
+      <text x={p2X+pW/2} y={pAy+10} textAnchor="middle" fontSize={9} fill="var(--text-muted)">receiver</text>
+
+      {/* Forward arrow A → mechanism */}
+      <line x1={p1X+pW} y1={pAy} x2={midX-2} y2={pAy}
+        stroke={color} strokeWidth={1.8} markerEnd={`url(#iaf-${name})`} />
+      {/* mechanism → B */}
+      <line x1={midX+midW} y1={pAy} x2={p2X-2} y2={pAy}
+        stroke={color} strokeWidth={1.8} markerEnd={`url(#iaf-${name})`} />
+      {/* Reverse arrows for bidirectional */}
+      {bidir && (
+        <>
+          <line x1={midX-2} y1={pAy+10} x2={p1X+pW} y2={pAy+10}
+            stroke={color} strokeWidth={1.2} strokeDasharray="4 3" markerEnd={`url(#iar-${name})`} />
+          <line x1={p2X-2} y1={pAy+10} x2={midX+midW} y2={pAy+10}
+            stroke={color} strokeWidth={1.2} strokeDasharray="4 3" markerEnd={`url(#iar-${name})`} />
+        </>
+      )}
+
+      {/* Detail label */}
+      <text x={W/2} y={H-6} textAnchor="middle" fontSize={9} fill="var(--text-muted)" fontStyle="italic">{detail}</text>
+    </svg>
+  )
+}
+
+// ─── Visual: Process Tree SVG ─────────────────────────────────────────────────
+
+function ProcessTreeDiagram() {
+  type PNode = { label: string; sub?: string; x: number; y: number; color: string }
+  const nodes: PNode[] = [
+    { label: 'idle',    sub: 'pid=0',   x: 220, y: 28,  color: '#a371f7' },
+    { label: 'systemd', sub: 'pid=1',   x: 220, y: 88,  color: '#58a6ff' },
+    { label: 'sshd',    sub: 'pid=xxx', x: 90,  y: 150, color: '#3fb950' },
+    { label: 'cron',    sub: 'pid=yyy', x: 220, y: 150, color: '#3fb950' },
+    { label: 'nginx',   sub: 'pid=zzz', x: 350, y: 150, color: '#3fb950' },
+    { label: 'bash',    sub: 'pid=aaa', x: 90,  y: 210, color: '#ffa657' },
+    { label: 'your-app',sub: 'pid=bbb', x: 90,  y: 268, color: '#e3b341' },
+    { label: 'thread-1',sub: 'tid=bbc', x: 30,  y: 326, color: '#79c0ff' },
+    { label: 'thread-2',sub: 'tid=bbd', x: 150, y: 326, color: '#79c0ff' },
+  ]
+  const edges: [number,number][] = [[0,1],[1,2],[1,3],[1,4],[2,5],[5,6],[6,7],[6,8]]
+  const W = 440, H = 360, bW = 90, bH = 36, R = 6
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, display: 'block' }}>
+      <defs>
+        <marker id="pt-arr" markerWidth={8} markerHeight={8} refX={7} refY={3.5} orient="auto">
+          <path d="M0,0 L0,7 L8,3.5z" fill="rgba(88,166,255,0.6)" />
+        </marker>
+      </defs>
+      {edges.map(([a,b],i) => (
+        <line key={i}
+          x1={nodes[a].x} y1={nodes[a].y + bH/2}
+          x2={nodes[b].x} y2={nodes[b].y - bH/2}
+          stroke="rgba(88,166,255,0.35)" strokeWidth={1.5} markerEnd="url(#pt-arr)" />
+      ))}
+      {nodes.map((n,i) => (
+        <g key={i}>
+          <rect x={n.x - bW/2} y={n.y - bH/2} width={bW} height={bH} rx={R}
+            fill={`${n.color}20`} stroke={n.color} strokeWidth={i===0?2.5:1.8} />
+          <text x={n.x} y={n.y-4} textAnchor="middle" fontSize={11} fontWeight={700} fill={n.color}>{n.label}</text>
+          <text x={n.x} y={n.y+11} textAnchor="middle" fontSize={9} fill="var(--text-muted)" fontFamily="monospace">{n.sub}</text>
+        </g>
+      ))}
+      {/* thread annotation */}
+      <text x={90} y={350} textAnchor="middle" fontSize={9} fill="#79c0ff" fontStyle="italic">
+        threads share mm_struct (same address space)
+      </text>
+    </svg>
+  )
+}
+
+// ─── Visual: Virtual Address Space ────────────────────────────────────────────
+
+function VmaLayoutDiagram() {
+  const segs = [
+    { label: 'kernel space',   sub: '(inaccessible)',      color: '#a371f7', h: 36, addr: '0xFFFF…' },
+    { label: 'stack',          sub: '↓ grows down',        color: '#f85149', h: 30, addr: '0x7FFF…' },
+    { label: 'mmap / libs',    sub: 'shared objs, anon',   color: '#ffa657', h: 30, addr: '' },
+    { label: 'heap',           sub: '↑ grows up (brk)',    color: '#3fb950', h: 30, addr: '' },
+    { label: 'BSS',            sub: 'uninit globals = 0',  color: '#58a6ff', h: 24, addr: '' },
+    { label: 'data (.data)',   sub: 'init globals & statics', color: '#79c0ff', h: 24, addr: '' },
+    { label: 'text (.text)',   sub: 'executable code (RX)', color: '#e3b341', h: 24, addr: '0x0040…' },
+    { label: 'null / reserved',sub: '(unmapped)',           color: '#444',    h: 20, addr: '0x0000' },
+  ]
+  const W = 360, padL = 60, barW = 180
+  let y = 16
+  const rows: { y: number; seg: typeof segs[0] }[] = []
+  for (const s of segs) { rows.push({ y, seg: s }); y += s.h + 4 }
+  const H = y + 8
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', maxWidth: W, display: 'block' }}>
+      {rows.map(({ y: ry, seg }, i) => (
+        <g key={i}>
+          {/* address */}
+          {seg.addr && (
+            <text x={padL-6} y={ry+seg.h/2+4} textAnchor="end" fontSize={8}
+              fill="var(--text-muted)" fontFamily="monospace">{seg.addr}</text>
+          )}
+          {/* bar */}
+          <rect x={padL} y={ry} width={barW} height={seg.h} rx={3}
+            fill={`${seg.color}28`} stroke={seg.color} strokeWidth={1.5} />
+          {/* label */}
+          <text x={padL+8} y={ry+seg.h/2+4} fontSize={10} fontWeight={700} fill={seg.color}>{seg.label}</text>
+          {/* sublabel */}
+          <text x={padL+barW+8} y={ry+seg.h/2+4} fontSize={9} fill="var(--text-muted)" fontStyle="italic">{seg.sub}</text>
+        </g>
+      ))}
+      <text x={padL+barW/2} y={H-2} textAnchor="middle" fontSize={9} fill="var(--text-muted)">
+        virtual address space (x86-64, 48-bit)
+      </text>
+    </svg>
+  )
+}
+
 // ─── Subsection components ─────────────────────────────────────────────────────
 
 function CommandsTab() {
@@ -328,41 +495,66 @@ function CommandsTab() {
   return (
     <div style={{ display: 'flex', gap: 0, height: '100%' }}>
       {/* Group sidebar */}
-      <div style={{ width: 130, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', padding: '8px 0' }}>
+      <div style={{ width: 148, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', padding: '8px 0', overflowY: 'auto' }}>
         {CMD_GROUPS.map((g, i) => (
           <button key={g.label} onClick={() => { setActiveGroup(i); setSearch('') }}
             style={{
               display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '9px 14px', border: 'none',
-              borderLeft: i === activeGroup && !search ? '3px solid var(--accent-blue)' : '3px solid transparent',
+              padding: '10px 14px', border: 'none',
+              borderLeft: i === activeGroup && !search ? `3px solid ${g.color}` : '3px solid transparent',
               background: i === activeGroup && !search ? 'var(--bg-elevated)' : 'transparent',
               color: i === activeGroup && !search ? 'var(--text-primary)' : 'var(--text-secondary)',
               cursor: 'pointer', fontSize: 12, fontWeight: i === activeGroup && !search ? 600 : 400,
             }}>
-            <span>{g.icon}</span><span>{g.label}</span>
+            <span style={{ fontSize: 15 }}>{g.icon}</span>
+            <span>{g.label}</span>
           </button>
         ))}
       </div>
       {/* Commands */}
       <div style={{ flex: 1, overflow: 'auto', padding: 16 }}>
+        {/* Category header */}
+        {!search && (
+          <div style={{
+            display: 'flex', alignItems: 'center', gap: 10, marginBottom: 12,
+            padding: '8px 14px', borderRadius: 8,
+            background: `${group.color}18`, border: `1px solid ${group.color}50`,
+          }}>
+            <span style={{ fontSize: 20 }}>{group.icon}</span>
+            <span style={{ fontSize: 14, fontWeight: 700, color: group.color }}>{group.label}</span>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', marginLeft: 4 }}>{group.cmds.length} commands</span>
+          </div>
+        )}
         <input
           placeholder="Search commands…"
           value={search}
           onChange={e => setSearch(e.target.value)}
           style={{
-            width: '100%', padding: '8px 12px', marginBottom: 16,
+            width: '100%', padding: '8px 12px', marginBottom: 12,
             background: 'var(--bg-tertiary)', border: '1px solid var(--border)',
             borderRadius: 8, color: 'var(--text-primary)', fontSize: 13, outline: 'none',
+            boxSizing: 'border-box',
           }}
         />
-        <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 7 }}>
           {filtered.map(c => (
-            <div key={c.cmd} style={{ background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 10, padding: '12px 16px' }}>
+            <div key={c.cmd} style={{
+              background: 'var(--bg-secondary)', border: '1px solid var(--border)',
+              borderRadius: 10, padding: '11px 14px',
+              borderLeft: `3px solid ${search ? '#4d8fff' : group.color}`,
+            }}>
               <div style={{ display: 'flex', alignItems: 'baseline', gap: 12, flexWrap: 'wrap' }}>
-                <code style={{ background: 'var(--bg-elevated)', borderRadius: 5, padding: '2px 8px', fontSize: 13, color: 'var(--accent-blue)', fontWeight: 700, whiteSpace: 'nowrap' }}>{c.cmd}</code>
+                <code style={{
+                  background: 'var(--bg-elevated)', borderRadius: 5, padding: '2px 8px',
+                  fontSize: 13, color: search ? '#4d8fff' : group.color, fontWeight: 700, whiteSpace: 'nowrap',
+                }}>{c.cmd}</code>
                 <span style={{ color: 'var(--text-secondary)', fontSize: 13 }}>{c.desc}</span>
               </div>
-              <div style={{ marginTop: 6, fontFamily: 'monospace', fontSize: 12, color: 'var(--accent-green)', background: 'var(--bg-tertiary)', borderRadius: 5, padding: '4px 10px' }}>$ {c.example}</div>
+              <div style={{
+                marginTop: 6, fontFamily: 'monospace', fontSize: 12,
+                color: 'var(--accent-green)', background: 'var(--bg-tertiary)',
+                borderRadius: 5, padding: '4px 10px',
+              }}>$ {c.example}</div>
             </div>
           ))}
         </div>
@@ -377,33 +569,46 @@ function IpcTab() {
   return (
     <div style={{ display: 'flex', gap: 0, height: '100%' }}>
       {/* Sidebar */}
-      <div style={{ width: 160, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', padding: '8px 0' }}>
-        {IPC_LIST.map((ipc, i) => (
-          <button key={ipc.name} onClick={() => setSel(i)}
-            style={{
-              display: 'flex', alignItems: 'center', gap: 8, width: '100%',
-              padding: '9px 14px', border: 'none',
-              borderLeft: i === sel ? '3px solid var(--accent-purple)' : '3px solid transparent',
-              background: i === sel ? 'var(--bg-elevated)' : 'transparent',
-              color: i === sel ? 'var(--text-primary)' : 'var(--text-secondary)',
-              cursor: 'pointer', fontSize: 12, fontWeight: i === sel ? 600 : 400,
-            }}>
-            <span style={{ fontSize: 16 }}>{ipc.icon}</span><span>{ipc.name}</span>
-          </button>
-        ))}
+      <div style={{ width: 168, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', padding: '8px 0', overflowY: 'auto' }}>
+        {IPC_LIST.map((item, i) => {
+          const flowColor = IPC_FLOWS[item.name]?.color ?? '#4d8fff'
+          return (
+            <button key={item.name} onClick={() => setSel(i)}
+              style={{
+                display: 'flex', alignItems: 'center', gap: 8, width: '100%',
+                padding: '9px 14px', border: 'none',
+                borderLeft: i === sel ? `3px solid ${flowColor}` : '3px solid transparent',
+                background: i === sel ? 'var(--bg-elevated)' : 'transparent',
+                color: i === sel ? 'var(--text-primary)' : 'var(--text-secondary)',
+                cursor: 'pointer', fontSize: 12, fontWeight: i === sel ? 600 : 400,
+              }}>
+              <span style={{ fontSize: 16 }}>{item.icon}</span><span>{item.name}</span>
+            </button>
+          )
+        })}
       </div>
       {/* Detail */}
       <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
-        <h3 style={{ fontSize: 18, margin: '0 0 8px', display: 'flex', alignItems: 'center', gap: 10 }}>
+        <h3 style={{ fontSize: 18, margin: '0 0 6px', display: 'flex', alignItems: 'center', gap: 10 }}>
           <span style={{ fontSize: 26 }}>{ipc.icon}</span>{ipc.name}
         </h3>
-        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 12, lineHeight: 1.6 }}>{ipc.desc}</p>
+        <p style={{ color: 'var(--text-secondary)', fontSize: 13, marginBottom: 14, lineHeight: 1.6 }}>{ipc.desc}</p>
+
+        {/* Flow diagram */}
+        <div style={{
+          background: 'var(--bg-secondary)', border: `1px solid ${IPC_FLOWS[ipc.name]?.color ?? '#4d8fff'}40`,
+          borderRadius: 10, padding: '12px 16px', marginBottom: 14,
+        }}>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>COMMUNICATION FLOW</div>
+          <IpcFlowDiagram name={ipc.name} />
+        </div>
+
         <div style={{ display: 'flex', gap: 12, marginBottom: 16 }}>
-          <div style={{ flex: 1, background: 'rgba(63,185,80,0.1)', border: '1px solid rgba(63,185,80,0.3)', borderRadius: 8, padding: '10px 14px' }}>
+          <div style={{ flex: 1, background: 'rgba(63,185,80,0.10)', border: '1px solid rgba(63,185,80,0.3)', borderRadius: 8, padding: '10px 14px' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-green)', marginBottom: 4 }}>✓ PROS</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ipc.pros}</div>
           </div>
-          <div style={{ flex: 1, background: 'rgba(248,81,73,0.1)', border: '1px solid rgba(248,81,73,0.3)', borderRadius: 8, padding: '10px 14px' }}>
+          <div style={{ flex: 1, background: 'rgba(248,81,73,0.10)', border: '1px solid rgba(248,81,73,0.3)', borderRadius: 8, padding: '10px 14px' }}>
             <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--accent-red)', marginBottom: 4 }}>✗ CONS</div>
             <div style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{ipc.cons}</div>
           </div>
@@ -447,18 +652,15 @@ function ProcessTab() {
         </p>
       </div>
 
-      {/* Process tree diagram */}
-      <div style={{ background: 'var(--bg-tertiary)', borderRadius: 10, padding: 16, marginBottom: 20, fontFamily: 'monospace', fontSize: 12, lineHeight: 1.8, color: 'var(--text-secondary)', overflowX: 'auto' }}>
-        <div style={{ color: 'var(--accent-blue)', fontWeight: 700, marginBottom: 4 }}>Process tree (kernel view):</div>
-        <pre style={{ margin: 0 }}>{`idle (pid=0)  ← swapper, runs when no other task is runnable
-└── init / systemd (pid=1)  ← ancestor of all user processes
-      ├── sshd (pid=xxx)
-      │     └── bash (pid=yyy)
-      │           └── your-program (pid=zzz)
-      │                 ├── thread-1  ← same mm_struct, different task_struct
-      │                 └── thread-2
-      ├── cron (pid=...)
-      └── ...`}</pre>
+      {/* Process tree — SVG visual */}
+      <div style={{ marginBottom: 20 }}>
+        <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>PROCESS TREE (kernel view)</div>
+        <div style={{
+          background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 12,
+          padding: 16, display: 'flex', justifyContent: 'center', overflowX: 'auto',
+        }}>
+          <ProcessTreeDiagram />
+        </div>
       </div>
 
       {/* Struct groups */}
@@ -495,18 +697,12 @@ function ProcessTab() {
             Describes the entire virtual address space. VMAs are stored in both a linked list (traversal) and a red-black tree (fast lookup by address).
           </p>
         </div>
-        <div style={{ fontFamily: 'monospace', fontSize: 12, color: 'var(--text-muted)', padding: '8px 12px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)' }}>
-          Address space layout (typical x86-64):
-          <pre style={{ margin: '6px 0 0', lineHeight: 1.7, color: 'var(--text-secondary)' }}>{`0xFFFF_FFFF_FFFF_FFFF  ← kernel space (not accessible from user)
-────────────────────────
-0x7FFF_FFFF_FFFF       ← stack (grows ↓)
-                        ← mmap / shared libs / anonymous maps
-              heap →    ← brk (grows ↑)
-              BSS →     ← uninitialised globals
-              data →    ← initialised globals
-              text →    ← executable code
-0x0000_0000_0000_0000`}</pre>
+
+        {/* Virtual address space visual */}
+        <div style={{ padding: '14px 20px', background: 'var(--bg-tertiary)', borderBottom: '1px solid var(--border)', display: 'flex', justifyContent: 'center' }}>
+          <VmaLayoutDiagram />
         </div>
+
         <div style={{ display: 'grid', gridTemplateColumns: '180px 220px 1fr', gap: 12, padding: '6px 12px', background: 'var(--bg-tertiary)', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', borderBottom: '1px solid var(--border)' }}>
           <span>FIELD</span><span>TYPE</span><span>DESCRIPTION</span>
         </div>

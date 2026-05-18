@@ -24,7 +24,6 @@ function highlightCode(code: string, lang: string): string {
 }
 
 function highlightLine(line: string, kws: Set<string>, lang: string): string {
-  // Handle comments first (whole line)
   const commentPrefixes: Record<string, string[]> = {
     c: ['//','/*'], cpp: ['//','/*'], java: ['//','/*'],
     rust: ['//'], go: ['//'],
@@ -35,7 +34,6 @@ function highlightLine(line: string, kws: Set<string>, lang: string): string {
   const indent = line.length - trimmed.length
   const indentStr = line.slice(0, indent)
 
-  // Check if the trimmed line starts with a comment prefix
   for (const p of prefixes) {
     if (trimmed.startsWith(p)) {
       return escHtml(indentStr) + `<span class="hl-comment">${escHtml(trimmed)}</span>`
@@ -44,7 +42,6 @@ function highlightLine(line: string, kws: Set<string>, lang: string): string {
 
   let out = ''
   let i = 0
-  // Scan for inline comment
   const commentStart = findInlineComment(line, lang)
   const mainPart = commentStart >= 0 ? line.slice(0, commentStart) : line
   const commentPart = commentStart >= 0 ? line.slice(commentStart) : ''
@@ -52,7 +49,6 @@ function highlightLine(line: string, kws: Set<string>, lang: string): string {
   while (i < mainPart.length) {
     const c = mainPart[i]
 
-    // String literal
     if (c === '"' || c === '\'') {
       let str = c
       const q = c
@@ -69,7 +65,6 @@ function highlightLine(line: string, kws: Set<string>, lang: string): string {
       continue
     }
 
-    // Number
     if (c >= '0' && c <= '9') {
       let num = ''
       while (i < mainPart.length && (mainPart[i] >= '0' && mainPart[i] <= '9' || mainPart[i] === '.')) num += mainPart[i++]
@@ -77,7 +72,6 @@ function highlightLine(line: string, kws: Set<string>, lang: string): string {
       continue
     }
 
-    // Identifier / keyword
     if (isIdStart(c)) {
       let word = ''
       while (i < mainPart.length && isIdChar(mainPart[i])) word += mainPart[i++]
@@ -87,7 +81,6 @@ function highlightLine(line: string, kws: Set<string>, lang: string): string {
       continue
     }
 
-    // Operators
     if (i + 1 < mainPart.length) {
       const two = c + mainPart[i + 1]
       if (['==','!=','<=','>=','->','::','&&','||','<<','>>','+=','-=','*=','/='].includes(two)) {
@@ -181,6 +174,304 @@ function CodeBlock({ code, lang }: { code: string; lang: string }) {
   )
 }
 
+// ─── DS Visual Diagrams ───────────────────────────────────────────────────────
+
+const B = '#4d8fff'     // blue
+const G = '#3fb950'     // green
+const P = '#a371f7'     // purple
+const O = '#ffa657'     // orange
+
+function Arrow({ id, color = B }: { id: string; color?: string }) {
+  return (
+    <marker id={id} markerWidth={9} markerHeight={9} refX={8} refY={3.5} orient="auto">
+      <path d="M0,0 L0,7 L9,3.5z" fill={color} />
+    </marker>
+  )
+}
+
+function LinkedListDiagram() {
+  const vals = [12, 37, 99, 5]
+  const nw = 38, pw = 18, nh = 32, gap = 20, cy = 60, sx = 60
+  const W = sx + vals.length * (nw + pw + gap) + 40
+  return (
+    <svg viewBox={`0 0 ${W} 110`} style={{ width: '100%', maxWidth: W, display: 'block' }}>
+      <defs><Arrow id="ll" /><Arrow id="llg" color={G} /></defs>
+      {/* HEAD box */}
+      <rect x={4} y={cy-14} width={46} height={28} rx={5} fill="none" stroke={G} strokeWidth={1.5} strokeDasharray="4 2" />
+      <text x={27} y={cy+5} textAnchor="middle" fontSize={10} fill={G} fontWeight={700} fontFamily="monospace">HEAD</text>
+      <line x1={50} y1={cy} x2={sx-3} y2={cy} stroke={G} strokeWidth={2} markerEnd="url(#llg)" />
+      {vals.map((v, i) => {
+        const x = sx + i * (nw + pw + gap)
+        const hasNext = i < vals.length - 1
+        return (
+          <g key={i}>
+            <rect x={x} y={cy-nh/2} width={nw} height={nh} rx={5}
+              fill="rgba(77,143,255,0.18)" stroke={B} strokeWidth={1.5} />
+            <text x={x+nw/2} y={cy+5} textAnchor="middle" fontSize={13} fontWeight={700}
+              fill="var(--text-primary)" fontFamily="monospace">{v}</text>
+            <rect x={x+nw} y={cy-nh/2} width={pw} height={nh} rx={4}
+              fill="rgba(77,143,255,0.06)" stroke={B} strokeWidth={1} />
+            <text x={x+nw+pw/2} y={cy+3} textAnchor="middle" fontSize={9} fill="var(--text-muted)">→</text>
+            {hasNext
+              ? <line x1={x+nw+pw} y1={cy} x2={x+nw+pw+gap-3} y2={cy} stroke={B} strokeWidth={1.5} markerEnd="url(#ll)" />
+              : <text x={x+nw+pw+10} y={cy+4} fontSize={11} fill="var(--text-muted)" fontFamily="monospace">null</text>
+            }
+            <text x={x+(nw+pw)/2} y={cy+nh/2+14} textAnchor="middle" fontSize={9} fill="var(--text-muted)">node{i}</text>
+          </g>
+        )
+      })}
+      <text x={sx} y={20} fontSize={10} fill="var(--text-muted)">Singly Linked List — O(n) search · O(1) insert at head</text>
+    </svg>
+  )
+}
+
+function StackDiagram() {
+  const items = [9, 1, 7, 3]   // bottom → top
+  const rw = 100, rh = 30, rx0 = 70, gap = 2, startY = 40
+  const H = startY + items.length * (rh + gap) + 40
+  return (
+    <svg viewBox={`0 0 260 ${H}`} style={{ width: '100%', maxWidth: 260, display: 'block' }}>
+      <defs><Arrow id="su" color={G} /><Arrow id="sd" color={O} /></defs>
+      <text x={130} y={18} textAnchor="middle" fontSize={10} fill="var(--text-muted)">Stack — LIFO · O(1) push/pop</text>
+      {/* PUSH */}
+      <text x={rx0+rw/2} y={startY-8} textAnchor="middle" fontSize={10} fill={G} fontWeight={700}>↓ PUSH</text>
+      {items.slice().reverse().map((v, i) => {
+        const y = startY + i * (rh + gap)
+        const isTop = i === 0
+        return (
+          <g key={i}>
+            <rect x={rx0} y={y} width={rw} height={rh} rx={5}
+              fill={isTop ? 'rgba(77,143,255,0.28)' : 'rgba(77,143,255,0.10)'}
+              stroke={isTop ? B : 'rgba(77,143,255,0.45)'} strokeWidth={isTop ? 2 : 1} />
+            <text x={rx0+rw/2} y={y+rh/2+5} textAnchor="middle" fontSize={13}
+              fontWeight={isTop ? 700 : 400} fill="var(--text-primary)" fontFamily="monospace">{v}</text>
+            {isTop && (
+              <text x={rx0+rw+8} y={y+rh/2+5} fontSize={10} fill={B} fontWeight={700}>← top</text>
+            )}
+          </g>
+        )
+      })}
+      {/* base line */}
+      <line x1={rx0-4} y1={startY + items.length*(rh+gap)} x2={rx0+rw+4} y2={startY + items.length*(rh+gap)} stroke={B} strokeWidth={2.5} />
+      {/* POP */}
+      <text x={rx0-10} y={startY+10} textAnchor="end" fontSize={10} fill={O} fontWeight={700}>POP ↑</text>
+    </svg>
+  )
+}
+
+function QueueDiagram() {
+  const vals = [4, 2, 8, 1]
+  const nw = 52, nh = 36, gap = 2, sx = 90, cy = 65
+  const W = sx + vals.length * (nw + gap) + 80
+  return (
+    <svg viewBox={`0 0 ${W} 120`} style={{ width: '100%', maxWidth: W, display: 'block' }}>
+      <defs>
+        <Arrow id="qe" color={G} />
+        <Arrow id="qd" color={O} />
+      </defs>
+      <text x={W/2} y={18} textAnchor="middle" fontSize={10} fill="var(--text-muted)">Queue — FIFO · O(1) enqueue/dequeue</text>
+      {/* ENQUEUE from left */}
+      <text x={sx-30} y={cy-18} textAnchor="middle" fontSize={10} fill={G} fontWeight={700}>ENQUEUE</text>
+      <line x1={sx-56} y1={cy} x2={sx-4} y2={cy} stroke={G} strokeWidth={1.8} markerEnd="url(#qe)" />
+      {vals.map((v, i) => {
+        const x = sx + i * (nw + gap)
+        const isFirst = i === 0
+        const isLast = i === vals.length - 1
+        const rl = isFirst ? 6 : 0, rr = isLast ? 6 : 0
+        return (
+          <g key={i}>
+            <rect x={x} y={cy-nh/2} width={nw} height={nh}
+              rx={0} ry={0}
+              fill={isFirst ? 'rgba(255,166,87,0.22)' : isLast ? 'rgba(63,185,80,0.16)' : 'rgba(77,143,255,0.12)'}
+              stroke={B} strokeWidth={1.5} />
+            {/* rounded corners hack via clipPath on first/last */}
+            <text x={x+nw/2} y={cy+5} textAnchor="middle" fontSize={13}
+              fontWeight={700} fill="var(--text-primary)" fontFamily="monospace">{v}</text>
+            {isFirst && <text x={x+nw/2} y={cy+nh/2+14} textAnchor="middle" fontSize={9} fill={O}>front</text>}
+            {isLast  && <text x={x+nw/2} y={cy+nh/2+14} textAnchor="middle" fontSize={9} fill={G}>rear</text>}
+          </g>
+        )
+      })}
+      {/* DEQUEUE to right */}
+      <text x={sx+vals.length*(nw+gap)+34} y={cy-18} textAnchor="middle" fontSize={10} fill={O} fontWeight={700}>DEQUEUE</text>
+      <line x1={sx+vals.length*(nw+gap)} y1={cy} x2={sx+vals.length*(nw+gap)+54} y2={cy} stroke={O} strokeWidth={1.8} markerEnd="url(#qd)" />
+    </svg>
+  )
+}
+
+function BSTDiagram() {
+  type N = { v: number; x: number; y: number }
+  const nodes: N[] = [
+    { v:8,  x:200, y:28  },
+    { v:3,  x:105, y:85  }, { v:10, x:295, y:85  },
+    { v:1,  x:55,  y:145 }, { v:6,  x:155, y:145 }, { v:14, x:345, y:145 },
+    { v:4,  x:125, y:205 }, { v:7,  x:185, y:205 }, { v:13, x:315, y:205 },
+  ]
+  const edges: [number,number][] = [[0,1],[0,2],[1,3],[1,4],[2,5],[4,6],[4,7],[5,8]]
+  const R = 20
+  return (
+    <svg viewBox="0 0 400 240" style={{ width: '100%', maxWidth: 400, display: 'block' }}>
+      <text x={200} y={16} textAnchor="middle" fontSize={10} fill="var(--text-muted)">BST — O(log n) avg · left &lt; root &lt; right</text>
+      {edges.map(([a,b],i) => (
+        <line key={i} x1={nodes[a].x} y1={nodes[a].y+R} x2={nodes[b].x} y2={nodes[b].y-R}
+          stroke="rgba(77,143,255,0.35)" strokeWidth={1.8} />
+      ))}
+      {nodes.map((n,i) => (
+        <g key={i}>
+          <circle cx={n.x} cy={n.y} r={R}
+            fill={i===0 ? 'rgba(163,113,247,0.30)' : i<3 ? 'rgba(77,143,255,0.18)' : 'rgba(77,143,255,0.10)'}
+            stroke={i===0 ? P : B} strokeWidth={i===0 ? 2.5 : 1.5} />
+          <text x={n.x} y={n.y+5} textAnchor="middle" fontSize={12} fontWeight={700}
+            fill="var(--text-primary)" fontFamily="monospace">{n.v}</text>
+        </g>
+      ))}
+      <text x={200} y={235} textAnchor="middle" fontSize={9} fill="var(--text-muted)" fontStyle="italic">
+        inorder traversal: 1 3 4 6 7 8 10 13 14 (sorted!)
+      </text>
+    </svg>
+  )
+}
+
+function HashTableDiagram() {
+  const buckets: (string|null)[][] = [
+    ['john'], ['alice', 'charlie'], [null], ['bob'], ['carol', 'eve']
+  ]
+  const bw = 60, bh = 28, cw = 52, gap = 8, sx = 80, sy = 26
+  const H = sy + buckets.length * (bh + gap) + 16
+  return (
+    <svg viewBox={`0 0 380 ${H}`} style={{ width: '100%', maxWidth: 380, display: 'block' }}>
+      <defs><Arrow id="ha" /></defs>
+      <text x={190} y={15} textAnchor="middle" fontSize={10} fill="var(--text-muted)">Hash Table — O(1) avg · separate chaining</text>
+      {buckets.map((chain, i) => {
+        const y = sy + i * (bh + gap)
+        const hasItems = chain[0] !== null
+        return (
+          <g key={i}>
+            {/* index */}
+            <text x={sx-8} y={y+bh/2+5} textAnchor="end" fontSize={11} fill="var(--text-muted)" fontFamily="monospace">[{i}]</text>
+            {/* bucket */}
+            <rect x={sx} y={y} width={bw} height={bh} rx={5}
+              fill="rgba(77,143,255,0.12)" stroke={B} strokeWidth={1.5} />
+            {hasItems ? (
+              <>
+                <line x1={sx+bw} y1={y+bh/2} x2={sx+bw+gap+2} y2={y+bh/2} stroke={B} strokeWidth={1.5} markerEnd="url(#ha)" />
+                {chain.map((name, j) => {
+                  if (!name) return null
+                  const cx = sx + bw + gap + j * (cw + gap + 14)
+                  return (
+                    <g key={j}>
+                      <rect x={cx} y={y} width={cw} height={bh} rx={5}
+                        fill="rgba(63,185,80,0.15)" stroke={G} strokeWidth={1.5} />
+                      <text x={cx+cw/2} y={y+bh/2+4} textAnchor="middle" fontSize={10}
+                        fill="var(--text-primary)">{name}</text>
+                      {j < chain.length-1 && chain[j+1] && (
+                        <line x1={cx+cw} y1={y+bh/2} x2={cx+cw+gap+2} y2={y+bh/2} stroke={G} strokeWidth={1.5} markerEnd="url(#ha)" />
+                      )}
+                    </g>
+                  )
+                })}
+              </>
+            ) : (
+              <text x={sx+bw+12} y={y+bh/2+4} fontSize={10} fill="var(--text-muted)" fontFamily="monospace">null</text>
+            )}
+          </g>
+        )
+      })}
+      <text x={sx+bw/2} y={sy-8} textAnchor="middle" fontSize={9} fill="var(--text-muted)">buckets</text>
+      <text x={sx+bw+gap+cw/2+10} y={sy-8} textAnchor="middle" fontSize={9} fill="var(--text-muted)">chains (nodes)</text>
+    </svg>
+  )
+}
+
+function MinHeapDiagram() {
+  type N = { v: number; x: number; y: number }
+  const nodes: N[] = [
+    { v:1, x:200, y:28 },
+    { v:3, x:120, y:88 }, { v:2, x:280, y:88 },
+    { v:5, x:72,  y:148}, { v:4, x:168, y:148}, { v:6, x:232, y:148}, { v:7, x:328, y:148},
+  ]
+  const edges: [number,number][] = [[0,1],[0,2],[1,3],[1,4],[2,5],[2,6]]
+  const R = 20
+  return (
+    <svg viewBox="0 0 400 190" style={{ width: '100%', maxWidth: 400, display: 'block' }}>
+      <text x={200} y={15} textAnchor="middle" fontSize={10} fill="var(--text-muted)">Min Heap — O(log n) insert/delete · O(1) peek min</text>
+      {edges.map(([a,b],i) => (
+        <line key={i} x1={nodes[a].x} y1={nodes[a].y+R} x2={nodes[b].x} y2={nodes[b].y-R}
+          stroke="rgba(255,166,87,0.4)" strokeWidth={1.8} />
+      ))}
+      {nodes.map((n,i) => (
+        <g key={i}>
+          <circle cx={n.x} cy={n.y} r={R}
+            fill={i===0 ? 'rgba(255,166,87,0.38)' : 'rgba(255,166,87,0.14)'}
+            stroke={O} strokeWidth={i===0 ? 2.5 : 1.5} />
+          <text x={n.x} y={n.y+5} textAnchor="middle" fontSize={12} fontWeight={700}
+            fill="var(--text-primary)" fontFamily="monospace">{n.v}</text>
+          {i===0 && <text x={n.x+26} y={n.y+4} fontSize={9} fill={O} fontWeight={700}>MIN</text>}
+        </g>
+      ))}
+      {/* parent ≤ children annotation */}
+      <text x={12} y={108} fontSize={9} fill="rgba(255,166,87,0.6)" fontStyle="italic">parent ≤ children</text>
+      {/* array */}
+      <text x={200} y={182} textAnchor="middle" fontSize={10} fill="var(--text-muted)" fontFamily="monospace">
+        array: [1, 3, 2, 5, 4, 6, 7]
+      </text>
+    </svg>
+  )
+}
+
+function GraphDiagram() {
+  type N = { id: string; x: number; y: number; lvl: number }
+  const nodes: N[] = [
+    { id:'A', x:55,  y:85,  lvl:0 },
+    { id:'B', x:155, y:35,  lvl:1 }, { id:'C', x:155, y:135, lvl:1 },
+    { id:'D', x:265, y:35,  lvl:2 }, { id:'E', x:265, y:85,  lvl:2 }, { id:'F', x:265, y:135, lvl:2 },
+    { id:'G', x:365, y:60,  lvl:3 }, { id:'H', x:365, y:130, lvl:3 },
+  ]
+  const edges: [number,number][] = [[0,1],[0,2],[1,3],[1,4],[2,4],[2,5],[3,6],[4,6],[5,7]]
+  const lc = [P, B, G, O]
+  const R = 20
+  return (
+    <svg viewBox="0 0 430 180" style={{ width: '100%', maxWidth: 430, display: 'block' }}>
+      <text x={215} y={15} textAnchor="middle" fontSize={10} fill="var(--text-muted)">Graph BFS — shortest path · O(V+E) · level-by-level</text>
+      {edges.map(([a,b],i) => (
+        <line key={i} x1={nodes[a].x} y1={nodes[a].y} x2={nodes[b].x} y2={nodes[b].y}
+          stroke="rgba(255,255,255,0.12)" strokeWidth={1.8} />
+      ))}
+      {nodes.map((n,i) => (
+        <g key={i}>
+          <circle cx={n.x} cy={n.y} r={R}
+            fill={`${lc[n.lvl]}28`} stroke={lc[n.lvl]} strokeWidth={2} />
+          <text x={n.x} y={n.y+5} textAnchor="middle" fontSize={12} fontWeight={700}
+            fill="var(--text-primary)" fontFamily="monospace">{n.id}</text>
+        </g>
+      ))}
+      {/* BFS order label */}
+      {nodes.map((n,i) => (
+        <text key={i} x={n.x} y={n.y-R-5} textAnchor="middle" fontSize={8} fill={lc[n.lvl]}>
+          L{n.lvl}
+        </text>
+      ))}
+      {/* legend */}
+      {['Start (L0)','L1','L2','L3'].map((l,i) => (
+        <g key={i}>
+          <circle cx={16+i*90} cy={168} r={5} fill={`${lc[i]}28`} stroke={lc[i]} strokeWidth={1.5} />
+          <text x={26+i*90} y={172} fontSize={9} fill={lc[i]}>{l}</text>
+        </g>
+      ))}
+    </svg>
+  )
+}
+
+const DS_DIAGRAM: Record<string, React.FC> = {
+  'linked-list': LinkedListDiagram,
+  'stack':       StackDiagram,
+  'queue':       QueueDiagram,
+  'bst':         BSTDiagram,
+  'hash-table':  HashTableDiagram,
+  'min-heap':    MinHeapDiagram,
+  'graph-bfs':   GraphDiagram,
+}
+
 // ─── Main View ────────────────────────────────────────────────────────────────
 
 export default function DataStructuresView() {
@@ -188,6 +479,7 @@ export default function DataStructuresView() {
   const [selectedLang, setSelectedLang] = useState<DSLangId>('c')
 
   const ds = DS_LIST.find(d => d.id === selectedDs) ?? DS_LIST[0]
+  const Diagram = DS_DIAGRAM[ds.id]
 
   const langColor: Record<DSLangId, string> = {
     c: '#555599', cpp: '#f34b7d', java: '#b07219',
@@ -226,7 +518,7 @@ export default function DataStructuresView() {
       {/* ── Right panel ──────────────────────────────────────────────────── */}
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Header */}
-        <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)' }}>
+        <div style={{ padding: '16px 20px 12px', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0 }}>
           <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
             <span style={{ fontSize: 28 }}>{ds.icon}</span>
             <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>{ds.name}</h2>
@@ -243,6 +535,18 @@ export default function DataStructuresView() {
             }}>💾 {ds.complexity.space}</span>
           </div>
         </div>
+
+        {/* ── Visual Diagram ────────────────────────────────────────────── */}
+        {Diagram && (
+          <div style={{
+            padding: '16px 24px', borderBottom: '1px solid var(--border)',
+            background: 'var(--bg-primary)',
+            display: 'flex', justifyContent: 'center', alignItems: 'center',
+            flexShrink: 0, overflowX: 'auto',
+          }}>
+            <Diagram />
+          </div>
+        )}
 
         {/* Language tabs */}
         <div style={{
