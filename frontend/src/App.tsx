@@ -20,8 +20,9 @@ const IEEE754View        = lazy(() => import('./components/IEEE754View'))
 const NetworkView        = lazy(() => import('./components/NetworkView'))
 const CPUView            = lazy(() => import('./components/CPUView'))
 const X86View            = lazy(() => import('./components/X86View'))
+const HardwareView       = lazy(() => import('./components/HardwareView'))
 
-type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi' | 'algo' | 'memory' | 'regex' | 'ieee754' | 'network' | 'cpu' | 'x86'
+type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi' | 'algo' | 'memory' | 'regex' | 'ieee754' | 'network' | 'cpu' | 'x86' | 'hw'
 
 function parseErrorLines(errors: string[]): Set<number> {
   const s = new Set<number>()
@@ -144,6 +145,7 @@ function AppInner() {
     { id: 'network', label: t('tab.network'), icon: '🌐' },
     { id: 'cpu',     label: t('tab.cpu'),     icon: '⚡' },
     { id: 'x86',     label: t('tab.x86'),    icon: '🖥' },
+    { id: 'hw',      label: t('tab.hw'),     icon: '🔌' },
   ]
 
   return (
@@ -201,7 +203,7 @@ function AppInner() {
       </header>
 
       {/* ── Lazy-loaded views ─────────────────────────────────────────────────── */}
-      {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86'] as TopMode[]).includes(topMode) && (
+      {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86','hw'] as TopMode[]).includes(topMode) && (
         <div style={{ height: 'calc(100vh - var(--header-h, 130px))', overflow: 'hidden' }}>
           <ErrorBoundary fallback={
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:12, color:'var(--text-muted)' }}>
@@ -221,6 +223,7 @@ function AppInner() {
               {topMode === 'network' && <NetworkView />}
               {topMode === 'cpu'     && <CPUView />}
               {topMode === 'x86'     && <X86View />}
+              {topMode === 'hw'      && <HardwareView />}
             </Suspense>
           </ErrorBoundary>
         </div>
