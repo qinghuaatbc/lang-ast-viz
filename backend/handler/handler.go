@@ -110,6 +110,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/languages", h.handleLanguages)
 	mux.HandleFunc("/api/run", h.handleRun)
 	mux.HandleFunc("/api/header", h.handleHeader)
+	mux.HandleFunc("/api/man", h.handleMan)
 	// Versioned API
 	mux.HandleFunc("/api/v1/compile", h.handleCompile)
 	mux.HandleFunc("/api/v1/history", h.handleHistory)

@@ -6077,6 +6077,48 @@ function HeaderModal({name,onClose}:{name:string;onClose:()=>void}) {
   )
 }
 
+// ─── Man page modal ───────────────────────────────────────────────────────────
+
+function ManModal({name,onClose}:{name:string;onClose:()=>void}) {
+  const [content,setContent]=useState<string|null>(null)
+  const [err,setErr]=useState('')
+  useEffect(()=>{
+    setContent(null); setErr('')
+    fetch(`/api/man?name=${encodeURIComponent(name)}`)
+      .then(r=>r.json())
+      .then(d=>{ if(d.content) setContent(d.content); else setErr(d.error||'not found') })
+      .catch(()=>setErr('network error'))
+  },[name])
+  useEffect(()=>{
+    const h=(e:KeyboardEvent)=>{ if(e.key==='Escape') onClose() }
+    window.addEventListener('keydown',h)
+    return ()=>window.removeEventListener('keydown',h)
+  },[onClose])
+  return (
+    <div onClick={onClose} style={{position:'fixed',inset:0,background:'rgba(0,0,0,0.65)',zIndex:2000,
+      display:'flex',alignItems:'center',justifyContent:'center',padding:16}}>
+      <div onClick={e=>e.stopPropagation()} style={{background:'var(--bg-secondary)',
+        border:'1px solid var(--border)',borderRadius:10,width:'min(900px,95vw)',
+        maxHeight:'85vh',display:'flex',flexDirection:'column',overflow:'hidden',
+        boxShadow:'0 20px 60px rgba(0,0,0,0.5)'}}>
+        <div style={{display:'flex',alignItems:'center',gap:10,padding:'10px 16px',
+          borderBottom:'1px solid var(--border)',background:'var(--bg-elevated)',flexShrink:0}}>
+          <span style={{fontSize:14}}>📖</span>
+          <code style={{color:'#ffa657',fontWeight:700,fontSize:13}}>man {name}</code>
+          <span style={{fontSize:11,color:'var(--text-muted)',marginLeft:4}}>— POSIX / Linux man page</span>
+          <button onClick={onClose} style={{marginLeft:'auto',border:'none',background:'transparent',
+            color:'var(--text-muted)',cursor:'pointer',fontSize:18,lineHeight:1,padding:'0 4px'}}>✕</button>
+        </div>
+        <pre style={{margin:0,flex:1,overflow:'auto',padding:'14px 18px',
+          fontFamily:'monospace',fontSize:11,lineHeight:1.7,whiteSpace:'pre-wrap',
+          color:'var(--text-primary)',background:'var(--bg-tertiary)'}}>
+          {content ?? (err ? `Man page not found: ${name}\n\nThis syscall may not have a POSIX man page installed in this container.` : 'Loading…')}
+        </pre>
+      </div>
+    </div>
+  )
+}
+
 // ─── Code display with clickable #include lines ────────────────────────────
 
 function ClickableCode({code,onHeaderClick}:{code:string;onHeaderClick:(n:string)=>void}) {
@@ -6186,6 +6228,7 @@ export default function TLPIView() {
   const ex=EXAMPLES[sel]
   const ch=CHAPTERS.find(c=>c.id===sel)!
   const [showDiag,setShowDiag]=useState(true)
+  const [manModal,setManModal]=useState<string|null>(null)
 
   const vol1=CHAPTERS.filter(c=>c.vol===1)
   const vol2=CHAPTERS.filter(c=>c.vol===2)
@@ -6276,7 +6319,11 @@ export default function TLPIView() {
           {(ex.syscalls ?? []).map(s=>(
             <div key={s.name} style={{display:'flex',gap:0,padding:'6px 14px',
               borderBottom:'1px solid var(--border)',alignItems:'baseline',flexWrap:'wrap'}}>
-              <code style={{color:ch.color,fontSize:12,fontWeight:700,marginRight:10,whiteSpace:'nowrap'}}>{s.name}()</code>
+              <code onClick={()=>setManModal(s.name)}
+                style={{color:ch.color,fontSize:12,fontWeight:700,marginRight:10,whiteSpace:'nowrap',
+                  cursor:'pointer',textDecoration:'underline',textDecorationStyle:'dotted',
+                  textDecorationColor:`${ch.color}80`}}
+                title={`man ${s.name}`}>{s.name}()</code>
               <code style={{color:'var(--text-secondary)',fontSize:11,fontFamily:'monospace'}}>{s.sig}</code>
             </div>
           ))}
@@ -6292,6 +6339,7 @@ export default function TLPIView() {
           <span style={{fontWeight:700,color:'#e3b341',marginRight:6}}>💡</span>{ex.notes}
         </div>
       </div>
+      {manModal && <ManModal name={manModal} onClose={()=>setManModal(null)}/>}
     </div>
   )
 }
