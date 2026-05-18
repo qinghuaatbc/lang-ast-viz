@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useMobile } from '../hooks/useMobile'
 import { DS_LIST, DS_LANGS, DS_LANG_LABELS, DSLangId } from '../dataStructures'
 
 // ─── Real-language syntax highlighter ─────────────────────────────────────────
@@ -474,9 +475,90 @@ const DS_DIAGRAM: Record<string, React.FC> = {
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 
+const DS_PROBLEMS: Record<string, { no: number; title: string; diff: 'Easy'|'Medium'|'Hard'; key: string }[]> = {
+  linkedlist: [
+    { no: 206,  title: 'Reverse Linked List',              diff: 'Easy',   key: '迭代/递归翻转，必背模板' },
+    { no: 21,   title: 'Merge Two Sorted Lists',           diff: 'Easy',   key: '虚拟头节点，双指针合并' },
+    { no: 141,  title: 'Linked List Cycle',                diff: 'Easy',   key: '快慢指针判环（Floyd）' },
+    { no: 142,  title: 'Linked List Cycle II',             diff: 'Medium', key: '找环入口：相遇后一指针回头' },
+    { no: 19,   title: 'Remove Nth Node From End',         diff: 'Medium', key: '快慢指针，间距 N' },
+    { no: 23,   title: 'Merge K Sorted Lists',             diff: 'Hard',   key: '优先队列，O(n log k)' },
+    { no: 25,   title: 'Reverse Nodes in k-Group',         diff: 'Hard',   key: '分组翻转，递归或迭代' },
+  ],
+  stack: [
+    { no: 20,   title: 'Valid Parentheses',                diff: 'Easy',   key: '栈匹配括号，经典模板' },
+    { no: 155,  title: 'Min Stack',                        diff: 'Medium', key: '辅助栈同步存最小值' },
+    { no: 739,  title: 'Daily Temperatures',               diff: 'Medium', key: '单调栈：下一个更大元素' },
+    { no: 84,   title: 'Largest Rectangle in Histogram',  diff: 'Hard',   key: '单调栈求面积，必考压轴题' },
+    { no: 85,   title: 'Maximal Rectangle',                diff: 'Hard',   key: '逐行转换为柱状图 + 84' },
+    { no: 394,  title: 'Decode String',                    diff: 'Medium', key: '双栈：数字栈 + 字符串栈' },
+  ],
+  queue: [
+    { no: 102,  title: 'Binary Tree Level Order Traversal',diff: 'Medium', key: 'BFS 队列模板，必背' },
+    { no: 239,  title: 'Sliding Window Maximum',           diff: 'Hard',   key: '单调递减双端队列，O(n)' },
+    { no: 622,  title: 'Design Circular Queue',            diff: 'Medium', key: '循环队列实现，front/rear 指针' },
+    { no: 933,  title: 'Number of Recent Calls',           diff: 'Easy',   key: '队列维护时间窗口' },
+  ],
+  bst: [
+    { no: 98,   title: 'Validate Binary Search Tree',      diff: 'Medium', key: '中序遍历有序 / 上下界递归' },
+    { no: 230,  title: 'Kth Smallest in BST',              diff: 'Medium', key: '中序第 K 个' },
+    { no: 235,  title: 'LCA of BST',                       diff: 'Medium', key: '利用 BST 有序性找公共祖先' },
+    { no: 450,  title: 'Delete Node in BST',               diff: 'Medium', key: '删除三种情况：叶/单子/双子' },
+    { no: 108,  title: 'Sorted Array to BST',              diff: 'Easy',   key: '取中点为根，递归建树' },
+  ],
+  hashtable: [
+    { no: 1,    title: 'Two Sum',                          diff: 'Easy',   key: '哈希表O(n)，面试开场白' },
+    { no: 49,   title: 'Group Anagrams',                   diff: 'Medium', key: '排序/计数作 key' },
+    { no: 128,  title: 'Longest Consecutive Sequence',     diff: 'Medium', key: '哈希 O(n) 判断连续段' },
+    { no: 146,  title: 'LRU Cache',                        diff: 'Medium', key: '哈希表 + 双向链表，必考！' },
+    { no: 460,  title: 'LFU Cache',                        diff: 'Hard',   key: '哈希表 + 频率双链表' },
+    { no: 380,  title: 'RandomizedSet O(1) Insert/Delete', diff: 'Medium', key: '哈希表 + 数组实现 O(1)' },
+  ],
+  heap: [
+    { no: 215,  title: 'Kth Largest Element',              diff: 'Medium', key: '最小堆大小 K，O(n log k)' },
+    { no: 347,  title: 'Top K Frequent Elements',          diff: 'Medium', key: '频率统计 + 堆' },
+    { no: 295,  title: 'Find Median from Data Stream',     diff: 'Hard',   key: '大根堆+小根堆，必考！' },
+    { no: 23,   title: 'Merge K Sorted Lists',             diff: 'Hard',   key: '优先队列合并' },
+    { no: 1046, title: 'Last Stone Weight',                diff: 'Easy',   key: '最大堆模拟' },
+    { no: 355,  title: 'Design Twitter',                   diff: 'Medium', key: '堆合并 K 个有序 Feed' },
+  ],
+  graph: [
+    { no: 200,  title: 'Number of Islands',                diff: 'Medium', key: 'DFS/BFS 连通分量，必考' },
+    { no: 207,  title: 'Course Schedule',                  diff: 'Medium', key: '拓扑排序判环（入度法）' },
+    { no: 210,  title: 'Course Schedule II',               diff: 'Medium', key: '拓扑排序返回顺序' },
+    { no: 743,  title: 'Network Delay Time',               diff: 'Medium', key: 'Dijkstra 单源最短路' },
+    { no: 684,  title: 'Redundant Connection',             diff: 'Medium', key: '并查集检测环' },
+    { no: 127,  title: 'Word Ladder',                      diff: 'Hard',   key: 'BFS 最短路 + 字符替换' },
+  ],
+  avl: [
+    { no: 1382, title: 'Balance a Binary Search Tree',     diff: 'Medium', key: '中序 + 有序数组建平衡 BST' },
+    { no: 110,  title: 'Balanced Binary Tree',             diff: 'Easy',   key: '递归判高度差 ≤ 1' },
+    { no: 108,  title: 'Convert Sorted Array to BST',      diff: 'Easy',   key: '二分取中点建平衡树' },
+  ],
+  trie: [
+    { no: 208,  title: 'Implement Trie',                   diff: 'Medium', key: 'Trie 节点数组/哈希，插入/查找' },
+    { no: 212,  title: 'Word Search II',                   diff: 'Hard',   key: 'Trie + DFS 回溯，剪枝' },
+    { no: 211,  title: 'Design Add and Search Words',      diff: 'Medium', key: 'Trie + . 通配符 DFS' },
+    { no: 648,  title: 'Replace Words',                    diff: 'Medium', key: 'Trie 最短前缀替换' },
+    { no: 421,  title: 'Maximum XOR of Two Numbers',       diff: 'Medium', key: '二进制 Trie 贪心 XOR' },
+  ],
+  skiplist: [
+    { no: 1206, title: 'Design Skiplist',                  diff: 'Hard',   key: '实现跳表 insert/erase/search' },
+    { no: 1348, title: 'Tweet Counts Per Frequency',       diff: 'Medium', key: '有序结构范围查询' },
+  ],
+  bloomfilter: [
+    { no: 0,    title: '设计题：URL 黑名单过滤',           diff: 'Hard',   key: '布隆过滤器：误判率 vs 空间权衡' },
+    { no: 0,    title: '设计题：缓存穿透防护',             diff: 'Medium', key: '不存在 key 用 BF 拦截，避免打穿 DB' },
+  ],
+}
+
+const DIFF_COLOR_DS = { Easy: '#56d364', Medium: '#ffa657', Hard: '#ff7b72' }
+
 export default function DataStructuresView() {
   const [selectedDs, setSelectedDs] = useState(DS_LIST[0].id)
   const [selectedLang, setSelectedLang] = useState<DSLangId>('c')
+  const [rightTab, setRightTab] = useState<'code'|'problems'>('code')
+  const isMobile = useMobile()
 
   const ds = DS_LIST.find(d => d.id === selectedDs) ?? DS_LIST[0]
   const Diagram = DS_DIAGRAM[ds.id]
@@ -487,30 +569,40 @@ export default function DataStructuresView() {
   }
 
   return (
-    <div style={{ display: 'flex', height: '100%', gap: 0 }}>
+    <div style={{ display: 'flex', flexDirection: isMobile ? 'column' : 'row', height: '100%', gap: 0 }}>
       {/* ── Left sidebar: DS list ────────────────────────────────────────── */}
       <div style={{
-        width: 200, flexShrink: 0,
-        borderRight: '1px solid var(--border)',
+        width: isMobile ? '100%' : 200, flexShrink: 0,
+        borderRight: isMobile ? 'none' : '1px solid var(--border)',
+        borderBottom: isMobile ? '1px solid var(--border)' : 'none',
         background: 'var(--bg-secondary)',
-        overflowY: 'auto', padding: '8px 0',
+        overflowX: isMobile ? 'auto' : undefined,
+        overflowY: isMobile ? 'hidden' : 'auto',
+        padding: isMobile ? '4px 0' : '8px 0',
+        maxHeight: isMobile ? 56 : undefined,
+        display: isMobile ? 'flex' : 'block',
+        scrollbarWidth: 'none',
       }}>
         {DS_LIST.map(d => (
           <button
             key={d.id}
             onClick={() => setSelectedDs(d.id)}
             style={{
-              display: 'flex', alignItems: 'center', gap: 10,
-              width: '100%', padding: '10px 16px',
+              display: 'flex', alignItems: 'center', gap: isMobile ? 4 : 10,
+              flexShrink: 0,
+              width: isMobile ? 'auto' : '100%',
+              padding: isMobile ? '6px 10px' : '10px 16px',
               background: selectedDs === d.id ? 'var(--bg-elevated)' : 'transparent',
-              border: 'none', borderLeft: selectedDs === d.id ? '3px solid var(--accent-blue)' : '3px solid transparent',
+              border: 'none',
+              borderLeft: isMobile ? 'none' : (selectedDs === d.id ? '3px solid var(--accent-blue)' : '3px solid transparent'),
+              borderBottom: isMobile ? (selectedDs === d.id ? '2px solid var(--accent-blue)' : '2px solid transparent') : 'none',
               color: selectedDs === d.id ? 'var(--text-primary)' : 'var(--text-secondary)',
-              cursor: 'pointer', textAlign: 'left', fontSize: 13, fontWeight: selectedDs === d.id ? 600 : 400,
-              transition: 'background 0.12s',
+              cursor: 'pointer', textAlign: 'left', fontSize: isMobile ? 11 : 13, fontWeight: selectedDs === d.id ? 600 : 400,
+              transition: 'background 0.12s', whiteSpace: 'nowrap',
             }}
           >
-            <span style={{ fontSize: 18, lineHeight: 1 }}>{d.icon}</span>
-            <span>{d.name}</span>
+            <span style={{ fontSize: isMobile ? 14 : 18, lineHeight: 1 }}>{d.icon}</span>
+            {!isMobile && <span>{d.name}</span>}
           </button>
         ))}
       </div>
@@ -548,6 +640,59 @@ export default function DataStructuresView() {
           </div>
         )}
 
+        {/* View toggle: Code vs Interview problems */}
+        <div style={{ display: 'flex', borderBottom: '1px solid var(--border)', background: 'var(--bg-secondary)', flexShrink: 0 }}>
+          {(['code','problems'] as const).map(tab => (
+            <button key={tab} onClick={() => setRightTab(tab)} style={{
+              padding: '8px 18px', border: 'none', background: 'transparent', cursor: 'pointer',
+              borderBottom: rightTab === tab ? '2px solid var(--accent-blue)' : '2px solid transparent',
+              color: rightTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
+              fontSize: 12, fontWeight: rightTab === tab ? 700 : 400,
+            }}>
+              {tab === 'code' ? '💻 多语言实现' : '📝 面试题'}
+            </button>
+          ))}
+          {rightTab === 'problems' && DS_PROBLEMS[selectedDs] && (
+            <span style={{ marginLeft: 'auto', padding: '8px 14px', fontSize: 11, color: 'var(--text-muted)' }}>
+              {DS_PROBLEMS[selectedDs].length} 题
+            </span>
+          )}
+        </div>
+
+        {rightTab === 'problems' ? (
+          <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px' }}>
+            {(DS_PROBLEMS[selectedDs] ?? []).map(p => (
+              <div key={`${p.no}-${p.title}`} style={{
+                background: 'var(--bg-secondary)', borderRadius: 7, padding: '10px 12px',
+                border: '1px solid var(--border)', marginBottom: 8,
+              }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
+                  {p.no > 0 && <span style={{ fontSize: 10, color: 'var(--text-muted)', minWidth: 34 }}>#{p.no}</span>}
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{p.title}</span>
+                  <span style={{
+                    fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 700,
+                    background: `${DIFF_COLOR_DS[p.diff]}20`, color: DIFF_COLOR_DS[p.diff],
+                  }}>{p.diff}</span>
+                </div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: p.no > 0 ? 40 : 0 }}>💡 {p.key}</div>
+              </div>
+            ))}
+            {!(DS_PROBLEMS[selectedDs]?.length) && (
+              <div style={{ color: 'var(--text-muted)', fontSize: 12, paddingTop: 20 }}>题目补充中…</div>
+            )}
+            {/* Complexity reminder */}
+            <div style={{ background: 'var(--bg-secondary)', borderRadius: 7, padding: '12px 14px', border: '1px solid var(--border)', marginTop: 4 }}>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>🎯 复杂度速记</div>
+              <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
+                <span>时间 <code style={{ color: '#ffa657' }}>{ds.complexity.time}</code></span>
+                <span>空间 <code style={{ color: '#79c0ff' }}>{ds.complexity.space}</code></span>
+              </div>
+              <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>{ds.description}</div>
+            </div>
+          </div>
+        ) : null}
+
+        {rightTab === 'code' && <>
         {/* Language tabs */}
         <div style={{
           display: 'flex', gap: 0, borderBottom: '1px solid var(--border)',
@@ -581,6 +726,7 @@ export default function DataStructuresView() {
         <div style={{ flex: 1, overflowY: 'auto', padding: 20 }}>
           <CodeBlock code={ds.langs[selectedLang]?.code ?? '// not available'} lang={selectedLang} />
         </div>
+        </>}
       </div>
     </div>
   )

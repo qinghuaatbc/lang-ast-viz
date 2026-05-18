@@ -21,8 +21,11 @@ const NetworkView        = lazy(() => import('./components/NetworkView'))
 const CPUView            = lazy(() => import('./components/CPUView'))
 const X86View            = lazy(() => import('./components/X86View'))
 const HardwareView       = lazy(() => import('./components/HardwareView'))
+const DockerView         = lazy(() => import('./components/DockerView'))
+const SystemDesignView   = lazy(() => import('./components/SystemDesignView'))
+const GitView            = lazy(() => import('./components/GitView'))
 
-type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi' | 'algo' | 'memory' | 'regex' | 'ieee754' | 'network' | 'cpu' | 'x86' | 'hw'
+type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi' | 'algo' | 'memory' | 'regex' | 'ieee754' | 'network' | 'cpu' | 'x86' | 'hw' | 'docker' | 'sysdesign' | 'git'
 
 function parseErrorLines(errors: string[]): Set<number> {
   const s = new Set<number>()
@@ -146,6 +149,9 @@ function AppInner() {
     { id: 'cpu',     label: t('tab.cpu'),     icon: '⚡' },
     { id: 'x86',     label: t('tab.x86'),    icon: '🖥' },
     { id: 'hw',      label: t('tab.hw'),     icon: '🔌' },
+    { id: 'docker',    label: t('tab.docker'),    icon: '🐳' },
+    { id: 'sysdesign', label: t('tab.sysdesign'), icon: '🏗' },
+    { id: 'git',       label: t('tab.git'),       icon: '🔀' },
   ]
 
   return (
@@ -175,8 +181,9 @@ function AppInner() {
                   ▶{autoRun ? ' ON' : ''}
                 </button>
               )}
-              <button className="toggle-btn" onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} title="中文/English">
-                {lang === 'zh' ? 'EN' : '中'}
+              <button className="toggle-btn" onClick={() => setLang(lang === 'zh' ? 'en' : 'zh')} title={lang === 'zh' ? 'Switch to English' : '切换为中文'}
+                style={{ minWidth: 36 }}>
+                {lang === 'zh' ? '中' : 'EN'}
               </button>
               <button className="toggle-btn theme-btn" onClick={toggleTheme} title={theme === 'dark' ? 'Light' : 'Dark'}>
                 {theme === 'dark' ? '☀' : '☾'}
@@ -203,7 +210,7 @@ function AppInner() {
       </header>
 
       {/* ── Lazy-loaded views ─────────────────────────────────────────────────── */}
-      {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86','hw'] as TopMode[]).includes(topMode) && (
+      {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86','hw','docker','sysdesign','git'] as TopMode[]).includes(topMode) && (
         <div style={{ height: 'calc(100vh - var(--header-h, 130px))', overflow: 'hidden' }}>
           <ErrorBoundary fallback={
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:12, color:'var(--text-muted)' }}>
@@ -224,6 +231,9 @@ function AppInner() {
               {topMode === 'cpu'     && <CPUView />}
               {topMode === 'x86'     && <X86View />}
               {topMode === 'hw'      && <HardwareView />}
+              {topMode === 'docker'    && <DockerView />}
+              {topMode === 'sysdesign' && <SystemDesignView />}
+              {topMode === 'git'       && <GitView />}
             </Suspense>
           </ErrorBoundary>
         </div>

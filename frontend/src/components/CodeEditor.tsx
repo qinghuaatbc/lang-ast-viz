@@ -131,26 +131,28 @@ export default function CodeEditor({ value, onChange, onCompile, onExampleSelect
         </div>
       )}
       <div className="editor-wrapper">
-          <div className="editor-gutter">
-            <pre ref={gutterRef} aria-hidden="true" className="editor-lines">{lineNums}</pre>
-          </div>
-        <pre
-          ref={preRef}
-          className="editor-highlight"
-          aria-hidden="true"
-          dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
-        />
-        <textarea
-          className="code-editor"
-          value={value}
-          onChange={(e) => onChange(e.target.value)}
-          onKeyDown={handleKeyDown}
-          onScroll={syncScroll}
-          placeholder={t('ctrl.enter')}
-          spellCheck={false}
-          autoCapitalize="off"
-          autoCorrect="off"
-        />
+        <div className="editor-gutter">
+          <pre ref={gutterRef} aria-hidden="true" className="editor-lines">{lineNums}</pre>
+        </div>
+        <div className="editor-code-area">
+          <pre
+            ref={preRef}
+            className="editor-highlight"
+            aria-hidden="true"
+            dangerouslySetInnerHTML={{ __html: highlighted + '\n' }}
+          />
+          <textarea
+            className="code-editor"
+            value={value}
+            onChange={(e) => onChange(e.target.value)}
+            onKeyDown={handleKeyDown}
+            onScroll={syncScroll}
+            placeholder={t('ctrl.enter')}
+            spellCheck={false}
+            autoCapitalize="off"
+            autoCorrect="off"
+          />
+        </div>
       </div>
       <div className="editor-footer">
         <span className="shortcut-hint">{t('ctrl.enter')} &nbsp;·&nbsp; Tab: indent &nbsp;·&nbsp; Ctrl+Z/Y: undo/redo</span>

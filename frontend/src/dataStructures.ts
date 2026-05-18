@@ -2459,4 +2459,1356 @@ print(g.bfs(0))            # [0, 1, 2, 3, 4, 5]
 print(g.shortest_path(0))  # [0, 1, 1, 2, 2, 2]` },
     },
   },
+  // ─── AVL Tree ─────────────────────────────────────────────────────────────────
+  {
+    id: 'avl',
+    name: 'AVL Tree',
+    icon: '⚖️',
+    description: 'Self-balancing BST. Every node maintains a balance factor (left height - right height) in {-1,0,1}. Rotations restore balance after insert/delete: O(log n) guaranteed for all operations.',
+    complexity: { time: 'Insert/Delete/Search O(log n)', space: 'O(n)' },
+    langs: {
+      c: { code: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct Node {
+    int key, height;
+    struct Node *left, *right;
+} Node;
+
+int height(Node *n) { return n ? n->height : 0; }
+int max2(int a, int b) { return a > b ? a : b; }
+int bf(Node *n) { return n ? height(n->left) - height(n->right) : 0; }
+
+Node *newNode(int key) {
+    Node *n = calloc(1, sizeof(Node));
+    n->key = key; n->height = 1;
+    return n;
+}
+
+void updH(Node *n) {
+    if (n) n->height = 1 + max2(height(n->left), height(n->right));
+}
+
+Node *rotR(Node *y) {   /* right rotation */
+    Node *x = y->left, *T2 = x->right;
+    x->right = y; y->left = T2;
+    updH(y); updH(x);
+    return x;
+}
+
+Node *rotL(Node *x) {   /* left rotation */
+    Node *y = x->right, *T2 = y->left;
+    y->left = x; x->right = T2;
+    updH(x); updH(y);
+    return y;
+}
+
+Node *insert(Node *n, int key) {
+    if (!n) return newNode(key);
+    if (key < n->key)      n->left  = insert(n->left,  key);
+    else if (key > n->key) n->right = insert(n->right, key);
+    else return n;  /* duplicate */
+    updH(n);
+    int b = bf(n);
+    if (b > 1  && key < n->left->key)  return rotR(n);       /* LL */
+    if (b < -1 && key > n->right->key) return rotL(n);       /* RR */
+    if (b > 1  && key > n->left->key)  { n->left  = rotL(n->left);  return rotR(n); } /* LR */
+    if (b < -1 && key < n->right->key) { n->right = rotR(n->right); return rotL(n); } /* RL */
+    return n;
+}
+
+void inorder(Node *n) {
+    if (!n) return;
+    inorder(n->left);
+    printf("%d(h%d) ", n->key, n->height);
+    inorder(n->right);
+}
+
+int main(void) {
+    Node *root = NULL;
+    int keys[] = {10, 20, 30, 40, 50, 25};
+    for (int i = 0; i < 6; i++) root = insert(root, keys[i]);
+    inorder(root);   /* balanced: 10 20 25 30 40 50 */
+    printf("\\nroot=%d height=%d\\n", root->key, root->height);
+    return 0;
+}` },
+      cpp: { code: `#include <iostream>
+#include <algorithm>
+using namespace std;
+
+struct Node {
+    int key, height;
+    Node *l = nullptr, *r = nullptr;
+    Node(int k) : key(k), height(1) {}
+};
+
+int h(Node *n) { return n ? n->height : 0; }
+void upd(Node *n) { if(n) n->height = 1 + max(h(n->l), h(n->r)); }
+int bf(Node *n)   { return n ? h(n->l) - h(n->r) : 0; }
+
+Node *rotR(Node *y) { Node *x=y->l; y->l=x->r; x->r=y; upd(y); upd(x); return x; }
+Node *rotL(Node *x) { Node *y=x->r; x->r=y->l; y->l=x; upd(x); upd(y); return y; }
+
+Node *balance(Node *n) {
+    upd(n); int b = bf(n);
+    if (b > 1)  { if (bf(n->l) < 0) n->l = rotL(n->l); return rotR(n); }
+    if (b < -1) { if (bf(n->r) > 0) n->r = rotR(n->r); return rotL(n); }
+    return n;
+}
+
+Node *insert(Node *n, int key) {
+    if (!n) return new Node(key);
+    if (key < n->key) n->l = insert(n->l, key);
+    else if (key > n->key) n->r = insert(n->r, key);
+    return balance(n);
+}
+
+void inorder(Node *n) {
+    if (!n) return;
+    inorder(n->l);
+    cout << n->key << "(h" << n->height << ") ";
+    inorder(n->r);
+}
+
+int main() {
+    Node *root = nullptr;
+    for (int k : {10,20,30,40,50,25}) root = insert(root, k);
+    inorder(root);  // 10 20 25 30 40 50
+    cout << "\\nroot=" << root->key << " h=" << root->height << endl;
+}` },
+      java: { code: `public class AVLTree {
+    static class Node {
+        int key, height = 1;
+        Node left, right;
+        Node(int k) { key = k; }
+    }
+
+    static int h(Node n) { return n == null ? 0 : n.height; }
+    static void upd(Node n) { if (n != null) n.height = 1 + Math.max(h(n.left), h(n.right)); }
+    static int bf(Node n)   { return n == null ? 0 : h(n.left) - h(n.right); }
+
+    static Node rotR(Node y) { Node x=y.left; y.left=x.right; x.right=y; upd(y); upd(x); return x; }
+    static Node rotL(Node x) { Node y=x.right; x.right=y.left; y.left=x; upd(x); upd(y); return y; }
+
+    static Node insert(Node n, int key) {
+        if (n == null) return new Node(key);
+        if      (key < n.key) n.left  = insert(n.left,  key);
+        else if (key > n.key) n.right = insert(n.right, key);
+        else return n;
+        upd(n);
+        int b = bf(n);
+        if (b > 1)  { if (bf(n.left)  < 0) n.left  = rotL(n.left);  return rotR(n); }
+        if (b < -1) { if (bf(n.right) > 0) n.right = rotR(n.right); return rotL(n); }
+        return n;
+    }
+
+    static void inorder(Node n) {
+        if (n == null) return;
+        inorder(n.left);
+        System.out.print(n.key + "(h" + n.height + ") ");
+        inorder(n.right);
+    }
+
+    public static void main(String[] args) {
+        Node root = null;
+        for (int k : new int[]{10,20,30,40,50,25}) root = insert(root, k);
+        inorder(root);  // 10 20 25 30 40 50
+        System.out.println("\\nroot=" + root.key + " h=" + root.height);
+    }
+}` },
+      rust: { code: `type Link = Option<Box<Node>>;
+
+#[derive(Default)]
+struct Node { key: i32, height: i32, left: Link, right: Link }
+
+fn h(n: &Link) -> i32 { n.as_ref().map_or(0, |n| n.height) }
+fn bf(n: &Node) -> i32 { h(&n.left) - h(&n.right) }
+fn upd(n: &mut Node)   { n.height = 1 + h(&n.left).max(h(&n.right)); }
+
+fn rot_r(mut y: Box<Node>) -> Box<Node> {
+    let mut x = y.left.take().unwrap();
+    y.left = x.right.take(); upd(&mut y);
+    x.right = Some(y); upd(&mut x); x
+}
+fn rot_l(mut x: Box<Node>) -> Box<Node> {
+    let mut y = x.right.take().unwrap();
+    x.right = y.left.take(); upd(&mut x);
+    y.left = Some(x); upd(&mut y); y
+}
+
+fn balance(mut n: Box<Node>) -> Box<Node> {
+    upd(&mut n);
+    let b = bf(&n);
+    if b > 1 {
+        if bf(n.left.as_ref().unwrap()) < 0 { n.left = Some(rot_l(n.left.take().unwrap())); }
+        return rot_r(n);
+    }
+    if b < -1 {
+        if bf(n.right.as_ref().unwrap()) > 0 { n.right = Some(rot_r(n.right.take().unwrap())); }
+        return rot_l(n);
+    }
+    n
+}
+
+fn insert(node: Link, key: i32) -> Link {
+    let mut n = node.unwrap_or_else(|| Box::new(Node { key, height: 1, ..Default::default() }));
+    if key < n.key      { n.left  = insert(n.left.take(),  key); }
+    else if key > n.key { n.right = insert(n.right.take(), key); }
+    Some(balance(n))
+}
+
+fn inorder(n: &Link) {
+    if let Some(n) = n { inorder(&n.left); print!("{}(h{}) ", n.key, n.height); inorder(&n.right); }
+}
+
+fn main() {
+    let mut root: Link = None;
+    for k in [10,20,30,40,50,25] { root = insert(root, k); }
+    inorder(&root);  // 10(h1) 20(h2) 25(h1) 30(h3) 40(h2) 50(h1)
+}` },
+      go: { code: `package main
+import "fmt"
+
+type Node struct{ key, h int; l, r *Node }
+
+func ht(n *Node) int { if n == nil { return 0 }; return n.h }
+func bf(n *Node) int { return ht(n.l) - ht(n.r) }
+func upd(n *Node)    { if n != nil { n.h = 1 + max(ht(n.l), ht(n.r)) } }
+func max(a, b int) int { if a > b { return a }; return b }
+
+func rotR(y *Node) *Node { x := y.l; y.l = x.r; x.r = y; upd(y); upd(x); return x }
+func rotL(x *Node) *Node { y := x.r; x.r = y.l; y.l = x; upd(x); upd(y); return y }
+
+func insert(n *Node, key int) *Node {
+    if n == nil { return &Node{key: key, h: 1} }
+    if key < n.key { n.l = insert(n.l, key) } else if key > n.key { n.r = insert(n.r, key) } else { return n }
+    upd(n)
+    if b := bf(n); b > 1 {
+        if bf(n.l) < 0 { n.l = rotL(n.l) }
+        return rotR(n)
+    } else if b < -1 {
+        if bf(n.r) > 0 { n.r = rotR(n.r) }
+        return rotL(n)
+    }
+    return n
+}
+
+func inorder(n *Node) {
+    if n == nil { return }
+    inorder(n.l); fmt.Printf("%d(h%d) ", n.key, n.h); inorder(n.r)
+}
+
+func main() {
+    var root *Node
+    for _, k := range []int{10,20,30,40,50,25} { root = insert(root, k) }
+    inorder(root)  // 10 20 25 30 40 50
+    fmt.Printf("\\nroot=%d h=%d\\n", root.key, root.h)
+}` },
+      javascript: { code: `class AVLNode {
+  constructor(key) { this.key = key; this.h = 1; this.l = this.r = null; }
+}
+
+const h  = n => n ? n.h : 0;
+const bf = n => n ? h(n.l) - h(n.r) : 0;
+const upd = n => { if(n) n.h = 1 + Math.max(h(n.l), h(n.r)); };
+
+function rotR(y) { let x=y.l; y.l=x.r; x.r=y; upd(y); upd(x); return x; }
+function rotL(x) { let y=x.r; x.r=y.l; y.l=x; upd(x); upd(y); return y; }
+
+function insert(n, key) {
+  if (!n) return new AVLNode(key);
+  if      (key < n.key) n.l = insert(n.l, key);
+  else if (key > n.key) n.r = insert(n.r, key);
+  else return n;
+  upd(n);
+  const b = bf(n);
+  if (b > 1)  { if (bf(n.l) < 0) n.l = rotL(n.l); return rotR(n); }
+  if (b < -1) { if (bf(n.r) > 0) n.r = rotR(n.r); return rotL(n); }
+  return n;
+}
+
+function inorder(n, res=[]) { if(n){ inorder(n.l,res); res.push(n.key); inorder(n.r,res); } return res; }
+
+let root = null;
+for (const k of [10,20,30,40,50,25]) root = insert(root, k);
+console.log(inorder(root));  // [10,20,25,30,40,50]
+console.log("root=" + root.key + " h=" + root.h);` },
+      python: { code: `class Node:
+    def __init__(self, key):
+        self.key = key; self.h = 1
+        self.l = self.r = None
+
+def h(n):   return n.h if n else 0
+def bf(n):  return h(n.l) - h(n.r) if n else 0
+def upd(n):
+    if n: n.h = 1 + max(h(n.l), h(n.r))
+
+def rot_r(y):
+    x = y.l; y.l = x.r; x.r = y; upd(y); upd(x); return x
+def rot_l(x):
+    y = x.r; x.r = y.l; y.l = x; upd(x); upd(y); return y
+
+def insert(n, key):
+    if not n: return Node(key)
+    if   key < n.key: n.l = insert(n.l, key)
+    elif key > n.key: n.r = insert(n.r, key)
+    else: return n
+    upd(n)
+    b = bf(n)
+    if b > 1:
+        if bf(n.l) < 0: n.l = rot_l(n.l)
+        return rot_r(n)
+    if b < -1:
+        if bf(n.r) > 0: n.r = rot_r(n.r)
+        return rot_l(n)
+    return n
+
+def inorder(n, res=[]):
+    if n: inorder(n.l, res); res.append(n.key); inorder(n.r, res)
+    return res
+
+root = None
+for k in [10,20,30,40,50,25]: root = insert(root, k)
+print(inorder(root, []))  # [10, 20, 25, 30, 40, 50]
+print(f"root={root.key} h={root.h}")` },
+    },
+  },
+  // ─── Trie ─────────────────────────────────────────────────────────────────────
+  {
+    id: 'trie',
+    name: 'Trie (Prefix Tree)',
+    icon: '🌲',
+    description: 'A tree where each node represents a character. Root-to-leaf paths spell words. insert/search/startsWith all run in O(L) where L is the word length. Used in autocomplete, spell-check, IP routing (LPM).',
+    complexity: { time: 'Insert/Search O(L) · L=word length', space: 'O(ALPHABET × N)' },
+    langs: {
+      c: { code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <stdbool.h>
+
+#define ALPHA 26
+
+typedef struct Trie {
+    struct Trie *children[ALPHA];
+    bool is_end;
+} Trie;
+
+Trie *newTrie(void) { return calloc(1, sizeof(Trie)); }
+
+void insert(Trie *root, const char *word) {
+    Trie *cur = root;
+    for (; *word; word++) {
+        int idx = *word - 'a';
+        if (!cur->children[idx]) cur->children[idx] = newTrie();
+        cur = cur->children[idx];
+    }
+    cur->is_end = true;
+}
+
+bool search(Trie *root, const char *word) {
+    Trie *cur = root;
+    for (; *word; word++) {
+        int idx = *word - 'a';
+        if (!cur->children[idx]) return false;
+        cur = cur->children[idx];
+    }
+    return cur->is_end;
+}
+
+bool startsWith(Trie *root, const char *prefix) {
+    Trie *cur = root;
+    for (; *prefix; prefix++) {
+        int idx = *prefix - 'a';
+        if (!cur->children[idx]) return false;
+        cur = cur->children[idx];
+    }
+    return true;
+}
+
+/* Print all words with given prefix (autocomplete) */
+void autocomplete(Trie *n, char *buf, int depth) {
+    if (n->is_end) { buf[depth] = '\\0'; printf("  %s\\n", buf); }
+    for (int i = 0; i < ALPHA; i++) {
+        if (n->children[i]) {
+            buf[depth] = 'a' + i;
+            autocomplete(n->children[i], buf, depth + 1);
+        }
+    }
+}
+
+int main(void) {
+    Trie *root = newTrie();
+    const char *words[] = {"apple","app","apply","apt","bat","ball","band"};
+    for (int i = 0; i < 7; i++) insert(root, words[i]);
+
+    printf("search('app'): %s\\n",   search(root, "app")   ? "true" : "false");  /* true */
+    printf("search('ap'):  %s\\n",   search(root, "ap")    ? "true" : "false");  /* false */
+    printf("startsWith('ap'): %s\\n",startsWith(root,"ap") ? "true" : "false");  /* true */
+
+    printf("Autocomplete 'ap':\\n");
+    Trie *cur = root;
+    char buf[100]; const char *pf = "ap";
+    strncpy(buf, pf, strlen(pf));
+    for (; *pf; pf++) cur = cur->children[*pf - 'a'];
+    autocomplete(cur, buf, strlen(buf));  /* app, apple, apply, apt */
+    return 0;
+}` },
+      cpp: { code: `#include <iostream>
+#include <string>
+#include <array>
+#include <memory>
+using namespace std;
+
+struct Trie {
+    array<unique_ptr<Trie>, 26> ch{};
+    bool end = false;
+    void insert(const string &w) {
+        Trie *cur = this;
+        for (char c : w) {
+            int i = c - 'a';
+            if (!cur->ch[i]) cur->ch[i] = make_unique<Trie>();
+            cur = cur->ch[i].get();
+        }
+        cur->end = true;
+    }
+    bool search(const string &w) const {
+        const Trie *cur = this;
+        for (char c : w) {
+            int i = c - 'a';
+            if (!cur->ch[i]) return false;
+            cur = cur->ch[i].get();
+        }
+        return cur->end;
+    }
+    bool startsWith(const string &p) const {
+        const Trie *cur = this;
+        for (char c : p) {
+            int i = c - 'a';
+            if (!cur->ch[i]) return false;
+            cur = cur->ch[i].get();
+        }
+        return true;
+    }
+};
+
+int main() {
+    Trie t;
+    for (auto &w : {"apple","app","apply","bat","ball"}) t.insert(w);
+    cout << t.search("app")     << "\\n";  // 1
+    cout << t.search("ap")      << "\\n";  // 0
+    cout << t.startsWith("app") << "\\n";  // 1
+}` },
+      java: { code: `import java.util.HashMap;
+
+public class Trie {
+    private final HashMap<Character, Trie> children = new HashMap<>();
+    private boolean isEnd = false;
+
+    public void insert(String word) {
+        Trie cur = this;
+        for (char c : word.toCharArray()) {
+            cur.children.putIfAbsent(c, new Trie());
+            cur = cur.children.get(c);
+        }
+        cur.isEnd = true;
+    }
+
+    public boolean search(String word) {
+        Trie cur = this;
+        for (char c : word.toCharArray()) {
+            if (!cur.children.containsKey(c)) return false;
+            cur = cur.children.get(c);
+        }
+        return cur.isEnd;
+    }
+
+    public boolean startsWith(String prefix) {
+        Trie cur = this;
+        for (char c : prefix.toCharArray()) {
+            if (!cur.children.containsKey(c)) return false;
+            cur = cur.children.get(c);
+        }
+        return true;
+    }
+
+    public static void main(String[] args) {
+        Trie t = new Trie();
+        for (String w : new String[]{"apple","app","apply","bat","ball"}) t.insert(w);
+        System.out.println(t.search("app"));      // true
+        System.out.println(t.search("ap"));       // false
+        System.out.println(t.startsWith("app"));  // true
+    }
+}` },
+      rust: { code: `use std::collections::HashMap;
+
+#[derive(Default)]
+struct Trie { children: HashMap<char, Trie>, is_end: bool }
+
+impl Trie {
+    fn insert(&mut self, word: &str) {
+        let mut cur = self;
+        for c in word.chars() { cur = cur.children.entry(c).or_default(); }
+        cur.is_end = true;
+    }
+    fn search(&self, word: &str) -> bool {
+        let mut cur = self;
+        for c in word.chars() { cur = cur.children.get(&c)?; }
+        Some(cur.is_end).unwrap_or(false)
+    }
+    fn starts_with(&self, prefix: &str) -> bool {
+        let mut cur = self;
+        for c in prefix.chars() { cur = if let Some(n) = cur.children.get(&c) { n } else { return false }; }
+        true
+    }
+}
+
+fn main() {
+    let mut t = Trie::default();
+    for w in ["apple","app","apply","bat","ball"] { t.insert(w); }
+    println!("{}", t.search("app"));      // true
+    println!("{}", t.search("ap"));       // false
+    println!("{}", t.starts_with("app")); // true
+}` },
+      go: { code: `package main
+import "fmt"
+
+type Trie struct {
+    children map[rune]*Trie
+    isEnd    bool
+}
+func newTrie() *Trie { return &Trie{children: make(map[rune]*Trie)} }
+
+func (t *Trie) Insert(word string) {
+    cur := t
+    for _, c := range word {
+        if cur.children[c] == nil { cur.children[c] = newTrie() }
+        cur = cur.children[c]
+    }
+    cur.isEnd = true
+}
+func (t *Trie) Search(word string) bool {
+    cur := t
+    for _, c := range word {
+        if cur.children[c] == nil { return false }
+        cur = cur.children[c]
+    }
+    return cur.isEnd
+}
+func (t *Trie) StartsWith(prefix string) bool {
+    cur := t
+    for _, c := range prefix {
+        if cur.children[c] == nil { return false }
+        cur = cur.children[c]
+    }
+    return true
+}
+func main() {
+    t := newTrie()
+    for _, w := range []string{"apple","app","apply","bat"} { t.Insert(w) }
+    fmt.Println(t.Search("app"))      // true
+    fmt.Println(t.Search("ap"))       // false
+    fmt.Println(t.StartsWith("app"))  // true
+}` },
+      javascript: { code: `class TrieNode {
+  constructor() { this.children = {}; this.isEnd = false; }
+}
+
+class Trie {
+  constructor() { this.root = new TrieNode(); }
+
+  insert(word) {
+    let cur = this.root;
+    for (const c of word) {
+      if (!cur.children[c]) cur.children[c] = new TrieNode();
+      cur = cur.children[c];
+    }
+    cur.isEnd = true;
+  }
+
+  search(word) {
+    let cur = this.root;
+    for (const c of word) {
+      if (!cur.children[c]) return false;
+      cur = cur.children[c];
+    }
+    return cur.isEnd;
+  }
+
+  startsWith(prefix) {
+    let cur = this.root;
+    for (const c of prefix) {
+      if (!cur.children[c]) return false;
+      cur = cur.children[c];
+    }
+    return true;
+  }
+
+  // Autocomplete: return all words with given prefix
+  autocomplete(prefix) {
+    let cur = this.root;
+    for (const c of prefix) {
+      if (!cur.children[c]) return [];
+      cur = cur.children[c];
+    }
+    const results = [];
+    const dfs = (node, path) => {
+      if (node.isEnd) results.push(prefix + path);
+      for (const [c, child] of Object.entries(node.children)) dfs(child, path + c);
+    };
+    dfs(cur, '');
+    return results;
+  }
+}
+
+const t = new Trie();
+['apple','app','apply','apt','bat','ball'].forEach(w => t.insert(w));
+console.log(t.search('app'));          // true
+console.log(t.search('ap'));           // false
+console.log(t.startsWith('ap'));       // true
+console.log(t.autocomplete('ap'));     // ['app','apple','apply','apt']` },
+      python: { code: `class TrieNode:
+    def __init__(self):
+        self.children = {}
+        self.is_end = False
+
+class Trie:
+    def __init__(self):
+        self.root = TrieNode()
+
+    def insert(self, word: str) -> None:
+        cur = self.root
+        for c in word:
+            if c not in cur.children:
+                cur.children[c] = TrieNode()
+            cur = cur.children[c]
+        cur.is_end = True
+
+    def search(self, word: str) -> bool:
+        cur = self.root
+        for c in word:
+            if c not in cur.children: return False
+            cur = cur.children[c]
+        return cur.is_end
+
+    def starts_with(self, prefix: str) -> bool:
+        cur = self.root
+        for c in prefix:
+            if c not in cur.children: return False
+            cur = cur.children[c]
+        return True
+
+    def autocomplete(self, prefix: str) -> list:
+        cur = self.root
+        for c in prefix:
+            if c not in cur.children: return []
+            cur = cur.children[c]
+        res = []
+        def dfs(node, path):
+            if node.is_end: res.append(prefix + path)
+            for c, child in node.children.items(): dfs(child, path + c)
+        dfs(cur, '')
+        return res
+
+t = Trie()
+for w in ['apple','app','apply','apt','bat','ball']: t.insert(w)
+print(t.search('app'))          # True
+print(t.search('ap'))           # False
+print(t.starts_with('ap'))      # True
+print(t.autocomplete('ap'))     # ['app', 'apple', 'apply', 'apt']` },
+    },
+  },
+  // ─── Skip List ────────────────────────────────────────────────────────────────
+  {
+    id: 'skiplist',
+    name: 'Skip List',
+    icon: '🎯',
+    description: 'Probabilistic multi-level linked list. Each element is promoted to higher levels with probability p=0.5. Redis Sorted Set (ZSET) uses skip list internally. Expected O(log n) search/insert/delete without rotations.',
+    complexity: { time: 'Search/Insert/Delete O(log n) expected', space: 'O(n log n) expected' },
+    langs: {
+      c: { code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <time.h>
+
+#define MAX_LEVEL 8
+#define P 0.5
+
+typedef struct SLNode {
+    int key;
+    struct SLNode *forward[MAX_LEVEL]; /* forward[i] = next node at level i */
+} SLNode;
+
+typedef struct { SLNode *header; int level; } SkipList;
+
+SLNode *newNode(int key, int lvl) {
+    SLNode *n = calloc(1, sizeof(SLNode));
+    n->key = key;
+    return n;
+}
+
+int randLevel(void) {
+    int lvl = 1;
+    while ((double)rand()/RAND_MAX < P && lvl < MAX_LEVEL) lvl++;
+    return lvl;
+}
+
+SkipList *slCreate(void) {
+    SkipList *sl = malloc(sizeof(SkipList));
+    sl->header = newNode(INT_MIN, MAX_LEVEL);
+    sl->level = 1;
+    srand(time(NULL));
+    return sl;
+}
+
+void slInsert(SkipList *sl, int key) {
+    SLNode *update[MAX_LEVEL];
+    SLNode *cur = sl->header;
+    for (int i = sl->level - 1; i >= 0; i--) {
+        while (cur->forward[i] && cur->forward[i]->key < key)
+            cur = cur->forward[i];
+        update[i] = cur;
+    }
+    int lvl = randLevel();
+    if (lvl > sl->level) {
+        for (int i = sl->level; i < lvl; i++) update[i] = sl->header;
+        sl->level = lvl;
+    }
+    SLNode *n = newNode(key, lvl);
+    for (int i = 0; i < lvl; i++) {
+        n->forward[i] = update[i]->forward[i];
+        update[i]->forward[i] = n;
+    }
+}
+
+int slSearch(SkipList *sl, int key) {
+    SLNode *cur = sl->header;
+    for (int i = sl->level - 1; i >= 0; i--)
+        while (cur->forward[i] && cur->forward[i]->key < key)
+            cur = cur->forward[i];
+    cur = cur->forward[0];
+    return cur && cur->key == key;
+}
+
+void slPrint(SkipList *sl) {
+    for (int i = sl->level - 1; i >= 0; i--) {
+        SLNode *n = sl->header->forward[i];
+        printf("L%d: ", i);
+        while (n) { printf("%d -> ", n->key); n = n->forward[i]; }
+        printf("NULL\\n");
+    }
+}
+
+int main(void) {
+    SkipList *sl = slCreate();
+    for (int k : (int[]){3,6,7,9,12,19,17,26}) slInsert(sl, k);
+    slPrint(sl);
+    printf("search(9): %d\\n", slSearch(sl, 9));   /* 1 */
+    printf("search(5): %d\\n", slSearch(sl, 5));   /* 0 */
+    return 0;
+}` },
+      cpp: { code: `#include <iostream>
+#include <vector>
+#include <cstdlib>
+#include <ctime>
+#include <climits>
+using namespace std;
+
+struct SLNode {
+    int key;
+    vector<SLNode*> fwd;
+    SLNode(int k, int lvl) : key(k), fwd(lvl, nullptr) {}
+};
+
+class SkipList {
+    int maxLvl, level;
+    float p;
+    SLNode *header;
+    int randLevel() {
+        int lvl = 1;
+        while ((float)rand()/RAND_MAX < p && lvl < maxLvl) lvl++;
+        return lvl;
+    }
+public:
+    SkipList(int ml=8, float p=0.5) : maxLvl(ml), level(1), p(p) {
+        header = new SLNode(INT_MIN, ml); srand(time(0));
+    }
+    void insert(int key) {
+        vector<SLNode*> upd(maxLvl, header);
+        SLNode *cur = header;
+        for (int i = level-1; i >= 0; i--)
+            while (cur->fwd[i] && cur->fwd[i]->key < key) cur = cur->fwd[i], upd[i] = cur;
+        int lvl = randLevel();
+        if (lvl > level) { level = lvl; }
+        SLNode *n = new SLNode(key, lvl);
+        for (int i = 0; i < lvl; i++) { n->fwd[i] = upd[i]->fwd[i]; upd[i]->fwd[i] = n; }
+    }
+    bool search(int key) {
+        SLNode *cur = header;
+        for (int i = level-1; i >= 0; i--)
+            while (cur->fwd[i] && cur->fwd[i]->key < key) cur = cur->fwd[i];
+        cur = cur->fwd[0];
+        return cur && cur->key == key;
+    }
+    void print() {
+        for (int i = level-1; i >= 0; i--) {
+            SLNode *n = header->fwd[i];
+            cout << "L" << i << ": ";
+            while (n) { cout << n->key << " -> "; n = n->fwd[i]; }
+            cout << "NULL\\n";
+        }
+    }
+};
+
+int main() {
+    SkipList sl;
+    for (int k : {3,6,7,9,12,19,17,26}) sl.insert(k);
+    sl.print();
+    cout << "search(9): " << sl.search(9) << "\\n";  // 1
+    cout << "search(5): " << sl.search(5) << "\\n";  // 0
+}` },
+      java: { code: `import java.util.Random;
+
+public class SkipList {
+    static final int MAX_LEVEL = 8;
+    static final double P = 0.5;
+
+    static class Node {
+        int key;
+        Node[] fwd;
+        Node(int key, int level) { this.key = key; fwd = new Node[level]; }
+    }
+
+    Node header = new Node(Integer.MIN_VALUE, MAX_LEVEL);
+    int level = 1;
+    Random rand = new Random();
+
+    int randLevel() {
+        int lvl = 1;
+        while (rand.nextDouble() < P && lvl < MAX_LEVEL) lvl++;
+        return lvl;
+    }
+
+    void insert(int key) {
+        Node[] update = new Node[MAX_LEVEL];
+        Node cur = header;
+        for (int i = level-1; i >= 0; i--) {
+            while (cur.fwd[i] != null && cur.fwd[i].key < key) cur = cur.fwd[i];
+            update[i] = cur;
+        }
+        int lvl = randLevel();
+        if (lvl > level) { for (int i = level; i < lvl; i++) update[i] = header; level = lvl; }
+        Node n = new Node(key, lvl);
+        for (int i = 0; i < lvl; i++) { n.fwd[i] = update[i].fwd[i]; update[i].fwd[i] = n; }
+    }
+
+    boolean search(int key) {
+        Node cur = header;
+        for (int i = level-1; i >= 0; i--)
+            while (cur.fwd[i] != null && cur.fwd[i].key < key) cur = cur.fwd[i];
+        cur = cur.fwd[0];
+        return cur != null && cur.key == key;
+    }
+
+    public static void main(String[] args) {
+        SkipList sl = new SkipList();
+        for (int k : new int[]{3,6,7,9,12,19,17,26}) sl.insert(k);
+        System.out.println(sl.search(9));  // true
+        System.out.println(sl.search(5));  // false
+    }
+}` },
+      rust: { code: `use rand::Rng;
+const MAX: usize = 8;
+
+struct Node { key: i32, fwd: Vec<*mut Node> }
+impl Node {
+    fn new(key: i32, lvl: usize) -> *mut Self {
+        Box::into_raw(Box::new(Node { key, fwd: vec![std::ptr::null_mut(); lvl] }))
+    }
+}
+
+struct SkipList { header: *mut Node, level: usize }
+impl SkipList {
+    fn new() -> Self { SkipList { header: Node::new(i32::MIN, MAX), level: 1 } }
+    fn rand_level() -> usize {
+        let mut rng = rand::thread_rng(); let mut lvl = 1;
+        while lvl < MAX && rng.gen::<f64>() < 0.5 { lvl += 1; } lvl
+    }
+    fn insert(&mut self, key: i32) {
+        let mut upd = vec![self.header; MAX];
+        let mut cur = self.header;
+        for i in (0..self.level).rev() {
+            unsafe { while !(*cur).fwd[i].is_null() && (*(*cur).fwd[i]).key < key { cur = (*cur).fwd[i]; } }
+            upd[i] = cur;
+        }
+        let lvl = Self::rand_level();
+        if lvl > self.level { self.level = lvl; }
+        let n = Node::new(key, lvl);
+        for i in 0..lvl {
+            unsafe { (*n).fwd[i] = (*upd[i]).fwd[i]; (*upd[i]).fwd[i] = n; }
+        }
+    }
+    fn search(&self, key: i32) -> bool {
+        let mut cur = self.header;
+        for i in (0..self.level).rev() {
+            unsafe { while !(*cur).fwd[i].is_null() && (*(*cur).fwd[i]).key < key { cur = (*cur).fwd[i]; } }
+        }
+        unsafe { let n = (*cur).fwd[0]; !n.is_null() && (*n).key == key }
+    }
+}
+
+fn main() {
+    let mut sl = SkipList::new();
+    for k in [3,6,7,9,12,19,17,26] { sl.insert(k); }
+    println!("{}", sl.search(9));  // true
+    println!("{}", sl.search(5));  // false
+}` },
+      go: { code: `package main
+import ("fmt"; "math"; "math/rand")
+
+const maxLevel = 8
+const p = 0.5
+
+type Node struct { key int; fwd [maxLevel]*Node }
+type SkipList struct { header *Node; level int }
+
+func newSL() *SkipList { return &SkipList{header: &Node{key: math.MinInt64}, level: 1} }
+
+func randLevel() int {
+    lvl := 1
+    for lvl < maxLevel && rand.Float64() < p { lvl++ }
+    return lvl
+}
+
+func (sl *SkipList) Insert(key int) {
+    var upd [maxLevel]*Node
+    cur := sl.header
+    for i := sl.level - 1; i >= 0; i-- {
+        for cur.fwd[i] != nil && cur.fwd[i].key < key { cur = cur.fwd[i] }
+        upd[i] = cur
+    }
+    lvl := randLevel()
+    if lvl > sl.level { for i := sl.level; i < lvl; i++ { upd[i] = sl.header }; sl.level = lvl }
+    n := &Node{key: key}
+    for i := 0; i < lvl; i++ { n.fwd[i] = upd[i].fwd[i]; upd[i].fwd[i] = n }
+}
+
+func (sl *SkipList) Search(key int) bool {
+    cur := sl.header
+    for i := sl.level - 1; i >= 0; i-- {
+        for cur.fwd[i] != nil && cur.fwd[i].key < key { cur = cur.fwd[i] }
+    }
+    n := cur.fwd[0]
+    return n != nil && n.key == key
+}
+
+func main() {
+    sl := newSL()
+    for _, k := range []int{3,6,7,9,12,19,17,26} { sl.Insert(k) }
+    fmt.Println(sl.Search(9))  // true
+    fmt.Println(sl.Search(5))  // false
+}` },
+      javascript: { code: `class SLNode {
+  constructor(key, level) {
+    this.key = key;
+    this.fwd = new Array(level).fill(null);
+  }
+}
+
+class SkipList {
+  constructor(maxLevel = 8, p = 0.5) {
+    this.maxLevel = maxLevel; this.p = p; this.level = 1;
+    this.header = new SLNode(-Infinity, maxLevel);
+  }
+  randLevel() {
+    let lvl = 1;
+    while (Math.random() < this.p && lvl < this.maxLevel) lvl++;
+    return lvl;
+  }
+  insert(key) {
+    const update = new Array(this.maxLevel).fill(this.header);
+    let cur = this.header;
+    for (let i = this.level - 1; i >= 0; i--) {
+      while (cur.fwd[i] && cur.fwd[i].key < key) cur = cur.fwd[i];
+      update[i] = cur;
+    }
+    const lvl = this.randLevel();
+    if (lvl > this.level) this.level = lvl;
+    const n = new SLNode(key, lvl);
+    for (let i = 0; i < lvl; i++) { n.fwd[i] = update[i].fwd[i]; update[i].fwd[i] = n; }
+  }
+  search(key) {
+    let cur = this.header;
+    for (let i = this.level - 1; i >= 0; i--)
+      while (cur.fwd[i] && cur.fwd[i].key < key) cur = cur.fwd[i];
+    cur = cur.fwd[0];
+    return cur !== null && cur.key === key;
+  }
+  print() {
+    for (let i = this.level - 1; i >= 0; i--) {
+      let n = this.header.fwd[i], s = \`L\${i}: \`;
+      while (n) { s += n.key + ' -> '; n = n.fwd[i]; }
+      console.log(s + 'null');
+    }
+  }
+}
+
+const sl = new SkipList();
+[3,6,7,9,12,19,17,26].forEach(k => sl.insert(k));
+sl.print();
+console.log(sl.search(9));  // true
+console.log(sl.search(5));  // false` },
+      python: { code: `import random
+
+MAX_LEVEL = 8
+P = 0.5
+
+class SLNode:
+    def __init__(self, key, level):
+        self.key = key
+        self.fwd = [None] * level  # fwd[i] = next node at level i
+
+class SkipList:
+    def __init__(self):
+        self.header = SLNode(float('-inf'), MAX_LEVEL)
+        self.level = 1
+
+    def rand_level(self):
+        lvl = 1
+        while random.random() < P and lvl < MAX_LEVEL: lvl += 1
+        return lvl
+
+    def insert(self, key):
+        update = [self.header] * MAX_LEVEL
+        cur = self.header
+        for i in range(self.level - 1, -1, -1):
+            while cur.fwd[i] and cur.fwd[i].key < key: cur = cur.fwd[i]
+            update[i] = cur
+        lvl = self.rand_level()
+        if lvl > self.level: self.level = lvl
+        n = SLNode(key, lvl)
+        for i in range(lvl):
+            n.fwd[i] = update[i].fwd[i]
+            update[i].fwd[i] = n
+
+    def search(self, key) -> bool:
+        cur = self.header
+        for i in range(self.level - 1, -1, -1):
+            while cur.fwd[i] and cur.fwd[i].key < key: cur = cur.fwd[i]
+        cur = cur.fwd[0]
+        return cur is not None and cur.key == key
+
+    def print_list(self):
+        for i in range(self.level - 1, -1, -1):
+            n = self.header.fwd[i]
+            print(f"L{i}:", end=" ")
+            while n: print(n.key, "->", end=" "); n = n.fwd[i]
+            print("None")
+
+sl = SkipList()
+for k in [3, 6, 7, 9, 12, 19, 17, 26]: sl.insert(k)
+sl.print_list()
+print(sl.search(9))  # True
+print(sl.search(5))  # False
+# Redis ZSET 用 skip list 实现有序集合（O(log n) 范围查询）` },
+    },
+  },
+  // ─── Bloom Filter ─────────────────────────────────────────────────────────────
+  {
+    id: 'bloomfilter',
+    name: 'Bloom Filter',
+    icon: '🌸',
+    description: 'Space-efficient probabilistic set. Uses k hash functions over a bit array of size m. No false negatives, tunable false positive rate. Used in: Redis (key existence), Cassandra (row existence), CDN cache, browser malware URL check.',
+    complexity: { time: 'Insert/Query O(k)', space: 'O(m bits) — much smaller than hash set' },
+    langs: {
+      c: { code: `#include <stdio.h>
+#include <string.h>
+#include <stdint.h>
+#include <stdbool.h>
+
+#define BITS  (1 << 17)   /* 128 KB bit array */
+#define K     4            /* 4 hash functions */
+
+static uint8_t bit_arr[BITS / 8];
+
+/* FNV-1a 变种用作 k 个独立哈希 */
+uint32_t hash_k(const char *s, uint32_t seed) {
+    uint32_t h = 2166136261u ^ seed;
+    for (; *s; s++) { h ^= (uint8_t)*s; h *= 16777619u; }
+    return h % BITS;
+}
+
+void bf_set(uint32_t bit)  { bit_arr[bit/8] |=  (1u << (bit%8)); }
+int  bf_get(uint32_t bit)  { return (bit_arr[bit/8] >> (bit%8)) & 1; }
+
+void bloom_add(const char *item) {
+    for (int i = 0; i < K; i++) bf_set(hash_k(item, i * 0x9e3779b9));
+}
+
+bool bloom_contains(const char *item) {
+    for (int i = 0; i < K; i++)
+        if (!bf_get(hash_k(item, i * 0x9e3779b9))) return false;
+    return true;  /* might be false positive! */
+}
+
+int main(void) {
+    const char *db[] = {"apple","banana","cherry","date","elderberry"};
+    for (int i = 0; i < 5; i++) bloom_add(db[i]);
+
+    /* Test set members — should be true */
+    printf("apple:    %s\\n", bloom_contains("apple")    ? "YES" : "NO");
+    printf("cherry:   %s\\n", bloom_contains("cherry")   ? "YES" : "NO");
+    /* Test non-members — should be NO, rarely false positive */
+    printf("mango:    %s\\n", bloom_contains("mango")    ? "YES(FP?)" : "NO");
+    printf("kiwi:     %s\\n", bloom_contains("kiwi")     ? "YES(FP?)" : "NO");
+    /* FALSE NEGATIVES are IMPOSSIBLE in a bloom filter */
+    printf("\\nFalse negative rate: 0%% guaranteed\\n");
+    printf("False positive rate ≈ (1-e^(-kn/m))^k\\n");
+    return 0;
+}` },
+      cpp: { code: `#include <iostream>
+#include <bitset>
+#include <string>
+#include <functional>
+using namespace std;
+
+template<size_t M, int K = 4>
+class BloomFilter {
+    bitset<M> bits;
+
+    size_t hash_k(const string &s, int seed) const {
+        size_t h = hash<string>{}(s + to_string(seed));
+        return h % M;
+    }
+
+public:
+    void add(const string &item) {
+        for (int i = 0; i < K; i++) bits.set(hash_k(item, i));
+    }
+
+    bool contains(const string &item) const {
+        for (int i = 0; i < K; i++)
+            if (!bits.test(hash_k(item, i))) return false;
+        return true;
+    }
+
+    double falsePositiveRate(int n) const {
+        // p = (1 - e^(-kn/m))^k
+        double exp_val = 1.0 - exp(-(double)K * n / M);
+        double p = pow(exp_val, K);
+        return p;
+    }
+};
+
+int main() {
+    BloomFilter<(1<<17), 4> bf;
+    for (auto &w : {"apple","banana","cherry","date","elderberry"}) bf.add(w);
+
+    cout << "apple: "  << bf.contains("apple")  << "\\n"; // 1
+    cout << "cherry: " << bf.contains("cherry") << "\\n"; // 1
+    cout << "mango: "  << bf.contains("mango")  << "\\n"; // 0 (usually)
+    cout << "FP rate (n=5): " << bf.falsePositiveRate(5) * 100 << "%\\n";
+}` },
+      java: { code: `import java.util.BitSet;
+
+public class BloomFilter {
+    private final BitSet bits;
+    private final int m;  // bit array size
+    private final int k;  // number of hash functions
+
+    public BloomFilter(int m, int k) {
+        this.m = m; this.k = k;
+        this.bits = new BitSet(m);
+    }
+
+    private int hash(String item, int seed) {
+        int h = 0;
+        for (char c : item.toCharArray()) h = h * 31 + c;
+        return Math.abs((h ^ (seed * 0x9e3779b9)) % m);
+    }
+
+    public void add(String item) {
+        for (int i = 0; i < k; i++) bits.set(hash(item, i));
+    }
+
+    public boolean contains(String item) {
+        for (int i = 0; i < k; i++)
+            if (!bits.get(hash(item, i))) return false;
+        return true;
+    }
+
+    public static void main(String[] args) {
+        BloomFilter bf = new BloomFilter(1 << 17, 4);
+        for (String w : new String[]{"apple","banana","cherry","date","elderberry"})
+            bf.add(w);
+        System.out.println(bf.contains("apple"));   // true
+        System.out.println(bf.contains("cherry"));  // true
+        System.out.println(bf.contains("mango"));   // false (prob)
+        System.out.println(bf.contains("kiwi"));    // false (prob)
+    }
+}` },
+      rust: { code: `use std::collections::hash_map::DefaultHasher;
+use std::hash::{Hash, Hasher};
+
+struct BloomFilter { bits: Vec<bool>, m: usize, k: usize }
+
+impl BloomFilter {
+    fn new(m: usize, k: usize) -> Self { BloomFilter { bits: vec![false; m], m, k } }
+
+    fn hash(&self, item: &str, seed: u64) -> usize {
+        let mut h = DefaultHasher::new();
+        item.hash(&mut h); seed.hash(&mut h);
+        (h.finish() as usize) % self.m
+    }
+
+    fn add(&mut self, item: &str) {
+        for i in 0..self.k { let idx = self.hash(item, i as u64); self.bits[idx] = true; }
+    }
+
+    fn contains(&self, item: &str) -> bool {
+        (0..self.k).all(|i| self.bits[self.hash(item, i as u64)])
+    }
+}
+
+fn main() {
+    let mut bf = BloomFilter::new(1 << 17, 4);
+    for w in ["apple","banana","cherry","date","elderberry"] { bf.add(w); }
+    println!("{}", bf.contains("apple"));   // true
+    println!("{}", bf.contains("cherry"));  // true
+    println!("{}", bf.contains("mango"));   // false (usually)
+    println!("{}", bf.contains("kiwi"));    // false (usually)
+}` },
+      go: { code: `package main
+
+import (
+    "fmt"
+    "hash/fnv"
+)
+
+type BloomFilter struct {
+    bits []byte
+    m, k uint
+}
+
+func NewBloomFilter(m, k uint) *BloomFilter {
+    return &BloomFilter{bits: make([]byte, (m+7)/8), m: m, k: k}
+}
+
+func (bf *BloomFilter) hash(item string, seed uint) uint {
+    h := fnv.New32a()
+    fmt.Fprintf(h, "%s%d", item, seed)
+    return uint(h.Sum32()) % bf.m
+}
+
+func (bf *BloomFilter) Add(item string) {
+    for i := uint(0); i < bf.k; i++ {
+        pos := bf.hash(item, i)
+        bf.bits[pos/8] |= 1 << (pos % 8)
+    }
+}
+
+func (bf *BloomFilter) Contains(item string) bool {
+    for i := uint(0); i < bf.k; i++ {
+        pos := bf.hash(item, i)
+        if bf.bits[pos/8]&(1<<(pos%8)) == 0 { return false }
+    }
+    return true
+}
+
+func main() {
+    bf := NewBloomFilter(1<<17, 4)
+    for _, w := range []string{"apple","banana","cherry","date","elderberry"} { bf.Add(w) }
+    fmt.Println(bf.Contains("apple"))   // true
+    fmt.Println(bf.Contains("cherry"))  // true
+    fmt.Println(bf.Contains("mango"))   // false (prob)
+}` },
+      javascript: { code: `class BloomFilter {
+  constructor(m = 1 << 17, k = 4) {
+    this.m = m; this.k = k;
+    this.bits = new Uint8Array(Math.ceil(m / 8));
+  }
+
+  // FNV-like hash with seed
+  _hash(str, seed) {
+    let h = 2166136261 ^ seed;
+    for (let i = 0; i < str.length; i++) {
+      h ^= str.charCodeAt(i);
+      h = (h * 16777619) >>> 0;  // uint32
+    }
+    return h % this.m;
+  }
+
+  add(item) {
+    for (let i = 0; i < this.k; i++) {
+      const pos = this._hash(item, i * 0x9e3779b9);
+      this.bits[pos >> 3] |= (1 << (pos & 7));
+    }
+  }
+
+  contains(item) {
+    for (let i = 0; i < this.k; i++) {
+      const pos = this._hash(item, i * 0x9e3779b9);
+      if (!(this.bits[pos >> 3] & (1 << (pos & 7)))) return false;
+    }
+    return true;  // might be false positive!
+  }
+
+  // Optimal parameters: m = -n*ln(p) / (ln2)^2,  k = (m/n)*ln2
+  static optimalParams(n, p) {
+    const m = Math.ceil(-n * Math.log(p) / (Math.LN2 ** 2));
+    const k = Math.round((m / n) * Math.LN2);
+    return { m, k, fpRate: (1 - Math.exp(-k * n / m)) ** k };
+  }
+}
+
+const bf = new BloomFilter();
+['apple','banana','cherry','date','elderberry'].forEach(w => bf.add(w));
+console.log(bf.contains('apple'));   // true
+console.log(bf.contains('cherry'));  // true
+console.log(bf.contains('mango'));   // false (prob)
+console.log(BloomFilter.optimalParams(1000, 0.01));
+// { m: 9586, k: 7, fpRate: ~0.01 }` },
+      python: { code: `import math
+import hashlib
+
+class BloomFilter:
+    def __init__(self, m: int = 1 << 17, k: int = 4):
+        self.m = m   # bit array size
+        self.k = k   # number of hash functions
+        self.bits = bytearray(math.ceil(m / 8))
+
+    def _hash(self, item: str, seed: int) -> int:
+        data = f"{item}{seed}".encode()
+        h = int(hashlib.md5(data).hexdigest(), 16)
+        return h % self.m
+
+    def _set(self, pos: int):   self.bits[pos >> 3] |= (1 << (pos & 7))
+    def _test(self, pos: int):  return bool(self.bits[pos >> 3] & (1 << (pos & 7)))
+
+    def add(self, item: str) -> None:
+        for i in range(self.k): self._set(self._hash(item, i))
+
+    def contains(self, item: str) -> bool:
+        return all(self._test(self._hash(item, i)) for i in range(self.k))
+
+    @staticmethod
+    def optimal_params(n: int, p: float) -> dict:
+        """Compute optimal m and k for n elements and false positive rate p."""
+        m = math.ceil(-n * math.log(p) / math.log(2)**2)
+        k = round((m / n) * math.log(2))
+        fp = (1 - math.exp(-k * n / m)) ** k
+        return {"m": m, "k": k, "fp_rate": round(fp, 4)}
+
+bf = BloomFilter()
+for w in ["apple","banana","cherry","date","elderberry"]: bf.add(w)
+
+print(bf.contains("apple"))   # True
+print(bf.contains("cherry"))  # True
+print(bf.contains("mango"))   # False (very likely)
+print(bf.contains("kiwi"))    # False (very likely)
+# No false negatives — ever!
+
+print(BloomFilter.optimal_params(1000, 0.01))
+# {'m': 9586, 'k': 7, 'fp_rate': 0.0101}` },
+    },
+  },
 ]

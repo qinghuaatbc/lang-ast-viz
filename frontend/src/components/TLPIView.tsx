@@ -1,9 +1,12 @@
 import { useState, useEffect } from 'react'
+import { useMobile } from '../hooks/useMobile'
 
+interface CodeEx { name: string; desc?: string; code: string }
 interface SyscallEx {
   name: string; icon: string; chapter: string; vol: 1|2; desc: string
   syscalls?: { name: string; sig: string }[]
   code?: string; notes?: string; demoCode?: string
+  examples?: CodeEx[]   // multiple runnable examples
 }
 
 async function runCode(code: string): Promise<{ output: string[]; stderr?: string; error?: string }> {
@@ -83,12 +86,6 @@ const CHAPTERS: { id: string; label: string; icon: string; color: string; vol: 1
   { id: 'termios',       label: 'Ch.62  Terminals',           icon: '🖥️',  color: '#e3b341', vol: 2 },
   { id: 'eventfd',       label: 'Ch.63+ eventfd',             icon: '🔔',  color: '#3fb950', vol: 2 },
   { id: 'select',        label: 'Ch.63  select/poll/epoll',   icon: '⚡',  color: '#39d353', vol: 2 },
-  { id: 'inotify',       label: 'Ch.19  inotify',             icon: '👁',  color: '#4d8fff', vol: 1 },
-  { id: 'epoll',         label: 'Ch.62  epoll server',        icon: '⚡',  color: '#58a6ff', vol: 2 },
-  { id: 'timerfd',       label: 'Ch.25+ timerfd',             icon: '⏱',  color: '#a371f7', vol: 1 },
-  { id: 'posix_shm',     label: 'Ch.54  POSIX shm',           icon: '🤝',  color: '#ffa657', vol: 2 },
-  { id: 'posix_sem',     label: 'Ch.53  POSIX sem',           icon: '🚦',  color: '#ff6b6b', vol: 2 },
-  { id: 'select_poll',   label: 'Ch.63  select/poll',         icon: '🎯',  color: '#3fb950', vol: 2 },
   { id: 'setuid',        label: 'Ch.9   setuid/creds',        icon: '🪪',  color: '#e3b341', vol: 1 },
   { id: 'ptrace_demo',   label: 'Ch.41  ptrace',              icon: '🔭',  color: '#74c0fc', vol: 2 },
   { id: 'seccomp',       label: 'Ch.38+ seccomp',             icon: '🔒',  color: '#ff6b6b', vol: 2 },
@@ -160,6 +157,72 @@ int main() {
     }
     return 0;
 }`,
+    examples: [
+      { name: 'Custom errExit', desc: '封装 errExit/errMsg 供整个程序使用，模仿 TLPI 书中的 tlpi_hdr.h 风格',
+        code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+#include <errno.h>
+#include <stdarg.h>
+
+/* 非致命错误: 打印消息继续 */
+void errMsg(const char *fmt, ...) {
+    int savedErrno = errno;   /* 保存 errno，防止被 va_* 覆盖 */
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    fprintf(stderr, ": %s\\n", strerror(savedErrno));
+}
+
+/* 致命错误: 打印后 exit(1) */
+void errExit(const char *fmt, ...) {
+    int savedErrno = errno;
+    va_list ap;
+    va_start(ap, fmt);
+    vfprintf(stderr, fmt, ap);
+    va_end(ap);
+    fprintf(stderr, ": %s\\n", strerror(savedErrno));
+    exit(EXIT_FAILURE);
+}
+
+int main() {
+    errno = ENOENT;  errMsg("open(%s)", "/no/file");
+    errno = EACCES;  errMsg("write(%s)", "/etc/shadow");
+    errno = EINVAL;  errMsg("ioctl(TIOCGWINSZ)");
+    printf("program continues after non-fatal errors\\n");
+    /* errExit 会直接退出: */
+    /* errno = ENOMEM; errExit("malloc"); */
+    return 0;
+}` },
+      { name: 'errno 全表', desc: '打印所有标准 errno 错误码及描述',
+        code: `#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+int main() {
+    /* POSIX 要求的常见错误码 */
+    int codes[] = {
+        EPERM,ENOENT,ESRCH,EINTR,EIO,ENXIO,E2BIG,ENOEXEC,
+        EBADF,ECHILD,EAGAIN,ENOMEM,EACCES,EFAULT,EBUSY,
+        EEXIST,EXDEV,ENODEV,ENOTDIR,EISDIR,EINVAL,ENFILE,
+        EMFILE,ENOTTY,EFBIG,ENOSPC,ESPIPE,EROFS,EMLINK,
+        EPIPE,EDOM,ERANGE,EDEADLK,ENAMETOOLONG,ENOLCK,
+        ENOSYS,ENOTEMPTY,ELOOP,EWOULDBLOCK,ENOMSG,
+        EPROTO,EOVERFLOW,EILSEQ,EUSERS,ENOTSOCK,
+        EDESTADDRREQ,EMSGSIZE,EPROTOTYPE,ENOPROTOOPT,
+        ECONNREFUSED,ECONNRESET,ETIMEDOUT,EADDRINUSE,
+    };
+    int n = sizeof(codes)/sizeof(codes[0]);
+    for (int i = 0; i < n; i++) {
+        printf("%-4d  %-20s  %s\\n",
+               codes[i],
+               strerrorname_np(codes[i]),   /* GNU 扩展 */
+               strerror(codes[i]));
+    }
+    return 0;
+}` },
+    ],
   },
 
   fileio: {
@@ -218,6 +281,108 @@ int main() {
     unlink(p);
     return 0;
 }`,
+    examples: [
+      { name: 'Scatter-Gather I/O', desc: 'readv/writev 一次 syscall 读写多个缓冲区 (Scatter-Gather I/O)',
+        code: `#include <sys/uio.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    const char *path = "/tmp/tlpi_iov.txt";
+    /* writev: 3 个缓冲区合并成一次 syscall */
+    char h[] = "Header|";
+    char b[] = "Body content|";
+    char f[] = "Footer\\n";
+    struct iovec iov[3] = {
+        { h, strlen(h) },
+        { b, strlen(b) },
+        { f, strlen(f) },
+    };
+    int fd = open(path, O_WRONLY|O_CREAT|O_TRUNC, 0644);
+    ssize_t total = writev(fd, iov, 3);
+    printf("writev wrote %zd bytes in 1 syscall\\n", total);
+    close(fd);
+
+    /* readv: 读回分散到不同缓冲区 */
+    char r1[8], r2[14], r3[8];
+    struct iovec rov[3] = {
+        { r1, sizeof(r1)-1 },
+        { r2, sizeof(r2)-1 },
+        { r3, sizeof(r3)-1 },
+    };
+    fd = open(path, O_RDONLY);
+    readv(fd, rov, 3);
+    r1[7]=r2[13]=r3[7]='\\0';
+    printf("readv: [%s] [%s] [%s]\\n", r1, r2, r3);
+    close(fd);
+    unlink(path);
+    return 0;
+}` },
+      { name: 'O_APPEND 原子写', desc: '多进程并发追加写文件时 O_APPEND 保证原子性，避免数据交错',
+        code: `#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
+
+/* 演示: O_APPEND 下 fork 出的子进程安全并发追加 */
+int main() {
+    const char *p = "/tmp/tlpi_append.txt";
+    /* 以 O_APPEND 打开: 每次 write 自动跳到文件末尾 (原子) */
+    int fd = open(p, O_WRONLY|O_CREAT|O_TRUNC|O_APPEND, 0644);
+
+    for (int i = 0; i < 3; i++) {
+        pid_t pid = fork();
+        if (pid == 0) {
+            char line[64];
+            for (int j = 0; j < 5; j++) {
+                int len = snprintf(line, sizeof(line),
+                                   "pid=%d line=%d\\n", (int)getpid(), j);
+                write(fd, line, len);   /* O_APPEND: atomic lseek+write */
+            }
+            _exit(0);
+        }
+    }
+    close(fd);
+    while (wait(NULL) > 0) {}
+
+    /* 计行数: 应恰好 15 行 */
+    fd = open(p, O_RDONLY);
+    char buf[4096]; ssize_t n = read(fd, buf, sizeof(buf)-1); buf[n]=0;
+    close(fd); unlink(p);
+    int lines = 0;
+    for (char *c = buf; *c; c++) if (*c=='\\n') lines++;
+    printf("total lines = %d (expected 15)\\n", lines);
+    return 0;
+}` },
+      { name: '/proc/self/fd 查看 fd', desc: '通过 /proc/self/fd 列出进程当前所有打开的文件描述符',
+        code: `#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <dirent.h>
+#include <string.h>
+
+int main() {
+    /* 打开几个文件制造 fd */
+    open("/etc/hostname", O_RDONLY);
+    open("/etc/os-release", O_RDONLY);
+
+    DIR *d = opendir("/proc/self/fd");
+    struct dirent *e;
+    printf("%-6s  %s\\n", "fd", "target");
+    while ((e = readdir(d)) != NULL) {
+        if (e->d_name[0] == '.') continue;
+        char link[64], target[256];
+        snprintf(link, sizeof(link), "/proc/self/fd/%s", e->d_name);
+        ssize_t n = readlink(link, target, sizeof(target)-1);
+        if (n > 0) { target[n] = 0; printf("%-6s  %s\\n", e->d_name, target); }
+    }
+    closedir(d);
+    return 0;
+}` },
+    ],
   },
 
   proc_env: {
@@ -352,6 +517,90 @@ int main() {
     printf("brk delta: %ld bytes\\n", (char*)brk1-(char*)brk0);
     return 0;
 }`,
+    examples: [
+      { name: '内存泄漏检测', desc: '故意泄漏，用 valgrind 思路自己追踪 malloc/free', code: `#include <stdio.h>
+#include <stdlib.h>
+#include <string.h>
+
+/* Simple allocation tracker */
+static long alloc_count = 0, free_count = 0;
+static size_t alloc_bytes = 0;
+
+void *tracked_malloc(size_t n) {
+    void *p = malloc(n);
+    if (p) { alloc_count++; alloc_bytes += n; }
+    return p;
+}
+void tracked_free(void *p) {
+    if (p) { free_count++; free(p); }
+}
+
+int main() {
+    char *a = tracked_malloc(64);
+    strcpy(a, "allocated buffer 1");
+
+    char *b = tracked_malloc(128);
+    strcpy(b, "allocated buffer 2");
+
+    tracked_free(a);
+    /* intentional leak: b not freed */
+
+    printf("mallocs: %ld  frees: %ld  bytes allocated: %zu\\n",
+           alloc_count, free_count, alloc_bytes);
+    printf("LEAK: %ld allocation(s) not freed\\n",
+           alloc_count - free_count);
+    /* run under valgrind --leak-check=full to verify */
+    return 0;
+}` },
+      { name: 'realloc 动态数组', desc: '用 realloc 实现类似 vector 的动态增长', code: `#include <stdio.h>
+#include <stdlib.h>
+
+typedef struct {
+    int *data;
+    size_t len, cap;
+} IntVec;
+
+void vec_push(IntVec *v, int val) {
+    if (v->len == v->cap) {
+        v->cap = v->cap ? v->cap * 2 : 4;
+        v->data = realloc(v->data, v->cap * sizeof(int));
+    }
+    v->data[v->len++] = val;
+}
+
+int main() {
+    IntVec v = {0};
+    for (int i = 0; i < 20; i++) vec_push(&v, i * i);
+
+    printf("len=%zu cap=%zu\\n", v.len, v.cap);
+    printf("data: ");
+    for (size_t i = 0; i < v.len; i++) printf("%d ", v.data[i]);
+    printf("\\n");
+    free(v.data);
+    return 0;
+}` },
+      { name: 'brk/sbrk 堆边界', desc: '直接操控堆顶，观察 program break 变化', code: `#include <stdio.h>
+#include <unistd.h>
+
+int main() {
+    void *start = sbrk(0);
+    printf("initial brk: %p\\n", start);
+
+    /* Expand heap by 4096 bytes */
+    sbrk(4096);
+    void *after = sbrk(0);
+    printf("after +4096: %p (delta %ld)\\n", after,
+           (char*)after - (char*)start);
+
+    /* Shrink heap */
+    brk(start);
+    void *shrunk = sbrk(0);
+    printf("after shrink: %p (delta %ld)\\n", shrunk,
+           (char*)shrunk - (char*)start);
+    /* Note: large mallocs bypass brk and use mmap instead */
+    return 0;
+}` },
+    ],
   },
 
   creds: {
@@ -817,6 +1066,91 @@ int main() {
     printf("final caught=%d\\n", caught);
     return 0;
 }`,
+    examples: [
+      { name: 'signalfd + epoll', desc: '用 signalfd 将信号转为 fd 事件，配合 epoll 做事件循环',
+        code: `#include <sys/signalfd.h>
+#include <sys/epoll.h>
+#include <signal.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    /* 1. 屏蔽目标信号 (必须先屏蔽再 signalfd) */
+    sigset_t mask;
+    sigemptyset(&mask);
+    sigaddset(&mask, SIGUSR1);
+    sigaddset(&mask, SIGTERM);
+    sigprocmask(SIG_BLOCK, &mask, NULL);
+
+    /* 2. 创建 signalfd */
+    int sfd = signalfd(-1, &mask, SFD_CLOEXEC | SFD_NONBLOCK);
+
+    /* 3. 加入 epoll */
+    int efd = epoll_create1(EPOLL_CLOEXEC);
+    struct epoll_event ev = { .events = EPOLLIN, .data.fd = sfd };
+    epoll_ctl(efd, EPOLL_CTL_ADD, sfd, &ev);
+
+    /* 4. 发送信号给自己 */
+    kill(getpid(), SIGUSR1);
+    kill(getpid(), SIGUSR1);
+    kill(getpid(), SIGTERM);
+
+    /* 5. 事件循环 */
+    struct epoll_event events[4];
+    int done = 0;
+    while (!done) {
+        int n = epoll_wait(efd, events, 4, 500);
+        for (int i = 0; i < n; i++) {
+            struct signalfd_siginfo ssi;
+            read(sfd, &ssi, sizeof(ssi));
+            printf("signal %u from pid %u\\n",
+                   ssi.ssi_signo, ssi.ssi_pid);
+            if (ssi.ssi_signo == SIGTERM) done = 1;
+        }
+        if (n == 0) break;  /* 超时退出 */
+    }
+    close(sfd); close(efd);
+    return 0;
+}` },
+      { name: '实时信号排队', desc: '普通信号不排队，SIGRTMIN+n 可靠排队——用 sigqueue 发送',
+        code: `#include <signal.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <string.h>
+
+#define SIG_RT SIGRTMIN+1
+
+static void handler(int sig, siginfo_t *si, void *ctx) {
+    printf("RT signal: val=%d from pid=%d\\n",
+           si->si_value.sival_int, (int)si->si_pid);
+}
+
+int main() {
+    struct sigaction sa = {
+        .sa_sigaction = handler,
+        .sa_flags     = SA_SIGINFO,
+    };
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIG_RT, &sa, NULL);
+
+    /* 屏蔽信号，批量发送 3 次 */
+    sigset_t block;
+    sigemptyset(&block); sigaddset(&block, SIG_RT);
+    sigprocmask(SIG_BLOCK, &block, NULL);
+
+    for (int i = 1; i <= 3; i++) {
+        union sigval sv = { .sival_int = i * 100 };
+        sigqueue(getpid(), SIG_RT, sv);   /* 实时信号排队 */
+    }
+    printf("sent 3 RT signals (blocked, pending)\\n");
+
+    /* 解除屏蔽: 3 次全部按序触发 */
+    sigprocmask(SIG_UNBLOCK, &block, NULL);
+    printf("done\\n");
+    return 0;
+}` },
+    ],
   },
 
   timerfd: {
@@ -934,6 +1268,100 @@ int main() {
     }
     return 0;
 }`,
+    examples: [
+      { name: 'pipe + fork', desc: '父子进程通过 pipe 通信：子进程写，父进程读',
+        code: `#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
+
+int main() {
+    int pfd[2];
+    pipe(pfd);   /* pfd[0]=读端, pfd[1]=写端 */
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* 子进程: 关闭读端，写数据 */
+        close(pfd[0]);
+        const char *msgs[] = {"hello\\n","world\\n","from child\\n"};
+        for (int i = 0; i < 3; i++)
+            write(pfd[1], msgs[i], strlen(msgs[i]));
+        close(pfd[1]);
+        _exit(0);
+    }
+    /* 父进程: 关闭写端，读数据 */
+    close(pfd[1]);
+    char buf[256]; ssize_t n;
+    printf("parent reading pipe:\\n");
+    while ((n = read(pfd[0], buf, sizeof(buf)-1)) > 0) {
+        buf[n] = 0;
+        printf("  got: %s", buf);
+    }
+    close(pfd[0]);
+    wait(NULL);
+    return 0;
+}` },
+      { name: '僵尸进程演示', desc: '子进程退出后父进程延迟 wait()，期间子进程处于 zombie 状态',
+        code: `#include <unistd.h>
+#include <stdio.h>
+#include <sys/wait.h>
+
+int main() {
+    pid_t child = fork();
+    if (child == 0) {
+        printf("child PID=%d exiting now\\n", getpid());
+        _exit(99);
+    }
+    /* 父进程故意不立即 wait，子进程变僵尸 2 秒 */
+    printf("parent sleeping 2s (child is zombie during this time)\\n");
+    printf("run: ps aux | grep Z  in another shell to see it\\n");
+    sleep(2);
+
+    int status;
+    pid_t r = waitpid(child, &status, 0);
+    printf("reaped child=%d exit=%d\\n", r, WEXITSTATUS(status));
+    printf("zombie gone!\\n");
+    return 0;
+}` },
+      { name: 'SIGCHLD 异步 reap', desc: '安装 SIGCHLD 处理函数，在信号处理中 waitpid 避免僵尸',
+        code: `#include <unistd.h>
+#include <stdio.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <errno.h>
+
+static void sigchld_handler(int sig) {
+    (void)sig;
+    int saved = errno;
+    int status;
+    pid_t pid;
+    /* 循环 waitpid 处理所有已退出子进程 */
+    while ((pid = waitpid(-1, &status, WNOHANG)) > 0) {
+        if (WIFEXITED(status))
+            printf("[SIGCHLD] reaped pid=%d exit=%d\\n",
+                   pid, WEXITSTATUS(status));
+    }
+    errno = saved;
+}
+
+int main() {
+    struct sigaction sa = { .sa_handler = sigchld_handler,
+                            .sa_flags   = SA_RESTART | SA_NOCLDSTOP };
+    sigemptyset(&sa.sa_mask);
+    sigaction(SIGCHLD, &sa, NULL);
+
+    for (int i = 0; i < 4; i++) {
+        if (fork() == 0) {
+            sleep(i);                 /* 错开退出时间 */
+            _exit(i * 10);
+        }
+    }
+    /* 父进程等所有子进程退出 */
+    while (wait(NULL) > 0 || errno == EINTR) {}
+    printf("all children reaped\\n");
+    return 0;
+}` },
+    ],
   },
 
   threads: {
@@ -1238,6 +1666,94 @@ int main() {
     return 0;
 }`,
     notes: 'The pipe has a kernel buffer (typically 64KB). write() to a full pipe blocks. Closing the write end causes read() to return 0 (EOF). Always close both ends you don\'t use in child — otherwise EOF is never sent.',
+    examples: [
+      { name: 'FIFO 命名管道', desc: '无亲缘关系的进程通过文件路径通信', code: `#include <sys/stat.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
+
+#define FIFO "/tmp/tlpi_fifo"
+
+int main() {
+    mkfifo(FIFO, 0600);   /* create named pipe in filesystem */
+
+    if (fork() == 0) {    /* reader child */
+        int rfd = open(FIFO, O_RDONLY);
+        char buf[64]; ssize_t n;
+        while ((n = read(rfd, buf, sizeof(buf)-1)) > 0) {
+            buf[n] = '\\0';
+            printf("reader got: %s\\n", buf);
+        }
+        close(rfd); return 0;
+    }
+    /* writer parent */
+    int wfd = open(FIFO, O_WRONLY);
+    write(wfd, "msg via FIFO", 12);
+    write(wfd, "second msg  ", 12);
+    close(wfd);           /* EOF to reader */
+    wait(NULL);
+    unlink(FIFO);
+    return 0;
+}` },
+      { name: '双向管道', desc: '两个 pipe 实现父子全双工通信', code: `#include <unistd.h>
+#include <sys/wait.h>
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    int p2c[2], c2p[2];   /* parent-to-child, child-to-parent */
+    pipe(p2c); pipe(c2p);
+
+    if (fork() == 0) {
+        close(p2c[1]); close(c2p[0]);
+
+        char buf[64]; ssize_t n;
+        n = read(p2c[0], buf, sizeof(buf)-1);
+        buf[n] = '\\0';
+        printf("child received: %s\\n", buf);
+
+        const char *reply = "pong from child";
+        write(c2p[1], reply, strlen(reply));
+        close(p2c[0]); close(c2p[1]);
+        return 0;
+    }
+    close(p2c[0]); close(c2p[1]);
+
+    write(p2c[1], "ping from parent", 16);
+    close(p2c[1]);
+
+    char buf[64]; ssize_t n = read(c2p[0], buf, sizeof(buf)-1);
+    buf[n] = '\\0';
+    printf("parent received: %s\\n", buf);
+    close(c2p[0]);
+    wait(NULL);
+    return 0;
+}` },
+      { name: 'popen 捕获命令输出', desc: '用 popen 读取 shell 命令的标准输出', code: `#include <stdio.h>
+#include <stdlib.h>
+
+int main() {
+    /* popen = pipe + fork + exec + sh -c */
+    FILE *f = popen("df -h / | tail -1", "r");
+    if (!f) { perror("popen"); return 1; }
+
+    char line[256];
+    printf("=== df -h / (last line) ===\\n");
+    while (fgets(line, sizeof(line), f))
+        printf("  %s", line);
+
+    int status = pclose(f);
+    printf("exit status: %d\\n", WEXITSTATUS(status));
+
+    /* also works for writing to a command */
+    FILE *g = popen("wc -c", "w");
+    fprintf(g, "count these bytes please");
+    pclose(g);
+    return 0;
+}` },
+    ],
     demoCode: `/* Demo: pipe + popen(ls) */
 #include <unistd.h>
 #include <sys/wait.h>
@@ -1297,6 +1813,90 @@ int main(int argc, char *argv[]) {
     munmap(p, st.st_size);
 }`,
     notes: 'MAP_PRIVATE creates copy-on-write — writes create private anonymous pages visible only to this process. MAP_SHARED writes go to the page cache and are visible to all mappers. madvise(MADV_SEQUENTIAL) enables aggressive readahead.',
+    examples: [
+      { name: '匿名共享内存', desc: 'MAP_ANONYMOUS|MAP_SHARED: 父子进程零拷贝共享', code: `#include <sys/mman.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+int main() {
+    /* Anonymous MAP_SHARED: visible to parent AND child */
+    int *counter = mmap(NULL, sizeof(int),
+        PROT_READ|PROT_WRITE,
+        MAP_SHARED|MAP_ANONYMOUS, -1, 0);
+    *counter = 0;
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        for (int i = 0; i < 5; i++) {
+            (*counter)++;          /* child increments */
+            usleep(10000);
+        }
+        return 0;
+    }
+    /* parent reads counter updated by child */
+    wait(NULL);
+    printf("shared counter = %d (expected 5)\\n", *counter);
+    munmap(counter, sizeof(int));
+    return 0;
+}` },
+      { name: 'mprotect 只读保护', desc: '将内存区域改为只读，写入触发 SIGSEGV', code: `#include <sys/mman.h>
+#include <stdio.h>
+#include <string.h>
+#include <signal.h>
+#include <setjmp.h>
+
+static sigjmp_buf jb;
+static void handler(int s) { siglongjmp(jb, 1); }
+
+int main() {
+    char *p = mmap(NULL, 4096,
+        PROT_READ|PROT_WRITE,
+        MAP_PRIVATE|MAP_ANONYMOUS, -1, 0);
+    strcpy(p, "writable");
+    printf("wrote: %s\\n", p);
+
+    mprotect(p, 4096, PROT_READ);   /* make read-only */
+
+    signal(SIGSEGV, handler);
+    if (sigsetjmp(jb, 1) == 0) {
+        p[0] = 'X';                 /* triggers SIGSEGV */
+        printf("should not reach here\\n");
+    } else {
+        printf("caught SIGSEGV: write to read-only mmap\\n");
+    }
+    munmap(p, 4096);
+    return 0;
+}` },
+      { name: 'msync 持久化', desc: '将 MAP_SHARED 修改同步写回文件', code: `#include <sys/mman.h>
+#include <sys/stat.h>
+#include <fcntl.h>
+#include <stdio.h>
+#include <string.h>
+#include <unistd.h>
+
+int main() {
+    const char *path = "/tmp/tlpi_msync.txt";
+    const char *init = "0000000000";
+    int fd = open(path, O_RDWR|O_CREAT|O_TRUNC, 0600);
+    write(fd, init, strlen(init));
+
+    struct stat st; fstat(fd, &st);
+    char *p = mmap(NULL, st.st_size,
+        PROT_READ|PROT_WRITE, MAP_SHARED, fd, 0);
+    close(fd);
+
+    /* Modify in memory */
+    memcpy(p, "PERSISTED", 9);
+    /* Force writeback to disk */
+    if (msync(p, st.st_size, MS_SYNC) == 0)
+        printf("msync OK, file now: %.*s\\n", (int)st.st_size, p);
+
+    munmap(p, st.st_size);
+    unlink(path);
+    return 0;
+}` },
+    ],
     demoCode: `/* Demo: create file, MAP_SHARED uppercase in-place */
 #include <sys/mman.h>
 #include <sys/stat.h>
@@ -1360,6 +1960,41 @@ int main() {
     mq_unlink("/tlpi_mq");
     return 0;
 }`,
+    examples: [
+      { name: '跨进程消息传递', desc: '父进程发送，子进程接收，验证优先级排序', code: `#include <mqueue.h>
+#include <stdio.h>
+#include <string.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <sys/wait.h>
+
+#define MQ_NAME "/tlpi_ipc_mq"
+
+int main() {
+    mq_unlink(MQ_NAME);
+    struct mq_attr attr = { .mq_maxmsg=10, .mq_msgsize=64 };
+    mqd_t mq = mq_open(MQ_NAME, O_CREAT|O_RDWR, 0600, &attr);
+
+    if (fork() == 0) {   /* consumer */
+        mqd_t cmq = mq_open(MQ_NAME, O_RDONLY);
+        char buf[64]; unsigned prio;
+        for (int i = 0; i < 3; i++) {
+            mq_receive(cmq, buf, sizeof(buf), &prio);
+            printf("child got [prio=%u]: %s\\n", prio, buf);
+        }
+        mq_close(cmq);
+        return 0;
+    }
+    /* producer sends in reverse priority order */
+    mq_send(mq, "LOW",  3, 1);
+    mq_send(mq, "HIGH", 4, 9);
+    mq_send(mq, "MED",  3, 5);
+    mq_close(mq);
+    wait(NULL);
+    mq_unlink(MQ_NAME);
+    return 0;
+}` },
+    ],
     notes: 'mq_receive() always returns the highest-priority message. Use mq_notify() to get a signal or start a thread when a message arrives on an empty queue. Compile with -lrt. Queue names must start with "/".',
     demoCode: `/* Demo: priority ordering and mq_getattr */
 #include <mqueue.h>
@@ -1428,6 +2063,59 @@ int main() {
     sem_unlink("/tlpi_sem");
     return 0;
 }`,
+    examples: [
+      { name: '生产者-消费者', desc: '用无名信号量实现线程间生产者-消费者同步', code: `#include <semaphore.h>
+#include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
+
+#define BUF_SIZE 4
+static int buffer[BUF_SIZE];
+static int head = 0, tail = 0;
+static sem_t empty_slots, filled_slots;
+static pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+void *producer(void *_) {
+    for (int i = 0; i < 8; i++) {
+        sem_wait(&empty_slots);
+        pthread_mutex_lock(&mtx);
+        buffer[tail % BUF_SIZE] = i;
+        tail++;
+        printf("produced: %d  (tail=%d)\\n", i, tail);
+        pthread_mutex_unlock(&mtx);
+        sem_post(&filled_slots);
+        usleep(10000);
+    }
+    return NULL;
+}
+
+void *consumer(void *_) {
+    for (int i = 0; i < 8; i++) {
+        sem_wait(&filled_slots);
+        pthread_mutex_lock(&mtx);
+        int val = buffer[head % BUF_SIZE];
+        head++;
+        printf("consumed: %d  (head=%d)\\n", val, head);
+        pthread_mutex_unlock(&mtx);
+        sem_post(&empty_slots);
+        usleep(15000);
+    }
+    return NULL;
+}
+
+int main() {
+    sem_init(&empty_slots, 0, BUF_SIZE);
+    sem_init(&filled_slots, 0, 0);
+    pthread_t p, c;
+    pthread_create(&p, NULL, producer, NULL);
+    pthread_create(&c, NULL, consumer, NULL);
+    pthread_join(p, NULL);
+    pthread_join(c, NULL);
+    sem_destroy(&empty_slots);
+    sem_destroy(&filled_slots);
+    return 0;
+}` },
+    ],
     notes: 'sem_post() is async-signal-safe — it can be called from a signal handler. Unnamed semaphores (sem_init with pshared=1) live in shared memory and can synchronize processes. Unlike mutexes, any process/thread can call sem_post regardless of who called sem_wait.',
     demoCode: `/* Demo: named sem + unnamed sem in threads */
 #include <semaphore.h>
@@ -1580,6 +2268,79 @@ int main() {
     unlink("/tmp/tlpi_lock.txt");
     return 0;
 }`,
+    examples: [
+      { name: 'flock 全文件锁', desc: '用 flock() 实现简单进程间互斥锁', code: `#include <sys/file.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <sys/wait.h>
+
+int main() {
+    int fd = open("/tmp/tlpi_flock.lock",
+                  O_RDWR|O_CREAT|O_TRUNC, 0600);
+
+    if (fork() == 0) {
+        printf("child: trying to acquire exclusive lock...\\n");
+        /* LOCK_EX: exclusive (writer) lock, blocking */
+        flock(fd, LOCK_EX);
+        printf("child: got lock, working...\\n");
+        usleep(200000);
+        flock(fd, LOCK_UN);
+        printf("child: released lock\\n");
+        return 0;
+    }
+
+    /* parent also takes exclusive lock briefly */
+    flock(fd, LOCK_EX);
+    printf("parent: holding lock for 100ms\\n");
+    usleep(100000);
+    flock(fd, LOCK_UN);
+    printf("parent: released, child can proceed\\n");
+
+    wait(NULL);
+    close(fd);
+    unlink("/tmp/tlpi_flock.lock");
+    return 0;
+}` },
+      { name: 'fcntl 字节范围锁', desc: '对文件的特定字节范围加锁（数据库常用）', code: `#include <fcntl.h>
+#include <stdio.h>
+#include <unistd.h>
+
+void lock_range(int fd, short type, off_t start, off_t len) {
+    struct flock fl = {
+        .l_type   = type,
+        .l_whence = SEEK_SET,
+        .l_start  = start,
+        .l_len    = len,
+    };
+    if (fcntl(fd, F_SETLKW, &fl) == 0)
+        printf("%s bytes [%lld, %lld]\\n",
+            type == F_WRLCK ? "WRLCK" : "RDLCK",
+            (long long)start, (long long)(start+len-1));
+    else
+        perror("fcntl");
+}
+
+void unlock_all(int fd) {
+    struct flock fl = { .l_type=F_UNLCK, .l_whence=SEEK_SET,
+                        .l_start=0, .l_len=0 };
+    fcntl(fd, F_SETLK, &fl);
+    printf("all locks released\\n");
+}
+
+int main() {
+    int fd = open("/tmp/tlpi_range.db",
+                  O_RDWR|O_CREAT|O_TRUNC, 0600);
+    /* Simulate: write-lock record 0-63, read-lock record 64-127 */
+    lock_range(fd, F_WRLCK,  0, 64);
+    lock_range(fd, F_RDLCK, 64, 64);
+    /* ... modify records ... */
+    unlock_all(fd);
+    close(fd);
+    unlink("/tmp/tlpi_range.db");
+    return 0;
+}` },
+    ],
     notes: 'POSIX locks are per-process, not per-fd — closing any fd to the file releases all locks held by that process on the file. Use flock() (whole-file) for simpler use cases. Mandatory locking (rarely used) enforces locks on read()/write() calls.',
     demoCode: `/* Demo: write lock then shared (read) lock from child */
 #include <fcntl.h>
@@ -1693,6 +2454,118 @@ int main() {
     wait(NULL); close(sv[0]);
     return 0;
 }`,
+    examples: [
+      { name: 'TCP echo server', desc: '最简 TCP echo 服务端 + 客户端 (fork 在同一进程演示)',
+        code: `#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
+
+#define PORT 19988
+
+int main() {
+    /* ── 服务端 ── */
+    int srv = socket(AF_INET, SOCK_STREAM, 0);
+    int opt = 1;
+    setsockopt(srv, SOL_SOCKET, SO_REUSEADDR, &opt, sizeof(opt));
+
+    struct sockaddr_in addr = {
+        .sin_family      = AF_INET,
+        .sin_port        = htons(PORT),
+        .sin_addr.s_addr = INADDR_ANY,
+    };
+    bind(srv, (struct sockaddr*)&addr, sizeof(addr));
+    listen(srv, 5);
+    printf("server listening on port %d\\n", PORT);
+
+    pid_t pid = fork();
+    if (pid == 0) {
+        /* ── 客户端 (子进程) ── */
+        sleep(0);   /* 等服务端就绪 */
+        int c = socket(AF_INET, SOCK_STREAM, 0);
+        struct sockaddr_in saddr = {
+            .sin_family = AF_INET,
+            .sin_port   = htons(PORT),
+        };
+        inet_pton(AF_INET, "127.0.0.1", &saddr.sin_addr);
+        connect(c, (struct sockaddr*)&saddr, sizeof(saddr));
+
+        const char *msgs[] = {"hello\\n","world\\n","quit\\n"};
+        char buf[64];
+        for (int i = 0; i < 3; i++) {
+            send(c, msgs[i], strlen(msgs[i]), 0);
+            ssize_t n = recv(c, buf, sizeof(buf)-1, 0);
+            if (n > 0) { buf[n]=0; printf("client echo: %s", buf); }
+        }
+        close(c);
+        _exit(0);
+    }
+
+    /* 服务端接受一个连接 */
+    int conn = accept(srv, NULL, NULL);
+    char buf[64]; ssize_t n;
+    while ((n = recv(conn, buf, sizeof(buf)-1, 0)) > 0) {
+        buf[n]=0;
+        printf("server got: %s", buf);
+        send(conn, buf, n, 0);   /* echo back */
+        if (strstr(buf, "quit")) break;
+    }
+    close(conn); close(srv);
+    wait(NULL);
+    return 0;
+}` },
+      { name: 'UDP 广播', desc: 'UDP 一发多收：SO_BROADCAST + INADDR_BROADCAST',
+        code: `#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <sys/wait.h>
+
+#define PORT 19989
+
+/* 启动 2 个接收者，1 个广播发送者 */
+int main() {
+    /* 接收者 1 */
+    if (fork() == 0) {
+        int s = socket(AF_INET, SOCK_DGRAM, 0);
+        int yes = 1; setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes));
+        struct sockaddr_in a = { AF_INET, htons(PORT), {INADDR_ANY} };
+        bind(s, (struct sockaddr*)&a, sizeof(a));
+        char buf[64]; struct sockaddr_in from; socklen_t fl=sizeof(from);
+        recvfrom(s, buf, sizeof(buf)-1, 0, (struct sockaddr*)&from, &fl);
+        printf("receiver-1 got: %s\\n", buf);
+        _exit(0);
+    }
+    /* 接收者 2 */
+    if (fork() == 0) {
+        int s = socket(AF_INET, SOCK_DGRAM, 0);
+        int yes = 1; setsockopt(s, SOL_SOCKET, SO_REUSEPORT, &yes, sizeof(yes));
+        struct sockaddr_in a = { AF_INET, htons(PORT), {INADDR_ANY} };
+        bind(s, (struct sockaddr*)&a, sizeof(a));
+        char buf[64]; struct sockaddr_in from; socklen_t fl=sizeof(from);
+        recvfrom(s, buf, sizeof(buf)-1, 0, (struct sockaddr*)&from, &fl);
+        printf("receiver-2 got: %s\\n", buf);
+        _exit(0);
+    }
+
+    sleep(0);
+    /* 发送者: SO_BROADCAST 允许向广播地址发送 */
+    int s = socket(AF_INET, SOCK_DGRAM, 0);
+    int bcast = 1; setsockopt(s, SOL_SOCKET, SO_BROADCAST, &bcast, sizeof(bcast));
+    struct sockaddr_in dst = { AF_INET, htons(PORT), {INADDR_BROADCAST} };
+    const char *msg = "broadcast hello!";
+    sendto(s, msg, strlen(msg), 0, (struct sockaddr*)&dst, sizeof(dst));
+    printf("sent broadcast\\n");
+    close(s);
+    wait(NULL); wait(NULL);
+    return 0;
+}` },
+    ],
   },
 
   select: {
@@ -1728,6 +2601,109 @@ int main() {
     return 0;
 }`,
     notes: 'select() rebuilds fd_set on every call — O(n) scan of all bits up to nfds. poll() uses an array of structs (no bit-scanning limit). epoll is O(1): it stores ready events in a linked list and only returns what\'s ready. Use EPOLLET (edge-triggered) with non-blocking fds for maximum performance.',
+    examples: [
+      { name: 'poll() 多 fd', desc: 'poll 同时监听两个管道，无 fd 数量上限', code: `#include <poll.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+
+int main() {
+    int p1[2], p2[2];
+    pipe(p1); pipe(p2);
+
+    write(p1[1], "pipe1 ready", 11);
+    write(p2[1], "pipe2 ready", 11);
+
+    struct pollfd fds[2] = {
+        { .fd = p1[0], .events = POLLIN },
+        { .fd = p2[0], .events = POLLIN },
+    };
+
+    int n = poll(fds, 2, 1000 /* ms timeout */);
+    printf("poll returned %d ready fds\\n", n);
+
+    char buf[32];
+    for (int i = 0; i < 2; i++) {
+        if (fds[i].revents & POLLIN) {
+            ssize_t k = read(fds[i].fd, buf, sizeof(buf)-1);
+            buf[k] = '\\0';
+            printf("fd[%d]: %s\\n", i, buf);
+        }
+    }
+    close(p1[0]); close(p1[1]);
+    close(p2[0]); close(p2[1]);
+    return 0;
+}` },
+      { name: 'epoll ET 边缘触发', desc: 'EPOLLET 模式：仅在状态变化时通知一次，需读尽', code: `#include <sys/epoll.h>
+#include <fcntl.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <string.h>
+#include <errno.h>
+
+int set_nonblock(int fd) {
+    return fcntl(fd, F_SETFL, fcntl(fd, F_GETFL) | O_NONBLOCK);
+}
+
+int main() {
+    int pfd[2]; pipe(pfd);
+    set_nonblock(pfd[0]);  /* EPOLLET requires non-blocking */
+
+    int ep = epoll_create1(0);
+    struct epoll_event ev = {
+        .events = EPOLLIN | EPOLLET,  /* edge-triggered */
+        .data.fd = pfd[0],
+    };
+    epoll_ctl(ep, EPOLL_CTL_ADD, pfd[0], &ev);
+
+    /* Write data in two chunks — ET only fires once */
+    write(pfd[1], "hello", 5);
+    write(pfd[1], "world", 5);
+
+    struct epoll_event evs[4];
+    int n = epoll_wait(ep, evs, 4, 1000);
+    printf("epoll_wait returned %d events\\n", n);
+
+    /* Must drain ALL data on ET notification */
+    char buf[4]; ssize_t r;
+    while ((r = read(pfd[0], buf, sizeof(buf))) > 0)
+        printf("read %zd bytes: %.*s\\n", r, (int)r, buf);
+    if (errno == EAGAIN) printf("EAGAIN: fd drained\\n");
+
+    close(ep); close(pfd[0]); close(pfd[1]);
+    return 0;
+}` },
+      { name: 'epoll 超时', desc: 'epoll_wait 超时：-1 永久阻塞，0 立即返回，>0 毫秒', code: `#include <sys/epoll.h>
+#include <unistd.h>
+#include <stdio.h>
+#include <time.h>
+
+int main() {
+    int pfd[2]; pipe(pfd);  /* empty pipe — nothing to read */
+
+    int ep = epoll_create1(0);
+    struct epoll_event ev = { .events = EPOLLIN, .data.fd = pfd[0] };
+    epoll_ctl(ep, EPOLL_CTL_ADD, pfd[0], &ev);
+
+    struct epoll_event evs[1];
+
+    /* timeout = 200 ms */
+    struct timespec t0, t1;
+    clock_gettime(CLOCK_MONOTONIC, &t0);
+    int n = epoll_wait(ep, evs, 1, 200);
+    clock_gettime(CLOCK_MONOTONIC, &t1);
+
+    long elapsed_ms = (t1.tv_sec - t0.tv_sec) * 1000 +
+                      (t1.tv_nsec - t0.tv_nsec) / 1000000;
+    if (n == 0)
+        printf("timeout after ~%ld ms (no events)\\n", elapsed_ms);
+    else
+        printf("event ready (unexpected)\\n");
+
+    close(ep); close(pfd[0]); close(pfd[1]);
+    return 0;
+}` },
+    ],
     demoCode: `/* Demo: select, poll, epoll — all three on a self-pipe */
 #include <sys/select.h>
 #include <poll.h>
@@ -2102,6 +3078,103 @@ int main() {
     return 0;
 }`,
     notes: 'After execve(), open file descriptors without FD_CLOEXEC survive. Signal dispositions are reset to SIG_DFL. The exec family differs only in how argv/envp are passed: l=varargs list, v=array, p=PATH search, e=explicit envp. Use execve() when you need precise control; execlp()/execvp() for convenience.',
+    examples: [
+      { name: 'exec 家族对比', desc: 'execlp/execvp/execve 三种变体对比', code: `#include <unistd.h>
+#include <sys/wait.h>
+#include <stdio.h>
+
+void run(const char *label) {
+    pid_t pid = fork();
+    if (pid == 0) {
+        if (label[0] == 'l') {
+            /* execlp: PATH search, varargs */
+            execlp("echo", "echo", "hello from execlp", NULL);
+        } else if (label[0] == 'v') {
+            /* execvp: PATH search, array */
+            char *argv[] = { "echo", "hello from execvp", NULL };
+            execvp("echo", argv);
+        } else {
+            /* execve: full path, explicit env */
+            char *argv[] = { "echo", "hello from execve", NULL };
+            char *envp[] = { "HOME=/tmp", NULL };
+            execve("/bin/echo", argv, envp);
+        }
+        _exit(1);
+    }
+    int st; waitpid(pid, &st, 0);
+    printf("[%s] exit=%d\\n", label, WEXITSTATUS(st));
+}
+
+int main() {
+    run("execlp");
+    run("execvp");
+    run("execve");
+    return 0;
+}` },
+      { name: 'FD_CLOEXEC 继承', desc: 'exec 后 fd 默认继承，FD_CLOEXEC 可阻止泄漏', code: `#include <unistd.h>
+#include <fcntl.h>
+#include <sys/wait.h>
+#include <stdio.h>
+
+int main() {
+    /* Open without CLOEXEC — fd survives exec */
+    int fd_leak = open("/tmp/test_leak.txt", O_RDWR|O_CREAT|O_TRUNC, 0600);
+
+    /* Open with CLOEXEC — fd closed on exec */
+    int fd_safe = open("/tmp/test_safe.txt", O_RDWR|O_CREAT|O_TRUNC|O_CLOEXEC, 0600);
+
+    printf("fd_leak=%d fd_safe=%d\\n", fd_leak, fd_safe);
+
+    if (fork() == 0) {
+        /* /proc/self/fd shows which fds are open */
+        char *argv[] = { "ls", "-la",
+            "/proc/self/fd", NULL };
+        execvp("ls", argv);
+        _exit(1);
+    }
+    wait(NULL);
+    close(fd_leak); close(fd_safe);
+    unlink("/tmp/test_leak.txt");
+    unlink("/tmp/test_safe.txt");
+    return 0;
+}` },
+      { name: '简单 Shell 实现', desc: '用 fork+exec+waitpid 实现一个极简 shell', code: `#include <unistd.h>
+#include <sys/wait.h>
+#include <stdio.h>
+#include <string.h>
+#include <stdlib.h>
+
+#define MAXARGS 64
+
+int main() {
+    char line[256];
+    while (1) {
+        printf("sh$ ");
+        fflush(stdout);
+        if (!fgets(line, sizeof(line), stdin)) break;
+        line[strcspn(line, "\\n")] = '\\0';
+        if (!*line) continue;
+        if (strcmp(line, "exit") == 0) break;
+
+        /* tokenize */
+        char *argv[MAXARGS]; int argc = 0;
+        char *tok = strtok(line, " ");
+        while (tok && argc < MAXARGS-1)
+            argv[argc++] = tok, tok = strtok(NULL, " ");
+        argv[argc] = NULL;
+
+        pid_t pid = fork();
+        if (pid == 0) {
+            execvp(argv[0], argv);
+            fprintf(stderr, "%s: command not found\\n", argv[0]);
+            _exit(127);
+        }
+        int status; waitpid(pid, &status, 0);
+        printf("[exit %d]\\n", WEXITSTATUS(status));
+    }
+    return 0;
+}` },
+    ],
     demoCode: `/* Demo: fork+exec pipeline — ls /etc | wc -l */
 #include <unistd.h>
 #include <sys/wait.h>
@@ -2213,6 +3286,130 @@ int main() {
     pthread_join(c, NULL);
     return 0;
 }`,
+    examples: [
+      { name: '竞态条件', desc: '不加锁的计数器 vs 加锁计数器：演示 race condition 造成结果错误',
+        code: `#include <pthread.h>
+#include <stdio.h>
+
+#define N_THREADS 4
+#define N_ITERS   100000
+
+long unsafe_counter = 0;
+long safe_counter   = 0;
+pthread_mutex_t mtx = PTHREAD_MUTEX_INITIALIZER;
+
+void *unsafe_fn(void *_) {
+    for (int i = 0; i < N_ITERS; i++)
+        unsafe_counter++;   /* 竞态：read-modify-write 非原子 */
+    return NULL;
+}
+
+void *safe_fn(void *_) {
+    for (int i = 0; i < N_ITERS; i++) {
+        pthread_mutex_lock(&mtx);
+        safe_counter++;
+        pthread_mutex_unlock(&mtx);
+    }
+    return NULL;
+}
+
+int main() {
+    pthread_t t[N_THREADS];
+    for (int i = 0; i < N_THREADS; i++)
+        pthread_create(&t[i], NULL, unsafe_fn, NULL);
+    for (int i = 0; i < N_THREADS; i++) pthread_join(t[i], NULL);
+    printf("unsafe counter = %ld  (expected %d)\\n",
+           unsafe_counter, N_THREADS * N_ITERS);
+
+    for (int i = 0; i < N_THREADS; i++)
+        pthread_create(&t[i], NULL, safe_fn, NULL);
+    for (int i = 0; i < N_THREADS; i++) pthread_join(t[i], NULL);
+    printf("safe  counter = %ld  (expected %d)\\n",
+           safe_counter, N_THREADS * N_ITERS);
+    return 0;
+}` },
+      { name: '线程局部存储 TLS', desc: 'pthread_key_create + 每线程独立数据，__thread 关键字',
+        code: `#include <pthread.h>
+#include <stdio.h>
+#include <stdlib.h>
+
+/* 方法1: __thread (GCC/Clang 扩展，最简单) */
+static __thread int tls_val = 0;
+
+/* 方法2: POSIX pthread_key_t (更通用) */
+static pthread_key_t key;
+
+static void key_destructor(void *val) {
+    printf("TLS destructor called for key, val=%d\\n", *(int*)val);
+    free(val);
+}
+
+void *thread_fn(void *arg) {
+    int id = (int)(long)arg;
+
+    /* __thread: 每线程独立 */
+    tls_val = id * 100;
+    printf("thread %d: tls_val=%d\\n", id, tls_val);
+
+    /* pthread_key: 每线程独立 */
+    int *p = malloc(sizeof(int));
+    *p = id * 200;
+    pthread_setspecific(key, p);
+    printf("thread %d: key val=%d\\n", id,
+           *(int*)pthread_getspecific(key));
+    return NULL;
+}
+
+int main() {
+    pthread_key_create(&key, key_destructor);
+    pthread_t t[3];
+    for (int i = 0; i < 3; i++)
+        pthread_create(&t[i], NULL, thread_fn, (void*)(long)i);
+    for (int i = 0; i < 3; i++) pthread_join(t[i], NULL);
+    pthread_key_delete(key);
+    return 0;
+}` },
+      { name: '读写锁 rwlock', desc: '多读单写锁：允许并发读，写时独占',
+        code: `#include <pthread.h>
+#include <stdio.h>
+#include <unistd.h>
+
+static pthread_rwlock_t rwl = PTHREAD_RWLOCK_INITIALIZER;
+static int shared_data = 0;
+
+void *reader(void *arg) {
+    int id = (int)(long)arg;
+    for (int i = 0; i < 3; i++) {
+        pthread_rwlock_rdlock(&rwl);   /* 允许多个读者并发持有 */
+        printf("reader %d: data=%d\\n", id, shared_data);
+        usleep(5000);                  /* 模拟读操作耗时 */
+        pthread_rwlock_unlock(&rwl);
+        usleep(1000);
+    }
+    return NULL;
+}
+
+void *writer(void *arg) {
+    for (int i = 0; i < 2; i++) {
+        usleep(8000);
+        pthread_rwlock_wrlock(&rwl);   /* 写时独占，等待所有读者退出 */
+        shared_data = (i + 1) * 42;
+        printf("writer: updated data=%d\\n", shared_data);
+        pthread_rwlock_unlock(&rwl);
+    }
+    return NULL;
+}
+
+int main() {
+    pthread_t r[4], w;
+    pthread_create(&w, NULL, writer, NULL);
+    for (int i = 0; i < 4; i++)
+        pthread_create(&r[i], NULL, reader, (void*)(long)i);
+    pthread_join(w, NULL);
+    for (int i = 0; i < 4; i++) pthread_join(r[i], NULL);
+    return 0;
+}` },
+    ],
   },
 
   rlimit: {
@@ -6147,12 +7344,10 @@ function ClickableCode({code,onHeaderClick}:{code:string;onHeaderClick:(n:string
 
 type RunState={status:'idle'}|{status:'running'}|{status:'ok';output:string[];stderr?:string}|{status:'err';msg:string;stderr?:string}
 
-function RunPanel({bookCode,demoCode,color}:{bookCode:string;demoCode:string;color:string}) {
-  const [tab,setTab]=useState<'book'|'demo'>('book')
-  const [code,setCode]=useState(demoCode)
+function ExRunPanel({ex,color}:{ex:CodeEx;color:string}) {
+  const [code,setCode]=useState(ex.code)
   const [run,setRun]=useState<RunState>({status:'idle'})
-  const [headerModal,setHeaderModal]=useState<string|null>(null)
-
+  useEffect(()=>{setCode(ex.code);setRun({status:'idle'})},[ex.code])
   const handleRun=async()=>{
     setRun({status:'running'})
     try {
@@ -6161,39 +7356,24 @@ function RunPanel({bookCode,demoCode,color}:{bookCode:string;demoCode:string;col
       else setRun({status:'ok',output:res.output??[],stderr:res.stderr})
     } catch(e:any){setRun({status:'err',msg:e.message||'network error'})}
   }
-
   return (
-    <div style={{borderRadius:10,overflow:'hidden',border:`1px solid ${color}50`}}>
-      <div style={{display:'flex',borderBottom:`1px solid ${color}40`,background:`${color}10`}}>
-        {([['book','📖 Book excerpt'],['demo','▶ Demo (editable)']] as const).map(([id,lbl])=>(
-          <button key={id} onClick={()=>{setTab(id as any);if(id==='demo')setCode(demoCode);setRun({status:'idle'})}}
-            style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,
-              background:tab===id?`${color}28`:'transparent',
-              color:tab===id?color:'var(--text-muted)',fontWeight:tab===id?700:400,
-              borderBottom:tab===id?`2px solid ${color}`:'2px solid transparent'}}>{lbl}</button>
-        ))}
-        {tab==='demo'&&(
-          <button onClick={handleRun} disabled={run.status==='running'}
-            style={{marginLeft:'auto',padding:'6px 16px',border:'none',cursor:'pointer',
-              background:run.status==='running'?'rgba(63,185,80,0.2)':'#3fb950',
-              color:run.status==='running'?'#3fb950':'#fff',fontWeight:700,fontSize:12,borderRadius:0}}>
-            {run.status==='running'?'⏳ compiling…':'▶ Run'}
-          </button>
-        )}
-      </div>
-
-      {tab==='book'?(
-        <ClickableCode code={bookCode} onHeaderClick={setHeaderModal}/>
-      ):(
+    <div>
+      {ex.desc&&<div style={{padding:'6px 14px 0',fontSize:12,color:'var(--text-secondary)',lineHeight:1.5}}>{ex.desc}</div>}
+      <div style={{position:'relative'}}>
         <textarea value={code} onChange={e=>{setCode(e.target.value);setRun({status:'idle'})}}
           spellCheck={false}
-          style={{display:'block',width:'100%',minHeight:460,padding:'14px 16px',
+          style={{display:'block',width:'100%',minHeight:400,padding:'14px 16px',
             fontFamily:'monospace',fontSize:12,lineHeight:1.65,
             background:'var(--bg-tertiary)',color:'var(--text-primary)',
             border:'none',outline:'none',resize:'vertical',boxSizing:'border-box'}}/>
-      )}
-
-      {tab==='demo'&&run.status!=='idle'&&(
+        <button onClick={handleRun} disabled={run.status==='running'}
+          style={{position:'absolute',top:8,right:10,padding:'5px 14px',border:'none',cursor:'pointer',
+            background:run.status==='running'?'rgba(63,185,80,0.2)':'#3fb950',
+            color:run.status==='running'?'#3fb950':'#fff',fontWeight:700,fontSize:12,borderRadius:6}}>
+          {run.status==='running'?'⏳ …':'▶ Run'}
+        </button>
+      </div>
+      {run.status!=='idle'&&(
         <div style={{borderTop:`1px solid ${color}30`,padding:'10px 14px',background:'var(--bg-secondary)'}}>
           {run.status==='running'&&<div style={{color:'var(--text-muted)',fontSize:12}}>compiling &amp; running…</div>}
           {run.status==='ok'&&(
@@ -6216,6 +7396,42 @@ function RunPanel({bookCode,demoCode,color}:{bookCode:string;demoCode:string;col
           )}
         </div>
       )}
+    </div>
+  )
+}
+
+function RunPanel({bookCode,demoCode,color,examples}:{bookCode:string;demoCode:string;color:string;examples?:CodeEx[]}) {
+  const allExamples: CodeEx[] = [
+    ...(demoCode ? [{name:'Demo',code:demoCode}] : []),
+    ...(examples ?? []),
+  ]
+  const [tab,setTab]=useState<'book'|number>('book')
+  const [headerModal,setHeaderModal]=useState<string|null>(null)
+
+  return (
+    <div style={{borderRadius:10,overflow:'hidden',border:`1px solid ${color}50`}}>
+      <div style={{display:'flex',flexWrap:'wrap',borderBottom:`1px solid ${color}40`,background:`${color}10`}}>
+        <button onClick={()=>setTab('book')}
+          style={{padding:'7px 14px',border:'none',cursor:'pointer',fontSize:12,flexShrink:0,
+            background:tab==='book'?`${color}28`:'transparent',
+            color:tab==='book'?color:'var(--text-muted)',fontWeight:tab==='book'?700:400,
+            borderBottom:tab==='book'?`2px solid ${color}`:'2px solid transparent'}}>📖 Book</button>
+        {allExamples.map((ex,i)=>(
+          <button key={i} onClick={()=>setTab(i)}
+            style={{padding:'7px 12px',border:'none',cursor:'pointer',fontSize:12,flexShrink:0,
+              background:tab===i?`${color}28`:'transparent',
+              color:tab===i?color:'var(--text-muted)',fontWeight:tab===i?700:400,
+              borderBottom:tab===i?`2px solid ${color}`:'2px solid transparent'}}>
+            ▶ {ex.name}
+          </button>
+        ))}
+      </div>
+
+      {tab==='book'?(
+        <ClickableCode code={bookCode} onHeaderClick={setHeaderModal}/>
+      ):(
+        <ExRunPanel key={tab} ex={allExamples[tab as number]} color={color}/>
+      )}
       {headerModal && <HeaderModal name={headerModal} onClose={()=>setHeaderModal(null)}/>}
     </div>
   )
@@ -6225,26 +7441,43 @@ function RunPanel({bookCode,demoCode,color}:{bookCode:string;demoCode:string;col
 
 export default function TLPIView() {
   const [sel,setSel]=useState('errno')
-  const ex=EXAMPLES[sel]
-  const ch=CHAPTERS.find(c=>c.id===sel)!
   const [showDiag,setShowDiag]=useState(true)
   const [manModal,setManModal]=useState<string|null>(null)
+  const isMobile=useMobile()
 
+  const ex=EXAMPLES[sel]
+  const ch=CHAPTERS.find(c=>c.id===sel)
   const vol1=CHAPTERS.filter(c=>c.vol===1)
   const vol2=CHAPTERS.filter(c=>c.vol===2)
 
+  // Guard: chapter or example not found
+  if (!ch || !ex) return (
+    <div style={{display:'flex',alignItems:'center',justifyContent:'center',
+      height:'100%',color:'var(--text-muted)',fontSize:13}}>
+      章节内容待补充 (id: {sel})
+    </div>
+  )
+
   return (
-    <div style={{display:'flex',height:'100%',overflow:'hidden'}}>
+    <div style={{display:'flex',flexDirection:isMobile?'column':'row',height:'100%',overflow:'hidden'}}>
       {/* ── Sidebar ── */}
-      <div style={{width:210,flexShrink:0,borderRight:'1px solid var(--border)',
-        background:'var(--bg-secondary)',display:'flex',flexDirection:'column'}}>
-        <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg-elevated)'}}>
+      <div style={{
+        width:isMobile?'100%':210, flexShrink:0,
+        borderRight:isMobile?'none':'1px solid var(--border)',
+        borderBottom:isMobile?'1px solid var(--border)':'none',
+        background:'var(--bg-secondary)',
+        display:'flex', flexDirection:isMobile?'row':'column',
+        overflowX:isMobile?'auto':undefined,
+        overflowY:isMobile?'hidden':'auto',
+        maxHeight:isMobile?56:undefined,
+        scrollbarWidth:'none',
+      }}>
+        {!isMobile && <div style={{padding:'10px 14px',borderBottom:'1px solid var(--border)',background:'var(--bg-elevated)'}}>
           <div style={{fontSize:13,fontWeight:800,color:'var(--text-primary)'}}>📖 TLPI</div>
           <div style={{fontSize:10,color:'var(--text-muted)',marginTop:1}}>The Linux Programming Interface</div>
           <div style={{fontSize:10,color:'var(--text-muted)'}}>Michael Kerrisk · 1552 pages</div>
-        </div>
-        <div style={{flex:1,overflowY:'auto',padding:'4px 0'}}>
-          {/* Vol 1 */}
+        </div>}
+        {!isMobile && <div style={{flex:1,overflowY:'auto',padding:'4px 0'}}>
           <div style={{padding:'6px 14px 3px',fontSize:10,fontWeight:700,color:'var(--text-muted)',letterSpacing:1}}>
             VOL 1 上册 (Ch. 3–35)
           </div>
@@ -6260,7 +7493,6 @@ export default function TLPIView() {
               <span>{c.label}</span>
             </button>
           ))}
-          {/* Vol 2 */}
           <div style={{padding:'10px 14px 3px',fontSize:10,fontWeight:700,color:'var(--text-muted)',letterSpacing:1,borderTop:'1px solid var(--border)',marginTop:4}}>
             VOL 2 下册 (Ch. 37–63)
           </div>
@@ -6276,7 +7508,18 @@ export default function TLPIView() {
               <span>{c.label}</span>
             </button>
           ))}
-        </div>
+        </div>}
+        {isMobile && [...vol1,...vol2].map(c=>(
+          <button key={c.id} onClick={()=>setSel(c.id)}
+            style={{display:'flex',alignItems:'center',gap:4,flexShrink:0,
+              padding:'6px 10px',border:'none',
+              borderBottom:sel===c.id?`2px solid ${c.color}`:'2px solid transparent',
+              background:sel===c.id?'var(--bg-elevated)':'transparent',
+              color:sel===c.id?'var(--text-primary)':'var(--text-secondary)',
+              cursor:'pointer',fontSize:11,fontWeight:sel===c.id?700:400,whiteSpace:'nowrap'}}>
+            <span style={{fontSize:14}}>{c.icon}</span>
+          </button>
+        ))}
       </div>
 
       {/* ── Detail ── */}
@@ -6330,7 +7573,7 @@ export default function TLPIView() {
         </div>
 
         {/* Code + Run */}
-        <RunPanel key={sel} bookCode={ex.code ?? ''} demoCode={ex.demoCode ?? ''} color={ch.color}/>
+        <RunPanel key={sel} bookCode={ex.code ?? ''} demoCode={ex.demoCode ?? ''} color={ch.color} examples={ex.examples}/>
 
         {/* Notes */}
         <div style={{marginTop:12,padding:'10px 14px',borderRadius:8,fontSize:12,lineHeight:1.65,

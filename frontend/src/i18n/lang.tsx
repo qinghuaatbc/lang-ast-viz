@@ -23,6 +23,9 @@ const zh: Record<string, string> = {
   'tab.cpu': 'CPU 流水线',
   'tab.x86': 'x86 汇编',
   'tab.hw': '通信接口',
+  'tab.docker': 'Docker',
+  'tab.sysdesign': '系统设计',
+  'tab.git': 'Git 原理',
   'source.code': '源代码',
   'examples': '示例',
   'compile': '编译',
@@ -57,6 +60,9 @@ const en: Record<string, string> = {
   'tab.cpu': 'CPU Pipeline',
   'tab.x86': 'x86 Assembly',
   'tab.hw': 'Hardware I/O',
+  'tab.docker': 'Docker',
+  'tab.sysdesign': 'Sys Design',
+  'tab.git': 'Git Internals',
   'source.code': 'Source Code',
   'examples': 'Examples',
   'compile': 'Compile',
@@ -79,10 +85,11 @@ const en: Record<string, string> = {
 const dicts: Record<Lang, Record<string, string>> = { zh, en }
 
 export function LangProvider({ children }: { children: ReactNode }) {
-  const [lang, setLang] = useState<Lang>('zh')
+  const [lang, setLang] = useState<Lang>(() => (localStorage.getItem('ui-lang') as Lang) || 'zh')
+  const setLangPersist = (l: Lang) => { setLang(l); localStorage.setItem('ui-lang', l) }
   const t = (key: string) => dicts[lang][key] || key
   return (
-    <LangContext.Provider value={{ lang, setLang, t }}>
+    <LangContext.Provider value={{ lang, setLang: setLangPersist, t }}>
       {children}
     </LangContext.Provider>
   )
