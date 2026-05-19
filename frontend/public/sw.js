@@ -1,4 +1,4 @@
-const CACHE = 'deepcode-v1'
+const CACHE = 'deepcode-v2'
 const STATIC = [
   '/',
   '/index.html',

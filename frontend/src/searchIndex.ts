@@ -210,8 +210,8 @@ export const SEARCH_INDEX: SearchEntry[] = [
     keywords: 'replication sharding master replica raft paxos 主从复制 分片' },
   { tab: 'database', topicId: 'index2', title_zh: '索引类型', title_en: 'Index Types',
     keywords: 'clustered nonclustered hash fulltext spatial bitmap primary 二级索引' },
-  { tab: 'objectbus', topicId: '', title_zh: '三总线虚拟电路', title_en: '3-Bus Virtual Circuit',
-    keywords: 'bus address data control 总线 地址 数据 控制 virtual circuit 虚拟电路 module object method call cpp class vtable polymorphism' },
+  { tab: 'objectbus', topicId: '', title_zh: '对象总线分析器', title_en: 'Object Bus Analyzer',
+    keywords: 'bus address data control 总线 地址 数据 控制 virtual circuit 虚拟电路 module object method call cpp class vtable polymorphism code analysis 分析 caller callee' },
 ]
 
 export function searchEntries(query: string, lang: 'zh' | 'en'): SearchEntry[] {
