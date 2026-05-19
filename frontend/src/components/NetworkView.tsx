@@ -1,28 +1,33 @@
 import { useState } from 'react'
 import { useMobile } from '../hooks/useMobile'
+import { useLang } from '../i18n/lang'
 
 type Layer = 'app' | 'transport' | 'network' | 'link' | 'physical'
 
 interface Protocol {
   id: string; name: string; layer: Layer; color: string
-  fields: { name: string; bits: number; desc: string; value?: string }[]
+  fields: { name: string; bits: number; desc: string; desc_en: string; value?: string }[]
   desc: string
+  desc_en: string
   code?: string
   codeTitle?: string
+  codeTitle_en?: string
 }
 
 const PROTOCOLS: Protocol[] = [
   {
     id: 'http', name: 'HTTP/1.1', layer: 'app', color: '#4d8fff',
     desc: '超文本传输协议，无状态请求/响应，基于 TCP，端口 80',
+    desc_en: 'Hypertext Transfer Protocol, stateless request/response, TCP-based, port 80',
     fields: [
-      { name: 'Method',  bits: 0, desc: 'GET/POST/PUT/DELETE', value: 'GET' },
-      { name: 'URI',     bits: 0, desc: '资源路径', value: '/index.html' },
-      { name: 'Version', bits: 0, desc: 'HTTP 版本', value: 'HTTP/1.1' },
-      { name: 'Headers', bits: 0, desc: 'Host, Content-Type 等', value: 'Host: example.com' },
-      { name: 'Body',    bits: 0, desc: '请求/响应正文', value: '(empty)' },
+      { name: 'Method',  bits: 0, desc: 'GET/POST/PUT/DELETE', desc_en: 'GET/POST/PUT/DELETE', value: 'GET' },
+      { name: 'URI',     bits: 0, desc: '资源路径', desc_en: 'Resource path', value: '/index.html' },
+      { name: 'Version', bits: 0, desc: 'HTTP 版本', desc_en: 'HTTP version', value: 'HTTP/1.1' },
+      { name: 'Headers', bits: 0, desc: 'Host, Content-Type 等', desc_en: 'Host, Content-Type, etc.', value: 'Host: example.com' },
+      { name: 'Body',    bits: 0, desc: '请求/响应正文', desc_en: 'Request/response body', value: '(empty)' },
     ],
     codeTitle: 'HTTP 服务器 (C — POSIX socket)',
+    codeTitle_en: 'HTTP Server (C — POSIX socket)',
     code: `/* 极简 HTTP/1.1 服务器 — 返回 "Hello World" */
 #include <stdio.h>
 #include <string.h>
@@ -68,15 +73,17 @@ int main(void) {
   {
     id: 'dns', name: 'DNS', layer: 'app', color: '#4d8fff',
     desc: '域名解析，UDP 端口 53，将域名转为 IP 地址',
+    desc_en: 'Domain name resolution, UDP port 53, resolves domain names to IP addresses',
     fields: [
-      { name: 'Transaction ID', bits: 16, desc: '标识请求与响应', value: '0x1A2B' },
-      { name: 'Flags',          bits: 16, desc: 'QR/Opcode/AA/TC/RD/RA', value: '0x0100' },
-      { name: 'Questions',      bits: 16, desc: '查询记录数', value: '1' },
-      { name: 'Answers',        bits: 16, desc: '回答记录数', value: '0' },
-      { name: 'QNAME',          bits: 0,  desc: '查询域名', value: 'example.com' },
-      { name: 'QTYPE',          bits: 16, desc: 'A/AAAA/MX/CNAME', value: 'A (1)' },
+      { name: 'Transaction ID', bits: 16, desc: '标识请求与响应', desc_en: 'Identifies request and response', value: '0x1A2B' },
+      { name: 'Flags',          bits: 16, desc: 'QR/Opcode/AA/TC/RD/RA', desc_en: 'QR/Opcode/AA/TC/RD/RA', value: '0x0100' },
+      { name: 'Questions',      bits: 16, desc: '查询记录数', desc_en: 'Number of question entries', value: '1' },
+      { name: 'Answers',        bits: 16, desc: '回答记录数', desc_en: 'Number of answer entries', value: '0' },
+      { name: 'QNAME',          bits: 0,  desc: '查询域名', desc_en: 'Query domain name', value: 'example.com' },
+      { name: 'QTYPE',          bits: 16, desc: 'A/AAAA/MX/CNAME', desc_en: 'A/AAAA/MX/CNAME', value: 'A (1)' },
     ],
     codeTitle: 'DNS A 查询 (C — 原始 UDP)',
+    codeTitle_en: 'DNS A Query (C — Raw UDP)',
     code: `/* 手写 DNS A记录查询报文，解析响应 IP */
 #include <stdio.h>
 #include <string.h>
@@ -144,15 +151,17 @@ int main(void) {
   {
     id: 'rtsp', name: 'RTSP', layer: 'app', color: '#4d8fff',
     desc: '实时流传输协议，端口554，控制音视频流（监控/直播），媒体数据由 RTP 传输',
+    desc_en: 'Real-Time Streaming Protocol, port 554, controls audio/video streams (surveillance/live), media data transported via RTP',
     fields: [
-      { name: 'Method',    bits: 0, desc: 'DESCRIBE/SETUP/PLAY/PAUSE/TEARDOWN', value: 'DESCRIBE' },
-      { name: 'URL',       bits: 0, desc: 'rtsp://host:554/live/stream', value: 'rtsp://cam.local/ch0' },
-      { name: 'RTSP-Ver',  bits: 0, desc: '协议版本', value: 'RTSP/1.0' },
-      { name: 'CSeq',      bits: 0, desc: '序列号（每请求递增）', value: 'CSeq: 1' },
-      { name: 'Session',   bits: 0, desc: 'SETUP后服务端分配会话ID', value: 'Session: 12345678' },
-      { name: 'Transport', bits: 0, desc: 'RTP传输参数（端口/UDP/TCP）', value: 'RTP/AVP;unicast;client_port=5000-5001' },
+      { name: 'Method',    bits: 0, desc: 'DESCRIBE/SETUP/PLAY/PAUSE/TEARDOWN', desc_en: 'DESCRIBE/SETUP/PLAY/PAUSE/TEARDOWN', value: 'DESCRIBE' },
+      { name: 'URL',       bits: 0, desc: 'rtsp://host:554/live/stream', desc_en: 'rtsp://host:554/live/stream', value: 'rtsp://cam.local/ch0' },
+      { name: 'RTSP-Ver',  bits: 0, desc: '协议版本', desc_en: 'Protocol version', value: 'RTSP/1.0' },
+      { name: 'CSeq',      bits: 0, desc: '序列号（每请求递增）', desc_en: 'Sequence number (increments per request)', value: 'CSeq: 1' },
+      { name: 'Session',   bits: 0, desc: 'SETUP后服务端分配会话ID', desc_en: 'Session ID assigned by server after SETUP', value: 'Session: 12345678' },
+      { name: 'Transport', bits: 0, desc: 'RTP传输参数（端口/UDP/TCP）', desc_en: 'RTP transport parameters (port/UDP/TCP)', value: 'RTP/AVP;unicast;client_port=5000-5001' },
     ],
     codeTitle: 'RTSP 客户端 DESCRIBE+PLAY (C — TCP socket)',
+    codeTitle_en: 'RTSP Client DESCRIBE+PLAY (C — TCP socket)',
     code: `/* RTSP 完整流程: DESCRIBE → SETUP → PLAY → (接收RTP) → TEARDOWN */
 #include <stdio.h>
 #include <string.h>
@@ -242,16 +251,18 @@ int main(void) {
   {
     id: 'sip', name: 'SIP', layer: 'app', color: '#4d8fff',
     desc: '会话初始化协议，端口5060(UDP/TCP)，用于VoIP/视频通话信令，媒体由RTP传输',
+    desc_en: 'Session Initiation Protocol, port 5060 (UDP/TCP), used for VoIP/video call signaling, media transported via RTP',
     fields: [
-      { name: 'Request-Line', bits: 0, desc: 'INVITE/REGISTER/BYE/ACK/CANCEL/OPTIONS', value: 'INVITE sip:bob@domain.com SIP/2.0' },
-      { name: 'Via',         bits: 0, desc: '路由路径，含Branch参数', value: 'Via: SIP/2.0/UDP 192.168.1.10;branch=z9hG4bK776' },
-      { name: 'From',        bits: 0, desc: '主叫，含tag', value: 'From: <sip:alice@domain.com>;tag=1928301774' },
-      { name: 'To',          bits: 0, desc: '被叫', value: 'To: <sip:bob@domain.com>' },
-      { name: 'Call-ID',     bits: 0, desc: '唯一会话标识', value: 'Call-ID: a84b4c76e66710@pc33.atlanta.com' },
-      { name: 'CSeq',        bits: 0, desc: '序列号+方法', value: 'CSeq: 314159 INVITE' },
-      { name: 'Content-Type',bits: 0, desc: 'SDP媒体描述', value: 'Content-Type: application/sdp' },
+      { name: 'Request-Line', bits: 0, desc: 'INVITE/REGISTER/BYE/ACK/CANCEL/OPTIONS', desc_en: 'INVITE/REGISTER/BYE/ACK/CANCEL/OPTIONS', value: 'INVITE sip:bob@domain.com SIP/2.0' },
+      { name: 'Via',         bits: 0, desc: '路由路径，含Branch参数', desc_en: 'Routing path, includes Branch parameter', value: 'Via: SIP/2.0/UDP 192.168.1.10;branch=z9hG4bK776' },
+      { name: 'From',        bits: 0, desc: '主叫，含tag', desc_en: 'Caller, includes tag', value: 'From: <sip:alice@domain.com>;tag=1928301774' },
+      { name: 'To',          bits: 0, desc: '被叫', desc_en: 'Callee', value: 'To: <sip:bob@domain.com>' },
+      { name: 'Call-ID',     bits: 0, desc: '唯一会话标识', desc_en: 'Unique session identifier', value: 'Call-ID: a84b4c76e66710@pc33.atlanta.com' },
+      { name: 'CSeq',        bits: 0, desc: '序列号+方法', desc_en: 'Sequence number + method', value: 'CSeq: 314159 INVITE' },
+      { name: 'Content-Type',bits: 0, desc: 'SDP媒体描述', desc_en: 'SDP media description', value: 'Content-Type: application/sdp' },
     ],
     codeTitle: 'SIP REGISTER + INVITE (C — UDP socket)',
+    codeTitle_en: 'SIP REGISTER + INVITE (C — UDP socket)',
     code: `/* SIP 信令演示: REGISTER 注册 + INVITE 发起通话 */
 #include <stdio.h>
 #include <string.h>
@@ -357,16 +368,18 @@ int main(void) {
   {
     id: 'websocket', name: 'WebSocket', layer: 'app', color: '#4d8fff',
     desc: '全双工长连接，基于HTTP升级握手，帧格式紧凑，适合实时推送（聊天/行情/游戏）',
+    desc_en: 'Full-duplex persistent connection, based on HTTP upgrade handshake, compact frame format, ideal for real-time push (chat/market data/games)',
     fields: [
-      { name: 'FIN',        bits: 1,  desc: '最终帧标志', value: '1' },
-      { name: 'RSV1-3',     bits: 3,  desc: '扩展保留位', value: '0' },
-      { name: 'Opcode',     bits: 4,  desc: '0x1=文本 0x2=二进制 0x8=关闭 0x9=Ping', value: '0x1' },
-      { name: 'MASK',       bits: 1,  desc: '客户端→服务端必须为1（掩码）', value: '1' },
-      { name: 'Payload Len',bits: 7,  desc: '0-125直接；126用额外2B；127用额外8B', value: '5' },
-      { name: 'Masking Key',bits: 32, desc: '4字节掩码（仅客户端发送时有）', value: '0x37fa213d' },
-      { name: 'Payload',    bits: 0,  desc: '经掩码XOR的数据', value: 'Hello' },
+      { name: 'FIN',        bits: 1,  desc: '最终帧标志', desc_en: 'Final frame flag', value: '1' },
+      { name: 'RSV1-3',     bits: 3,  desc: '扩展保留位', desc_en: 'Extension reserved bits', value: '0' },
+      { name: 'Opcode',     bits: 4,  desc: '0x1=文本 0x2=二进制 0x8=关闭 0x9=Ping', desc_en: '0x1=text 0x2=binary 0x8=close 0x9=Ping', value: '0x1' },
+      { name: 'MASK',       bits: 1,  desc: '客户端→服务端必须为1（掩码）', desc_en: 'Client→server must be 1 (masking)', value: '1' },
+      { name: 'Payload Len',bits: 7,  desc: '0-125直接；126用额外2B；127用额外8B', desc_en: '0-125 direct; 126 uses extra 2B; 127 uses extra 8B', value: '5' },
+      { name: 'Masking Key',bits: 32, desc: '4字节掩码（仅客户端发送时有）', desc_en: '4-byte mask key (only present in client frames)', value: '0x37fa213d' },
+      { name: 'Payload',    bits: 0,  desc: '经掩码XOR的数据', desc_en: 'Data XOR-masked with masking key', value: 'Hello' },
     ],
     codeTitle: 'WebSocket 服务端 (C — HTTP升级+帧解析)',
+    codeTitle_en: 'WebSocket Server (C — HTTP Upgrade + Frame Parsing)',
     code: `/* WebSocket 服务器：HTTP升级握手 + 文本帧收发 */
 #include <stdio.h>
 #include <string.h>
@@ -467,15 +480,17 @@ int main(void) {
   {
     id: 'mqtt', name: 'MQTT', layer: 'app', color: '#4d8fff',
     desc: '轻量消息队列遥测传输，发布/订阅模式，端口1883(明文)/8883(TLS)，适合IoT设备',
+    desc_en: 'Lightweight Message Queue Telemetry Transport, publish/subscribe pattern, port 1883 (plain)/8883 (TLS), designed for IoT devices',
     fields: [
-      { name: 'Fixed Header',  bits: 8,  desc: 'Packet Type(4b)+Flags(4b)', value: '0x30 (PUBLISH)' },
-      { name: 'Remaining Len', bits: 8,  desc: '可变长编码，剩余字节数', value: '17' },
-      { name: 'Topic Len',     bits: 16, desc: '主题名长度', value: '9' },
-      { name: 'Topic',         bits: 0,  desc: '主题名 (UTF-8)', value: 'sensor/temp' },
-      { name: 'Packet ID',     bits: 16, desc: 'QoS>0时存在', value: '—' },
-      { name: 'Payload',       bits: 0,  desc: '消息内容', value: '{"t":25.6}' },
+      { name: 'Fixed Header',  bits: 8,  desc: 'Packet Type(4b)+Flags(4b)', desc_en: 'Packet Type(4b)+Flags(4b)', value: '0x30 (PUBLISH)' },
+      { name: 'Remaining Len', bits: 8,  desc: '可变长编码，剩余字节数', desc_en: 'Variable-length encoding, remaining byte count', value: '17' },
+      { name: 'Topic Len',     bits: 16, desc: '主题名长度', desc_en: 'Topic name length', value: '9' },
+      { name: 'Topic',         bits: 0,  desc: '主题名 (UTF-8)', desc_en: 'Topic name (UTF-8)', value: 'sensor/temp' },
+      { name: 'Packet ID',     bits: 16, desc: 'QoS>0时存在', desc_en: 'Present when QoS > 0', value: '—' },
+      { name: 'Payload',       bits: 0,  desc: '消息内容', desc_en: 'Message payload', value: '{"t":25.6}' },
     ],
     codeTitle: 'MQTT CONNECT+PUBLISH+SUBSCRIBE (C — 原始TCP)',
+    codeTitle_en: 'MQTT CONNECT+PUBLISH+SUBSCRIBE (C — Raw TCP)',
     code: `/* MQTT 3.1.1 手写报文：CONNECT → SUBSCRIBE → PUBLISH */
 #include <stdio.h>
 #include <string.h>
@@ -580,17 +595,19 @@ int main(void) {
   {
     id: 'tcp', name: 'TCP', layer: 'transport', color: '#3fb950',
     desc: '传输控制协议，可靠有序，面向连接，三次握手建立',
+    desc_en: 'Transmission Control Protocol, reliable and ordered, connection-oriented, established via three-way handshake',
     fields: [
-      { name: 'Src Port',    bits: 16, desc: '源端口',  value: '54321' },
-      { name: 'Dst Port',    bits: 16, desc: '目标端口', value: '80' },
-      { name: 'Seq Num',     bits: 32, desc: '序列号',  value: '1000' },
-      { name: 'Ack Num',     bits: 32, desc: '确认号',  value: '0' },
-      { name: 'Data Offset', bits: 4,  desc: '首部长度（×4字节）', value: '5' },
-      { name: 'Flags',       bits: 6,  desc: 'SYN/ACK/FIN/RST/PSH/URG', value: 'SYN' },
-      { name: 'Window',      bits: 16, desc: '接收窗口大小', value: '65535' },
-      { name: 'Checksum',    bits: 16, desc: '校验和', value: '0xA1B2' },
+      { name: 'Src Port',    bits: 16, desc: '源端口',  desc_en: 'Source port', value: '54321' },
+      { name: 'Dst Port',    bits: 16, desc: '目标端口', desc_en: 'Destination port', value: '80' },
+      { name: 'Seq Num',     bits: 32, desc: '序列号',  desc_en: 'Sequence number', value: '1000' },
+      { name: 'Ack Num',     bits: 32, desc: '确认号',  desc_en: 'Acknowledgment number', value: '0' },
+      { name: 'Data Offset', bits: 4,  desc: '首部长度（×4字节）', desc_en: 'Header length (×4 bytes)', value: '5' },
+      { name: 'Flags',       bits: 6,  desc: 'SYN/ACK/FIN/RST/PSH/URG', desc_en: 'SYN/ACK/FIN/RST/PSH/URG', value: 'SYN' },
+      { name: 'Window',      bits: 16, desc: '接收窗口大小', desc_en: 'Receive window size', value: '65535' },
+      { name: 'Checksum',    bits: 16, desc: '校验和', desc_en: 'Checksum', value: '0xA1B2' },
     ],
     codeTitle: 'TCP Echo 服务器 (C — POSIX socket)',
+    codeTitle_en: 'TCP Echo Server (C — POSIX socket)',
     code: `/* TCP Echo 服务器：三次握手 + 接收回显 + 四次挥手 */
 #include <stdio.h>
 #include <string.h>
@@ -641,55 +658,59 @@ int main(void) {
   {
     id: 'udp', name: 'UDP', layer: 'transport', color: '#3fb950',
     desc: '用户数据报协议，无连接无可靠性，低延迟，适合实时应用',
+    desc_en: 'User Datagram Protocol, connectionless and unreliable, low latency, suitable for real-time applications',
     fields: [
-      { name: 'Src Port', bits: 16, desc: '源端口',  value: '12345' },
-      { name: 'Dst Port', bits: 16, desc: '目标端口', value: '53' },
-      { name: 'Length',   bits: 16, desc: '数据报长度（首部+数据）', value: '28' },
-      { name: 'Checksum', bits: 16, desc: '校验和（可选）', value: '0x0000' },
-      { name: 'Data',     bits: 0,  desc: '应用层数据', value: 'DNS query...' },
+      { name: 'Src Port', bits: 16, desc: '源端口',  desc_en: 'Source port', value: '12345' },
+      { name: 'Dst Port', bits: 16, desc: '目标端口', desc_en: 'Destination port', value: '53' },
+      { name: 'Length',   bits: 16, desc: '数据报长度（首部+数据）', desc_en: 'Datagram length (header + data)', value: '28' },
+      { name: 'Checksum', bits: 16, desc: '校验和（可选）', desc_en: 'Checksum (optional)', value: '0x0000' },
+      { name: 'Data',     bits: 0,  desc: '应用层数据', desc_en: 'Application layer data', value: 'DNS query...' },
     ],
   },
   {
     id: 'ipv4', name: 'IPv4', layer: 'network', color: '#ffa657',
     desc: '网际协议第4版，32位地址，分片重组，TTL 防环路',
+    desc_en: 'Internet Protocol version 4, 32-bit addressing, fragmentation/reassembly, TTL prevents routing loops',
     fields: [
-      { name: 'Version',  bits: 4,  desc: '协议版本', value: '4' },
-      { name: 'IHL',      bits: 4,  desc: '首部长度（×4字节）', value: '5' },
-      { name: 'DSCP/ECN', bits: 8,  desc: '服务类型/拥塞通知', value: '0x00' },
-      { name: 'Total Len',bits: 16, desc: '总长度', value: '60' },
-      { name: 'ID',       bits: 16, desc: '分片标识', value: '0x1234' },
-      { name: 'Flags',    bits: 3,  desc: 'DF/MF 标志位', value: 'DF' },
-      { name: 'Frag Off', bits: 13, desc: '分片偏移', value: '0' },
-      { name: 'TTL',      bits: 8,  desc: '生存时间', value: '64' },
-      { name: 'Protocol', bits: 8,  desc: '上层协议 (6=TCP, 17=UDP)', value: '6' },
-      { name: 'Checksum', bits: 16, desc: '首部校验和', value: '0xB1C2' },
-      { name: 'Src IP',   bits: 32, desc: '源 IP 地址', value: '192.168.1.100' },
-      { name: 'Dst IP',   bits: 32, desc: '目标 IP 地址', value: '93.184.216.34' },
+      { name: 'Version',  bits: 4,  desc: '协议版本', desc_en: 'Protocol version', value: '4' },
+      { name: 'IHL',      bits: 4,  desc: '首部长度（×4字节）', desc_en: 'Header length (×4 bytes)', value: '5' },
+      { name: 'DSCP/ECN', bits: 8,  desc: '服务类型/拥塞通知', desc_en: 'Differentiated services / congestion notification', value: '0x00' },
+      { name: 'Total Len',bits: 16, desc: '总长度', desc_en: 'Total length', value: '60' },
+      { name: 'ID',       bits: 16, desc: '分片标识', desc_en: 'Fragment identifier', value: '0x1234' },
+      { name: 'Flags',    bits: 3,  desc: 'DF/MF 标志位', desc_en: 'DF/MF flag bits', value: 'DF' },
+      { name: 'Frag Off', bits: 13, desc: '分片偏移', desc_en: 'Fragment offset', value: '0' },
+      { name: 'TTL',      bits: 8,  desc: '生存时间', desc_en: 'Time to live', value: '64' },
+      { name: 'Protocol', bits: 8,  desc: '上层协议 (6=TCP, 17=UDP)', desc_en: 'Upper-layer protocol (6=TCP, 17=UDP)', value: '6' },
+      { name: 'Checksum', bits: 16, desc: '首部校验和', desc_en: 'Header checksum', value: '0xB1C2' },
+      { name: 'Src IP',   bits: 32, desc: '源 IP 地址', desc_en: 'Source IP address', value: '192.168.1.100' },
+      { name: 'Dst IP',   bits: 32, desc: '目标 IP 地址', desc_en: 'Destination IP address', value: '93.184.216.34' },
     ],
   },
   {
     id: 'eth', name: 'Ethernet II', layer: 'link', color: '#e3b341',
     desc: '以太网帧，IEEE 802.3，48位 MAC 地址，MTU 1500字节',
+    desc_en: 'Ethernet frame, IEEE 802.3, 48-bit MAC address, MTU 1500 bytes',
     fields: [
-      { name: 'Dst MAC',   bits: 48, desc: '目标 MAC 地址', value: 'aa:bb:cc:dd:ee:ff' },
-      { name: 'Src MAC',   bits: 48, desc: '源 MAC 地址', value: '11:22:33:44:55:66' },
-      { name: 'EtherType', bits: 16, desc: '上层协议 (0x0800=IPv4, 0x0806=ARP)', value: '0x0800' },
-      { name: 'Payload',   bits: 0,  desc: 'IP 数据报（46-1500字节）', value: 'IPv4 packet...' },
-      { name: 'FCS',       bits: 32, desc: '帧校验序列 (CRC-32)', value: '0x12345678' },
+      { name: 'Dst MAC',   bits: 48, desc: '目标 MAC 地址', desc_en: 'Destination MAC address', value: 'aa:bb:cc:dd:ee:ff' },
+      { name: 'Src MAC',   bits: 48, desc: '源 MAC 地址', desc_en: 'Source MAC address', value: '11:22:33:44:55:66' },
+      { name: 'EtherType', bits: 16, desc: '上层协议 (0x0800=IPv4, 0x0806=ARP)', desc_en: 'Upper-layer protocol (0x0800=IPv4, 0x0806=ARP)', value: '0x0800' },
+      { name: 'Payload',   bits: 0,  desc: 'IP 数据报（46-1500字节）', desc_en: 'IP datagram (46-1500 bytes)', value: 'IPv4 packet...' },
+      { name: 'FCS',       bits: 32, desc: '帧校验序列 (CRC-32)', desc_en: 'Frame check sequence (CRC-32)', value: '0x12345678' },
     ],
   },
   // ── TLS / HTTPS ──────────────────────────────────────────────────────────────
   {
     id: 'tls', name: 'TLS 1.3', layer: 'app', color: '#56d364',
     desc: 'TLS 1.3 安全传输层：握手→密钥协商→对称加密，HTTPS = HTTP over TLS，端口 443',
+    desc_en: 'TLS 1.3 secure transport: handshake → key agreement → symmetric encryption, HTTPS = HTTP over TLS, port 443',
     fields: [
-      { name: 'ContentType', bits: 8,  desc: '记录类型: 22=握手 20=ChangeCipherSpec 23=应用数据', value: '22' },
-      { name: 'Version',     bits: 16, desc: 'TLS 版本（TLS1.3报文仍写0x0303兼容）', value: '0x0303' },
-      { name: 'Length',      bits: 16, desc: '记录数据长度', value: '512' },
-      { name: 'HandshakeType',bits:8,  desc: '1=ClientHello 2=ServerHello 8=EncryptedExtensions 11=Certificate 15=CertVerify 20=Finished', value: '1' },
-      { name: 'CipherSuite', bits: 16, desc: 'TLS_AES_128_GCM_SHA256 / TLS_AES_256_GCM_SHA384', value: '0x1301' },
-      { name: 'KeyShare',    bits: 0,  desc: 'ECDHE 公钥 (x25519)，TLS1.3 在 ClientHello 直接携带', value: 'x25519 pubkey' },
-      { name: 'AppData',     bits: 0,  desc: '加密后的应用数据（AEAD: AES-GCM 或 ChaCha20-Poly1305）', value: 'encrypted...' },
+      { name: 'ContentType', bits: 8,  desc: '记录类型: 22=握手 20=ChangeCipherSpec 23=应用数据', desc_en: 'Record type: 22=handshake 20=ChangeCipherSpec 23=app data', value: '22' },
+      { name: 'Version',     bits: 16, desc: 'TLS 版本（TLS1.3报文仍写0x0303兼容）', desc_en: 'TLS version (TLS1.3 writes 0x0303 for compatibility)', value: '0x0303' },
+      { name: 'Length',      bits: 16, desc: '记录数据长度', desc_en: 'Record data length', value: '512' },
+      { name: 'HandshakeType',bits:8,  desc: '1=ClientHello 2=ServerHello 8=EncryptedExtensions 11=Certificate 15=CertVerify 20=Finished', desc_en: '1=ClientHello 2=ServerHello 8=EncryptedExtensions 11=Certificate 15=CertVerify 20=Finished', value: '1' },
+      { name: 'CipherSuite', bits: 16, desc: 'TLS_AES_128_GCM_SHA256 / TLS_AES_256_GCM_SHA384', desc_en: 'TLS_AES_128_GCM_SHA256 / TLS_AES_256_GCM_SHA384', value: '0x1301' },
+      { name: 'KeyShare',    bits: 0,  desc: 'ECDHE 公钥 (x25519)，TLS1.3 在 ClientHello 直接携带', desc_en: 'ECDHE public key (x25519), carried in ClientHello in TLS1.3', value: 'x25519 pubkey' },
+      { name: 'AppData',     bits: 0,  desc: '加密后的应用数据（AEAD: AES-GCM 或 ChaCha20-Poly1305）', desc_en: 'Encrypted application data (AEAD: AES-GCM or ChaCha20-Poly1305)', value: 'encrypted...' },
     ],
     codeTitle: 'TLS 握手流程 (C — OpenSSL)',
     code: `/* TLS 1.3 HTTPS 客户端 — OpenSSL */
@@ -762,12 +783,13 @@ int main(void) {
   {
     id: 'http2', name: 'HTTP/2', layer: 'app', color: '#a371f7',
     desc: 'HTTP/2 二进制分帧：多路复用、头部压缩(HPACK)、服务器推送，基于 TLS，端口 443',
+    desc_en: 'HTTP/2 binary framing: multiplexing, header compression (HPACK), server push, over TLS, port 443',
     fields: [
-      { name: 'Length',     bits: 24, desc: '帧 Payload 长度（字节）', value: '256' },
-      { name: 'Type',       bits: 8,  desc: '帧类型: 0=DATA 1=HEADERS 4=SETTINGS 8=WINDOW_UPDATE', value: '1' },
-      { name: 'Flags',      bits: 8,  desc: 'END_STREAM(0x1) END_HEADERS(0x4) PADDED(0x8)', value: '0x05' },
-      { name: 'Stream ID',  bits: 32, desc: '流标识符（奇数=客户端，偶数=服务端），0=连接级', value: '1' },
-      { name: 'Payload',    bits: 0,  desc: 'HEADERS帧: HPACK压缩的头部块; DATA帧: 请求/响应体', value: 'HPACK headers...' },
+      { name: 'Length',     bits: 24, desc: '帧 Payload 长度（字节）', desc_en: 'Frame payload length (bytes)', value: '256' },
+      { name: 'Type',       bits: 8,  desc: '帧类型: 0=DATA 1=HEADERS 4=SETTINGS 8=WINDOW_UPDATE', desc_en: 'Frame type: 0=DATA 1=HEADERS 4=SETTINGS 8=WINDOW_UPDATE', value: '1' },
+      { name: 'Flags',      bits: 8,  desc: 'END_STREAM(0x1) END_HEADERS(0x4) PADDED(0x8)', desc_en: 'END_STREAM(0x1) END_HEADERS(0x4) PADDED(0x8)', value: '0x05' },
+      { name: 'Stream ID',  bits: 32, desc: '流标识符（奇数=客户端，偶数=服务端），0=连接级', desc_en: 'Stream ID (odd=client, even=server), 0=connection-level', value: '1' },
+      { name: 'Payload',    bits: 0,  desc: 'HEADERS帧: HPACK压缩的头部块; DATA帧: 请求/响应体', desc_en: 'HEADERS: HPACK-compressed headers; DATA: request/response body', value: 'HPACK headers...' },
     ],
     codeTitle: 'HTTP/2 vs HTTP/1.1 对比 (C — nghttp2)',
     code: `/* HTTP/2 客户端 — nghttp2 库
@@ -828,15 +850,16 @@ int main(void) {
   {
     id: 'grpc', name: 'gRPC', layer: 'app', color: '#f0883e',
     desc: 'Google RPC 框架：Protobuf 序列化 + HTTP/2 传输，强类型接口，跨语言，高性能微服务',
+    desc_en: 'Google RPC framework: Protobuf serialization + HTTP/2 transport, strongly typed interfaces, cross-language, high-performance microservices',
     fields: [
-      { name: 'HTTP/2 Frame', bits: 0,  desc: 'gRPC 复用 HTTP/2 帧层', value: 'HEADERS+DATA' },
-      { name: ':method',      bits: 0,  desc: '固定 POST', value: 'POST' },
-      { name: ':path',        bits: 0,  desc: '/PackageName.ServiceName/MethodName', value: '/helloworld.Greeter/SayHello' },
-      { name: 'content-type', bits: 0,  desc: 'gRPC 内容类型', value: 'application/grpc' },
-      { name: 'Compressed',   bits: 8,  desc: '0=无压缩 1=压缩（grpc-encoding）', value: '0' },
-      { name: 'Message Len',  bits: 32, desc: 'Protobuf 消息字节长度', value: '15' },
-      { name: 'Protobuf Msg', bits: 0,  desc: 'Protocol Buffers 二进制编码的请求/响应', value: '\\x0a\\x0bHello World' },
-      { name: 'grpc-status',  bits: 0,  desc: '响应 trailer: 0=OK, 2=UNKNOWN, 12=UNIMPLEMENTED', value: '0' },
+      { name: 'HTTP/2 Frame', bits: 0,  desc: 'gRPC 复用 HTTP/2 帧层', desc_en: 'gRPC reuses HTTP/2 frame layer', value: 'HEADERS+DATA' },
+      { name: ':method',      bits: 0,  desc: '固定 POST', desc_en: 'Always POST', value: 'POST' },
+      { name: ':path',        bits: 0,  desc: '/PackageName.ServiceName/MethodName', desc_en: '/PackageName.ServiceName/MethodName', value: '/helloworld.Greeter/SayHello' },
+      { name: 'content-type', bits: 0,  desc: 'gRPC 内容类型', desc_en: 'gRPC content type', value: 'application/grpc' },
+      { name: 'Compressed',   bits: 8,  desc: '0=无压缩 1=压缩（grpc-encoding）', desc_en: '0=uncompressed 1=compressed (grpc-encoding)', value: '0' },
+      { name: 'Message Len',  bits: 32, desc: 'Protobuf 消息字节长度', desc_en: 'Protobuf message byte length', value: '15' },
+      { name: 'Protobuf Msg', bits: 0,  desc: 'Protocol Buffers 二进制编码的请求/响应', desc_en: 'Protocol Buffers binary-encoded request/response', value: '\\x0a\\x0bHello World' },
+      { name: 'grpc-status',  bits: 0,  desc: '响应 trailer: 0=OK, 2=UNKNOWN, 12=UNIMPLEMENTED', desc_en: 'Response trailer: 0=OK, 2=UNKNOWN, 12=UNIMPLEMENTED', value: '0' },
     ],
     codeTitle: 'gRPC 定义 & C++ 实现',
     code: `/* gRPC 完整示例：Protobuf 定义 + 服务端 + 客户端 */
@@ -905,16 +928,17 @@ int main() {
   {
     id: 'dhcp', name: 'DHCP', layer: 'app', color: '#79c0ff',
     desc: 'DHCP 动态主机配置：4步DORA租约(Discover→Offer→Request→ACK)，UDP 67/68端口',
+    desc_en: 'DHCP dynamic host configuration: 4-step DORA lease (Discover→Offer→Request→ACK), UDP ports 67/68',
     fields: [
-      { name: 'op',      bits: 8,  desc: '消息类型: 1=BOOTREQUEST 2=BOOTREPLY', value: '1' },
-      { name: 'htype',   bits: 8,  desc: '硬件类型: 1=Ethernet', value: '1' },
-      { name: 'hlen',    bits: 8,  desc: '硬件地址长度 (MAC=6)', value: '6' },
-      { name: 'xid',     bits: 32, desc: '事务ID，客户端随机生成匹配请求响应', value: '0xA1B2C3D4' },
-      { name: 'ciaddr',  bits: 32, desc: '客户端当前 IP（无则 0.0.0.0）', value: '0.0.0.0' },
-      { name: 'yiaddr',  bits: 32, desc: '服务器分配给客户端的 IP (Your IP)', value: '192.168.1.100' },
-      { name: 'siaddr',  bits: 32, desc: '下一跳引导服务器 IP', value: '192.168.1.1' },
-      { name: 'chaddr',  bits: 128,desc: '客户端 MAC 地址（16字节，不足补0）', value: 'aa:bb:cc:dd:ee:ff' },
-      { name: 'options', bits: 0,  desc: 'Magic Cookie(63825363) + TLV 选项: 53=消息类型 1=子网掩码 3=网关 6=DNS 51=租期', value: '53:01:01 01:04:ff.. 3:04:c0..' },
+      { name: 'op',      bits: 8,  desc: '消息类型: 1=BOOTREQUEST 2=BOOTREPLY', desc_en: 'Message type: 1=BOOTREQUEST 2=BOOTREPLY', value: '1' },
+      { name: 'htype',   bits: 8,  desc: '硬件类型: 1=Ethernet', desc_en: 'Hardware type: 1=Ethernet', value: '1' },
+      { name: 'hlen',    bits: 8,  desc: '硬件地址长度 (MAC=6)', desc_en: 'Hardware address length (MAC=6)', value: '6' },
+      { name: 'xid',     bits: 32, desc: '事务ID，客户端随机生成匹配请求响应', desc_en: 'Transaction ID, random client-generated to match responses', value: '0xA1B2C3D4' },
+      { name: 'ciaddr',  bits: 32, desc: '客户端当前 IP（无则 0.0.0.0）', desc_en: 'Client current IP (0.0.0.0 if none)', value: '0.0.0.0' },
+      { name: 'yiaddr',  bits: 32, desc: '服务器分配给客户端的 IP (Your IP)', desc_en: 'Server-assigned client IP (Your IP)', value: '192.168.1.100' },
+      { name: 'siaddr',  bits: 32, desc: '下一跳引导服务器 IP', desc_en: 'Next-hop boot server IP', value: '192.168.1.1' },
+      { name: 'chaddr',  bits: 128,desc: '客户端 MAC 地址（16字节，不足补0）', desc_en: 'Client MAC address (16 bytes, zero-padded)', value: 'aa:bb:cc:dd:ee:ff' },
+      { name: 'options', bits: 0,  desc: 'Magic Cookie(63825363) + TLV 选项: 53=消息类型 1=子网掩码 3=网关 6=DNS 51=租期', desc_en: 'Magic Cookie(63825363) + TLV options: 53=msg type 1=subnet 3=gateway 6=DNS 51=lease', value: '53:01:01 01:04:ff.. 3:04:c0..' },
     ],
     codeTitle: 'DHCP DORA 流程 (C — 原始 UDP)',
     code: `/* DHCP Discover 报文构造 — 演示 DORA 4步握手 */
@@ -1007,13 +1031,14 @@ int main(void) {
   {
     id: 'icmp', name: 'ICMP', layer: 'network', color: '#ff7b72',
     desc: 'Internet 控制消息协议：ping(Echo)、traceroute(TTL超时)、路由不可达，IP协议号1',
+    desc_en: 'Internet Control Message Protocol: ping (Echo), traceroute (TTL exceeded), destination unreachable, IP proto 1',
     fields: [
-      { name: 'Type',     bits: 8,  desc: '消息类型: 0=Echo Reply 8=Echo Request 3=Dest Unreachable 11=TTL Exceeded', value: '8' },
-      { name: 'Code',     bits: 8,  desc: '子类型: Type=3时 0=Net 1=Host 3=Port Unreachable', value: '0' },
-      { name: 'Checksum', bits: 16, desc: 'ICMP 首部+数据校验和', value: '0x4F1E' },
-      { name: 'Identifier',bits:16, desc: 'Echo 标识符（进程 ID）', value: '0x1234' },
-      { name: 'Seq Num',  bits: 16, desc: '序列号，每次 ping 递增', value: '1' },
-      { name: 'Data',     bits: 0,  desc: '时间戳 + 填充数据（用于计算 RTT）', value: 'timestamp+pad' },
+      { name: 'Type',     bits: 8,  desc: '消息类型: 0=Echo Reply 8=Echo Request 3=Dest Unreachable 11=TTL Exceeded', desc_en: 'Message type: 0=Echo Reply 8=Echo Request 3=Dest Unreachable 11=TTL Exceeded', value: '8' },
+      { name: 'Code',     bits: 8,  desc: '子类型: Type=3时 0=Net 1=Host 3=Port Unreachable', desc_en: 'Subtype: when Type=3, 0=Net 1=Host 3=Port Unreachable', value: '0' },
+      { name: 'Checksum', bits: 16, desc: 'ICMP 首部+数据校验和', desc_en: 'ICMP header+data checksum', value: '0x4F1E' },
+      { name: 'Identifier',bits:16, desc: 'Echo 标识符（进程 ID）', desc_en: 'Echo identifier (process ID)', value: '0x1234' },
+      { name: 'Seq Num',  bits: 16, desc: '序列号，每次 ping 递增', desc_en: 'Sequence number, increments per ping', value: '1' },
+      { name: 'Data',     bits: 0,  desc: '时间戳 + 填充数据（用于计算 RTT）', desc_en: 'Timestamp + padding (used for RTT calculation)', value: 'timestamp+pad' },
     ],
     codeTitle: 'ping & traceroute 实现 (C — 原始套接字)',
     code: `/* ping + traceroute 原始实现 — 需要 root 权限 */
@@ -1109,16 +1134,17 @@ int main(void) {
   {
     id: 'arp', name: 'ARP', layer: 'link', color: '#d2a8ff',
     desc: 'ARP 地址解析协议：广播查询 IP→MAC，EtherType 0x0806，同子网通信必经步骤',
+    desc_en: 'ARP address resolution: broadcast query IP→MAC, EtherType 0x0806, required for same-subnet communication',
     fields: [
-      { name: 'HW Type',   bits: 16, desc: '硬件类型: 1=Ethernet', value: '0x0001' },
-      { name: 'Proto Type',bits: 16, desc: '协议类型: 0x0800=IPv4', value: '0x0800' },
-      { name: 'HW Len',    bits: 8,  desc: '硬件地址长度: 6 (MAC)', value: '6' },
-      { name: 'Proto Len', bits: 8,  desc: '协议地址长度: 4 (IPv4)', value: '4' },
-      { name: 'Operation', bits: 16, desc: '1=Request(广播) 2=Reply(单播)', value: '1' },
-      { name: 'Sender MAC',bits: 48, desc: '发送方 MAC 地址', value: 'aa:bb:cc:11:22:33' },
-      { name: 'Sender IP', bits: 32, desc: '发送方 IP 地址', value: '192.168.1.100' },
-      { name: 'Target MAC',bits: 48, desc: 'Request时全0(未知), Reply时填充', value: '00:00:00:00:00:00' },
-      { name: 'Target IP', bits: 32, desc: '目标 IP 地址（要查询的 IP）', value: '192.168.1.1' },
+      { name: 'HW Type',   bits: 16, desc: '硬件类型: 1=Ethernet', desc_en: 'Hardware type: 1=Ethernet', value: '0x0001' },
+      { name: 'Proto Type',bits: 16, desc: '协议类型: 0x0800=IPv4', desc_en: 'Protocol type: 0x0800=IPv4', value: '0x0800' },
+      { name: 'HW Len',    bits: 8,  desc: '硬件地址长度: 6 (MAC)', desc_en: 'Hardware address length: 6 (MAC)', value: '6' },
+      { name: 'Proto Len', bits: 8,  desc: '协议地址长度: 4 (IPv4)', desc_en: 'Protocol address length: 4 (IPv4)', value: '4' },
+      { name: 'Operation', bits: 16, desc: '1=Request(广播) 2=Reply(单播)', desc_en: '1=Request(broadcast) 2=Reply(unicast)', value: '1' },
+      { name: 'Sender MAC',bits: 48, desc: '发送方 MAC 地址', desc_en: 'Sender MAC address', value: 'aa:bb:cc:11:22:33' },
+      { name: 'Sender IP', bits: 32, desc: '发送方 IP 地址', desc_en: 'Sender IP address', value: '192.168.1.100' },
+      { name: 'Target MAC',bits: 48, desc: 'Request时全0(未知), Reply时填充', desc_en: 'All-zeros in Request (unknown), filled in Reply', value: '00:00:00:00:00:00' },
+      { name: 'Target IP', bits: 32, desc: '目标 IP 地址（要查询的 IP）', desc_en: 'Target IP address (the IP being queried)', value: '192.168.1.1' },
     ],
     codeTitle: 'ARP 请求/响应 (C — AF_PACKET 原始帧)',
     code: `/* ARP 请求发送 + 响应接收 — 原始以太网帧 */

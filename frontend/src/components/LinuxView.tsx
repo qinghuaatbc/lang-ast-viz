@@ -1,9 +1,10 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMobile } from '../hooks/useMobile'
+import { useLang } from '../i18n/lang'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-interface CmdEntry { cmd: string; desc: string; example: string; flags?: { flag: string; desc: string }[] }
+interface CmdEntry { cmd: string; desc: string; example: string; flags?: { flag: string; desc: string; desc_en?: string }[]; }
 interface IpcEntry  { name: string; icon: string; desc: string; pros: string; cons: string; code: string }
 interface StructField { name: string; type: string; desc: string }
 
@@ -14,19 +15,19 @@ const CMD_GROUPS: { label: string; icon: string; color: string; cmds: CmdEntry[]
     label: 'Process', icon: '⚙️', color: '#4d8fff',
     cmds: [
       { cmd: 'ps',          desc: 'List running processes (snapshot)',           example: 'ps aux | grep nginx',
-        flags: [{ flag: 'a', desc: '显示所有用户的进程（包括其他终端）' }, { flag: 'u', desc: '以用户友好格式输出（USER/CPU/MEM等列）' }, { flag: 'x', desc: '显示无控制终端的进程（守护进程）' }, { flag: 'f', desc: '完整格式，显示父子关系树（--forest）' }, { flag: 'e', desc: '显示全部进程（等同于-A）' }, { flag: 'o', desc: '自定义输出列，如 -o pid,comm,cpu' }] },
+        flags: [{ flag: 'a', desc: '显示所有用户的进程（包括其他终端）', desc_en: 'Show processes of all users (including other terminals)' }, { flag: 'u', desc: '以用户友好格式输出（USER/CPU/MEM等列）', desc_en: 'User-friendly output format (USER/CPU/MEM columns)' }, { flag: 'x', desc: '显示无控制终端的进程（守护进程）', desc_en: 'Show processes without controlling terminal (daemons)' }, { flag: 'f', desc: '完整格式，显示父子关系树（--forest）', desc_en: 'Full format, show parent/child tree (--forest)' }, { flag: 'e', desc: '显示全部进程（等同于-A）', desc_en: 'Show all processes (same as -A)' }, { flag: 'o', desc: '自定义输出列，如 -o pid,comm,cpu', desc_en: 'Custom output columns, e.g. -o pid,comm,cpu' }] },
       { cmd: 'top / htop',  desc: 'Live process monitor with CPU/mem stats',    example: 'htop -u root',
-        flags: [{ flag: '-u user', desc: '只显示指定用户的进程' }, { flag: '-p pid', desc: '监视特定PID' }, { flag: '-d N', desc: '刷新间隔N秒（默认3s）' }, { flag: '-n N', desc: '刷新N次后退出' }, { flag: 'k (交互)', desc: '在top内按k，然后输入PID来kill进程' }, { flag: 'M (交互)', desc: '按内存使用量排序' }] },
+        flags: [{ flag: '-u user', desc: '只显示指定用户的进程', desc_en: 'Show only processes of specified user' }, { flag: '-p pid', desc: '监视特定PID', desc_en: 'Monitor a specific PID' }, { flag: '-d N', desc: '刷新间隔N秒（默认3s）', desc_en: 'Refresh interval N seconds (default 3s)' }, { flag: '-n N', desc: '刷新N次后退出', desc_en: 'Exit after N refreshes' }, { flag: 'k (交互)', desc: '在top内按k，然后输入PID来kill进程', desc_en: 'Press k inside top, then enter PID to kill process' }, { flag: 'M (交互)', desc: '按内存使用量排序', desc_en: 'Sort by memory usage' }] },
       { cmd: 'kill',        desc: 'Send signal to process by PID',              example: 'kill -9 1234',
-        flags: [{ flag: '-9 / -KILL', desc: 'SIGKILL：强制立即终止，进程无法忽略' }, { flag: '-15 / -TERM', desc: 'SIGTERM：优雅终止（默认信号）' }, { flag: '-1 / -HUP', desc: 'SIGHUP：重新加载配置（nginx/sshd常用）' }, { flag: '-l', desc: '列出所有信号名称和编号' }, { flag: '-s SIG', desc: '指定信号名，如 kill -s SIGINT 1234' }] },
+        flags: [{ flag: '-9 / -KILL', desc: 'SIGKILL：强制立即终止，进程无法忽略', desc_en: 'SIGKILL: force immediate termination, process cannot ignore' }, { flag: '-15 / -TERM', desc: 'SIGTERM：优雅终止（默认信号）', desc_en: 'SIGTERM: graceful termination (default signal)' }, { flag: '-1 / -HUP', desc: 'SIGHUP：重新加载配置（nginx/sshd常用）', desc_en: 'SIGHUP: reload config (common for nginx/sshd)' }, { flag: '-l', desc: '列出所有信号名称和编号', desc_en: 'List all signal names and numbers' }, { flag: '-s SIG', desc: '指定信号名，如 kill -s SIGINT 1234', desc_en: 'Specify signal name, e.g. kill -s SIGINT 1234' }] },
       { cmd: 'strace',      desc: 'Trace system calls made by a process',       example: 'strace -p 1234',
-        flags: [{ flag: '-p pid', desc: '附加到已运行进程（不重启）' }, { flag: '-e trace=read,write', desc: '只跟踪指定syscall' }, { flag: '-o file', desc: '输出到文件而非stderr' }, { flag: '-f', desc: '跟随fork创建的子进程' }, { flag: '-c', desc: '统计每个syscall的调用次数和耗时' }, { flag: '-T', desc: '显示每个syscall的耗时' }] },
+        flags: [{ flag: '-p pid', desc: '附加到已运行进程（不重启）', desc_en: 'Attach to running process (no restart)' }, { flag: '-e trace=read,write', desc: '只跟踪指定syscall', desc_en: 'Trace only specified syscalls' }, { flag: '-o file', desc: '输出到文件而非stderr', desc_en: 'Write output to file instead of stderr' }, { flag: '-f', desc: '跟随fork创建的子进程', desc_en: 'Follow child processes created by fork' }, { flag: '-c', desc: '统计每个syscall的调用次数和耗时', desc_en: 'Count calls and time spent per syscall' }, { flag: '-T', desc: '显示每个syscall的耗时', desc_en: 'Show time spent in each syscall' }] },
       { cmd: 'lsof',        desc: 'List open files held by processes',          example: 'lsof -p 1234',
-        flags: [{ flag: '-p pid', desc: '列出指定进程打开的文件' }, { flag: '-i :port', desc: '查看占用指定端口的进程' }, { flag: '-u user', desc: '列出指定用户打开的文件' }, { flag: '-n', desc: '不做DNS解析（速度更快）' }, { flag: '+D dir', desc: '列出目录下被打开的文件' }, { flag: '-t', desc: '只输出PID（方便管道）' }] },
+        flags: [{ flag: '-p pid', desc: '列出指定进程打开的文件', desc_en: 'List files opened by specified process' }, { flag: '-i :port', desc: '查看占用指定端口的进程', desc_en: 'Show process occupying specified port' }, { flag: '-u user', desc: '列出指定用户打开的文件', desc_en: 'List files opened by specified user' }, { flag: '-n', desc: '不做DNS解析（速度更快）', desc_en: 'No DNS resolution (faster)' }, { flag: '+D dir', desc: '列出目录下被打开的文件', desc_en: 'List open files under directory' }, { flag: '-t', desc: '只输出PID（方便管道）', desc_en: 'Output only PIDs (useful for piping)' }] },
       { cmd: 'pgrep/pkill', desc: 'Find / kill processes by name pattern',      example: 'pkill -9 zombie',
-        flags: [{ flag: '-x', desc: '精确匹配进程名（不是子字符串）' }, { flag: '-u user', desc: '只匹配指定用户的进程' }, { flag: '-l', desc: '输出PID和进程名（pgrep专用）' }, { flag: '-f', desc: '匹配完整命令行（而非只进程名）' }, { flag: '-n', desc: '只匹配最新启动的进程' }] },
+        flags: [{ flag: '-x', desc: '精确匹配进程名（不是子字符串）', desc_en: 'Exact match process name (not substring)' }, { flag: '-u user', desc: '只匹配指定用户的进程', desc_en: 'Match only processes of specified user' }, { flag: '-l', desc: '输出PID和进程名（pgrep专用）', desc_en: 'Output PID and process name (pgrep only)' }, { flag: '-f', desc: '匹配完整命令行（而非只进程名）', desc_en: 'Match full command line (not just process name)' }, { flag: '-n', desc: '只匹配最新启动的进程', desc_en: 'Match only the most recently started process' }] },
       { cmd: 'nice/renice', desc: 'Set / change process scheduling priority',   example: 'nice -n 10 ./heavy',
-        flags: [{ flag: '-n N', desc: 'nice值 -20(最高优先级) 到 19(最低)，默认0' }, { flag: 'renice -n N -p pid', desc: '修改已运行进程的nice值' }, { flag: 'renice -n N -u user', desc: '修改用户所有进程的nice值' }] },
+        flags: [{ flag: '-n N', desc: 'nice值 -20(最高优先级) 到 19(最低)，默认0', desc_en: 'nice value -20 (highest priority) to 19 (lowest), default 0' }, { flag: 'renice -n N -p pid', desc: '修改已运行进程的nice值', desc_en: 'Change nice value of a running process' }, { flag: 'renice -n N -u user', desc: '修改用户所有进程的nice值', desc_en: "Change nice value for all of a user's processes" }] },
       { cmd: 'nohup &',     desc: 'Run process immune to hangup, in background', example: 'nohup ./server > out.log 2>&1 &',
         flags: [{ flag: '&', desc: '放到后台运行，Shell继续响应' }, { flag: 'nohup', desc: '忽略SIGHUP信号，终端关闭后进程继续' }, { flag: 'disown', desc: '将已后台运行的进程从Shell作业列表移除' }, { flag: 'jobs', desc: '列出当前Shell的后台作业' }, { flag: 'fg %N', desc: '把编号为N的后台作业移到前台' }] },
     ],

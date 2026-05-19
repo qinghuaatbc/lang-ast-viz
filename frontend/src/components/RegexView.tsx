@@ -1,4 +1,5 @@
 import { useState, useMemo } from 'react'
+import { useLang } from '../i18n/lang'
 
 interface Match { start: number; end: number; groups: string[] }
 
@@ -70,14 +71,14 @@ function buildSimpleNFA(pattern: string): { states: NFAState[]; edges: NFAEdge[]
 }
 
 const PRESETS = [
-  { label: '邮箱',      pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}', flags: 'g', sample: 'alice@example.com, bob@test.org, invalid@' },
-  { label: 'IPv4',      pattern: '\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b',               flags: 'g', sample: '192.168.1.1 and 10.0.0.1 and 999.999.999.999' },
-  { label: '日期',      pattern: '\\d{4}[-/]\\d{2}[-/]\\d{2}',                    flags: 'g', sample: '2024-01-15 or 2023/12/31 done' },
-  { label: '手机号',    pattern: '1[3-9]\\d{9}',                                   flags: 'g', sample: '13800138000 and 19912345678 and 12345678901' },
-  { label: 'URL',       pattern: 'https?://[\\w./-]+',                              flags: 'g', sample: 'Visit https://example.com/path and http://test.org' },
-  { label: '十六进制',  pattern: '#?[0-9a-fA-F]{3,6}\\b',                          flags: 'g', sample: 'Colors: #ff6b6b #3fb950 abc123 #xyz' },
-  { label: '重复单词',  pattern: '\\b(\\w+)\\s+\\1\\b',                            flags: 'gi', sample: 'the the quick brown fox fox jumped' },
-  { label: '数字',      pattern: '-?\\d+(\\.\\d+)?',                               flags: 'g', sample: 'pi=3.14159, e=2.718, zero=0, neg=-42' },
+  { label_zh: '邮箱',     label_en: 'Email',    pattern: '[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}', flags: 'g', sample: 'alice@example.com, bob@test.org, invalid@' },
+  { label_zh: 'IPv4',    label_en: 'IPv4',     pattern: '\\b(?:\\d{1,3}\\.){3}\\d{1,3}\\b',               flags: 'g', sample: '192.168.1.1 and 10.0.0.1 and 999.999.999.999' },
+  { label_zh: '日期',    label_en: 'Date',     pattern: '\\d{4}[-/]\\d{2}[-/]\\d{2}',                    flags: 'g', sample: '2024-01-15 or 2023/12/31 done' },
+  { label_zh: '手机号',  label_en: 'CN Phone', pattern: '1[3-9]\\d{9}',                                   flags: 'g', sample: '13800138000 and 19912345678 and 12345678901' },
+  { label_zh: 'URL',     label_en: 'URL',      pattern: 'https?://[\\w./-]+',                              flags: 'g', sample: 'Visit https://example.com/path and http://test.org' },
+  { label_zh: '十六进制',label_en: 'Hex Color',pattern: '#?[0-9a-fA-F]{3,6}\\b',                          flags: 'g', sample: 'Colors: #ff6b6b #3fb950 abc123 #xyz' },
+  { label_zh: '重复单词',label_en: 'Duplicate',pattern: '\\b(\\w+)\\s+\\1\\b',                            flags: 'gi', sample: 'the the quick brown fox fox jumped' },
+  { label_zh: '数字',    label_en: 'Number',   pattern: '-?\\d+(\\.\\d+)?',                               flags: 'g', sample: 'pi=3.14159, e=2.718, zero=0, neg=-42' },
 ]
 
 function HighlightText({ text, matches }: { text: string; matches: Match[] }) {
@@ -160,6 +161,8 @@ function NFADiagram({ states, edges }: { states: NFAState[]; edges: NFAEdge[] })
 }
 
 export default function RegexView() {
+  const { lang } = useLang()
+  const isZh = lang === 'zh'
   const [pattern, setPattern] = useState('[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\\.[a-zA-Z]{2,}')
   const [flags, setFlags] = useState('g')
   const [text, setText] = useState('alice@example.com, bob@test.org, invalid@')
@@ -178,39 +181,59 @@ export default function RegexView() {
     setPattern(p.pattern); setFlags(p.flags); setText(p.sample)
   }
 
+  const FLAG_DESCS_ZH: Record<string, string> = { g: '全局', i: '忽略大小写', m: '多行', s: '. 匹配换行' }
+  const FLAG_DESCS_EN: Record<string, string> = { g: 'global', i: 'ignore case', m: 'multiline', s: '. matches \\n' }
+  const flagDescs = isZh ? FLAG_DESCS_ZH : FLAG_DESCS_EN
+
+  const CHEATSHEET_ZH = [
+    ['.','任意字符（不含\\n）'],['\\d','数字 [0-9]'],['\\w','单词字符'],['\\s','空白字符'],
+    ['^','行首'],['$','行尾'],['*','0或多次'],['+',' 1或多次'],
+    ['?','0或1次'],['{n,m}','n到m次'],['(...)','捕获组'],['(?:...)','非捕获组'],
+    ['[abc]','字符集'],['[^abc]','排除字符集'],['a|b','或'],['\\b','单词边界'],
+  ]
+  const CHEATSHEET_EN = [
+    ['.','any char (not \\n)'],['\\d','digit [0-9]'],['\\w','word char'],['\\s','whitespace'],
+    ['^','line start'],['$','line end'],['*','0 or more'],['+','1 or more'],
+    ['?','0 or 1'],['{n,m}','n to m times'],['(...)','capture group'],['(?:...)','non-capturing'],
+    ['[abc]','char set'],['[^abc]','negated set'],['a|b','alternation'],['\\b','word boundary'],
+  ]
+  const cheatsheet = isZh ? CHEATSHEET_ZH : CHEATSHEET_EN
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Sidebar */}
       <div style={{ width: 170, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', padding: '12px 8px', overflowY: 'auto' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: 1 }}>常用预设</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: 1 }}>{isZh ? '常用预设' : 'PRESETS'}</div>
         {PRESETS.map(p => (
-          <button key={p.label} onClick={() => applyPreset(p)} style={{
+          <button key={p.pattern} onClick={() => applyPreset(p)} style={{
             display: 'block', width: '100%', marginBottom: 4, padding: '7px 10px',
             background: pattern === p.pattern ? 'rgba(255,169,77,0.15)' : 'transparent',
             border: pattern === p.pattern ? '1px solid #ffa94d' : '1px solid transparent',
             color: pattern === p.pattern ? '#ffa94d' : 'var(--text-secondary)',
             borderRadius: 6, cursor: 'pointer', fontSize: 12, textAlign: 'left',
-          }}>{p.label}</button>
+          }}>{isZh ? p.label_zh : p.label_en}</button>
         ))}
 
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', margin: '14px 0 8px', letterSpacing: 1 }}>标志位</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', margin: '14px 0 8px', letterSpacing: 1 }}>{isZh ? '标志位' : 'FLAGS'}</div>
         {['g', 'i', 'm', 's'].map(f => (
           <label key={f} style={{ display: 'flex', gap: 6, alignItems: 'center', marginBottom: 5, cursor: 'pointer', fontSize: 12, color: 'var(--text-secondary)' }}>
             <input type="checkbox" checked={flags.includes(f)}
               onChange={() => setFlags(fs => fs.includes(f) ? fs.replace(f, '') : fs + f)} />
             <code style={{ color: '#74c0fc' }}>{f}</code>
-            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{{ g: '全局', i: '忽略大小写', m: '多行', s: '. 匹配换行' }[f]}</span>
+            <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{flagDescs[f]}</span>
           </label>
         ))}
       </div>
 
       {/* Main */}
       <div style={{ flex: 1, overflow: 'auto', padding: 20, display: 'flex', flexDirection: 'column', gap: 14 }}>
-        <h2 style={{ margin: 0, fontSize: 18, color: 'var(--text-primary)' }}>正则表达式可视化</h2>
+        <h2 style={{ margin: 0, fontSize: 18, color: 'var(--text-primary)' }}>
+          {isZh ? '正则表达式可视化' : 'Regular Expression Visualizer'}
+        </h2>
 
         {/* Pattern input */}
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, border: `1px solid ${error ? '#ff6b6b' : 'var(--border)'}` }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>正则表达式</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>{isZh ? '正则表达式' : 'PATTERN'}</div>
           <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
             <span style={{ color: '#ffa94d', fontSize: 18 }}>/</span>
             <input value={pattern} onChange={e => setPattern(e.target.value)}
@@ -222,7 +245,7 @@ export default function RegexView() {
 
         {/* Test text */}
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, border: '1px solid var(--border)' }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>测试文本</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 6 }}>{isZh ? '测试文本' : 'TEST TEXT'}</div>
           <textarea value={text} onChange={e => setText(e.target.value)} rows={3}
             style={{ width: '100%', padding: '8px 10px', background: 'var(--bg-tertiary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', fontSize: 13, fontFamily: 'monospace', resize: 'vertical', boxSizing: 'border-box' }} />
         </div>
@@ -230,9 +253,11 @@ export default function RegexView() {
         {/* Match result */}
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, border: '1px solid var(--border)' }}>
           <div style={{ display: 'flex', gap: 10, alignItems: 'center', marginBottom: 8 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>匹配结果</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>{isZh ? '匹配结果' : 'MATCHES'}</div>
             <div style={{ fontSize: 12, color: matches.length > 0 ? '#51cf66' : '#ff6b6b', fontWeight: 700 }}>
-              {matches.length > 0 ? `✓ 找到 ${matches.length} 个匹配` : '✗ 无匹配'}
+              {matches.length > 0
+                ? isZh ? `✓ 找到 ${matches.length} 个匹配` : `✓ ${matches.length} match${matches.length !== 1 ? 'es' : ''} found`
+                : isZh ? '✗ 无匹配' : '✗ No match'}
             </div>
           </div>
           <div style={{ fontSize: 14, fontFamily: 'monospace', lineHeight: 1.8, wordBreak: 'break-all' }}>
@@ -244,41 +269,44 @@ export default function RegexView() {
         {matches.length > 0 && (
           <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
             <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
-              匹配详情
+              {isZh ? '匹配详情' : 'MATCH DETAILS'}
             </div>
             {matches.slice(0, 10).map((m, i) => (
               <div key={i} style={{ padding: '7px 14px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 14, alignItems: 'baseline', fontSize: 12 }}>
                 <span style={{ color: 'var(--text-muted)', minWidth: 20 }}>#{i + 1}</span>
                 <code style={{ color: '#ffa94d', background: 'rgba(255,169,77,0.1)', padding: '2px 6px', borderRadius: 4 }}>{text.slice(m.start, m.end)}</code>
                 <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>index [{m.start}, {m.end}]</span>
-                {m.groups.length > 0 && <span style={{ color: '#74c0fc', fontSize: 11 }}>捕获组: {m.groups.map((g, j) => `$${j + 1}=${g}`).join(', ')}</span>}
+                {m.groups.length > 0 && <span style={{ color: '#74c0fc', fontSize: 11 }}>{isZh ? '捕获组' : 'groups'}: {m.groups.map((g, j) => `$${j + 1}=${g}`).join(', ')}</span>}
               </div>
             ))}
-            {matches.length > 10 && <div style={{ padding: '6px 14px', fontSize: 11, color: 'var(--text-muted)' }}>… 还有 {matches.length - 10} 个匹配</div>}
+            {matches.length > 10 && <div style={{ padding: '6px 14px', fontSize: 11, color: 'var(--text-muted)' }}>
+              {isZh ? `… 还有 ${matches.length - 10} 个匹配` : `… ${matches.length - 10} more matches`}
+            </div>}
           </div>
         )}
 
         {/* NFA diagram */}
         {nfa.states.length > 0 && nfa.states.length <= 12 && (
           <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, padding: 14, border: '1px solid var(--border)' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>NFA 状态机（简化）</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10 }}>
+              {isZh ? 'NFA 状态机（简化）' : 'NFA State Machine (simplified)'}
+            </div>
             <NFADiagram states={nfa.states} edges={nfa.edges} />
             <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 6 }}>
-              双圆圈 = 接受态 · 虚线边 = ε 转移 · 蓝色边 = 字符转移 · 橙色边 = 自环（循环）
+              {isZh
+                ? '双圆圈 = 接受态 · 虚线边 = ε 转移 · 蓝色边 = 字符转移 · 橙色边 = 自环（循环）'
+                : 'Double circle = accept state · dashed = ε-transition · blue = char transition · orange = self-loop'}
             </div>
           </div>
         )}
 
         {/* Cheatsheet */}
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
-          <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>正则速查</div>
+          <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
+            {isZh ? '正则速查' : 'CHEATSHEET'}
+          </div>
           <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', padding: 8 }}>
-            {[
-              ['.','任意字符（不含\\n）'],['\\d','数字 [0-9]'],['\\w','单词字符'],['\\s','空白字符'],
-              ['^','行首'],['$','行尾'],['*','0或多次'],['+',' 1或多次'],
-              ['?','0或1次'],['{n,m}','n到m次'],['(...)','捕获组'],['(?:...)','非捕获组'],
-              ['[abc]','字符集'],['[^abc]','排除字符集'],['a|b','或'],['\\b','单词边界'],
-            ].map(([sym, desc]) => (
+            {cheatsheet.map(([sym, desc]) => (
               <div key={sym} style={{ padding: '4px 8px', display: 'flex', gap: 8 }}>
                 <code style={{ color: '#ffa94d', minWidth: 60, fontSize: 12 }}>{sym}</code>
                 <span style={{ color: 'var(--text-muted)', fontSize: 11 }}>{desc}</span>

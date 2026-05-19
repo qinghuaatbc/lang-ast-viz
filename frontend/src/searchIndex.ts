@@ -2,7 +2,7 @@
 
 export type TopMode = 'ast' | 'ds' | 'linux' | 'tlpi' | 'algo' | 'memory' | 'regex' |
   'ieee754' | 'network' | 'cpu' | 'x86' | 'hw' | 'docker' | 'sysdesign' | 'git' |
-  'concurrency' | 'wasm' | 'database'
+  'concurrency' | 'wasm' | 'database' | 'objectbus'
 
 export interface SearchEntry {
   tab: TopMode
@@ -209,7 +209,9 @@ export const SEARCH_INDEX: SearchEntry[] = [
   { tab: 'database', topicId: 'replication', title_zh: '复制与分片', title_en: 'Replication & Sharding',
     keywords: 'replication sharding master replica raft paxos 主从复制 分片' },
   { tab: 'database', topicId: 'index2', title_zh: '索引类型', title_en: 'Index Types',
-    keywords: 'index hash composite partial covering bloom filter GIN GiST 索引类型' },
+    keywords: 'clustered nonclustered hash fulltext spatial bitmap primary 二级索引' },
+  { tab: 'objectbus', topicId: '', title_zh: '三总线虚拟电路', title_en: '3-Bus Virtual Circuit',
+    keywords: 'bus address data control 总线 地址 数据 控制 virtual circuit 虚拟电路 module object method call cpp class vtable polymorphism' },
 ]
 
 export function searchEntries(query: string, lang: 'zh' | 'en'): SearchEntry[] {
@@ -243,4 +245,5 @@ export const TAB_LABELS: Record<TopMode, { zh: string; en: string; icon: string 
   concurrency: { zh: '并发原理',   en: 'Concurrency',       icon: '🔄' },
   wasm:        { zh: 'WebAssembly',en: 'WebAssembly',       icon: '🕸' },
   database:    { zh: '数据库原理', en: 'DB Internals',      icon: '🗄' },
+  objectbus:   { zh: '三总线',     en: '3-Bus Circuit',     icon: '🔌' },
 }

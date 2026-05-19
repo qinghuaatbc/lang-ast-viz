@@ -1,4 +1,5 @@
 import { useState, useCallback } from 'react'
+import { useLang } from '../i18n/lang'
 
 function floatToBits(f: number): number[] {
   const buf = new ArrayBuffer(4)
@@ -44,19 +45,19 @@ function bitLabel(i: number, mode: '32' | '64'): string {
 }
 
 const PRESETS = [
-  { label: '0.1',       v: 0.1 },
-  { label: '0.2',       v: 0.2 },
-  { label: '0.1+0.2',   v: 0.1 + 0.2 },
-  { label: '1.0',       v: 1.0 },
-  { label: '-1.5',      v: -1.5 },
-  { label: 'π',         v: Math.PI },
-  { label: 'NaN',       v: NaN },
-  { label: '∞',         v: Infinity },
-  { label: '-∞',        v: -Infinity },
-  { label: 'MAX',       v: 3.4028235e38 },
-  { label: 'MIN+',      v: 1.17549435e-38 },
-  { label: '0',         v: 0 },
-  { label: '-0',        v: -0 },
+  { label: '0.1',  v: 0.1 },
+  { label: '0.2',  v: 0.2 },
+  { label: '0.1+0.2', v: 0.1 + 0.2 },
+  { label: '1.0',  v: 1.0 },
+  { label: '-1.5', v: -1.5 },
+  { label: 'π',    v: Math.PI },
+  { label: 'NaN',  v: NaN },
+  { label: '∞',    v: Infinity },
+  { label: '-∞',   v: -Infinity },
+  { label: 'MAX',  v: 3.4028235e38 },
+  { label: 'MIN+', v: 1.17549435e-38 },
+  { label: '0',    v: 0 },
+  { label: '-0',   v: -0 },
 ]
 
 function analyzeFloat(bits: number[]): string {
@@ -87,6 +88,8 @@ function analyzeDouble(bits: number[]): string {
 }
 
 export default function IEEE754View() {
+  const { lang } = useLang()
+  const isZh = lang === 'zh'
   const [mode, setMode] = useState<'32' | '64'>('32')
   const [input, setInput] = useState('0.1')
   const [bits32, setBits32] = useState<number[]>(() => floatToBits(0.1))
@@ -132,6 +135,24 @@ export default function IEEE754View() {
     return a
   }, [] as number[]).map(n => n.toString(16).toUpperCase()).join('')
 
+  const SPECIAL_ROWS = isZh ? [
+    ['+0',  '0','00000000','00000000000000000000000','零'],
+    ['-0',  '1','00000000','00000000000000000000000','负零（等于+0）'],
+    ['+∞',  '0','11111111','00000000000000000000000','正无穷'],
+    ['-∞',  '1','11111111','00000000000000000000000','负无穷'],
+    ['NaN', '0','11111111','10000000000000000000000','非数字'],
+    ['最大正数','0','11111110','11111111111111111111111','≈ 3.4×10³⁸'],
+    ['最小正数','0','00000001','00000000000000000000000','≈ 1.18×10⁻³⁸'],
+  ] : [
+    ['+0',  '0','00000000','00000000000000000000000','Zero'],
+    ['-0',  '1','00000000','00000000000000000000000','Negative zero (equals +0)'],
+    ['+∞',  '0','11111111','00000000000000000000000','Positive infinity'],
+    ['-∞',  '1','11111111','00000000000000000000000','Negative infinity'],
+    ['NaN', '0','11111111','10000000000000000000000','Not a Number'],
+    ['MAX', '0','11111110','11111111111111111111111','≈ 3.4×10³⁸'],
+    ['MIN+','0','00000001','00000000000000000000000','≈ 1.18×10⁻³⁸'],
+  ]
+
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden', fontFamily: 'monospace' }}>
       {/* Sidebar */}
@@ -158,14 +179,16 @@ export default function IEEE754View() {
 
       {/* Main */}
       <div style={{ flex: 1, overflow: 'auto', padding: 24 }}>
-        <h2 style={{ margin: '0 0 4px', fontSize: 20, color: 'var(--text-primary)' }}>IEEE 754 浮点数可视化</h2>
+        <h2 style={{ margin: '0 0 4px', fontSize: 20, color: 'var(--text-primary)' }}>
+          {isZh ? 'IEEE 754 浮点数可视化' : 'IEEE 754 Float Visualizer'}
+        </h2>
         <p style={{ margin: '0 0 20px', fontSize: 12, color: 'var(--text-muted)' }}>
           {mode === '32' ? '32-bit: 1 sign + 8 exponent + 23 mantissa bits' : '64-bit: 1 sign + 11 exponent + 52 mantissa bits'}
         </p>
 
         {/* Input */}
         <div style={{ display: 'flex', gap: 10, marginBottom: 20, alignItems: 'center' }}>
-          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>十进制值：</label>
+          <label style={{ fontSize: 13, color: 'var(--text-muted)' }}>{isZh ? '十进制值：' : 'Decimal:'}</label>
           <input value={input} onChange={e => handleInput(e.target.value)}
             style={{ padding: '6px 12px', background: 'var(--bg-secondary)', border: '1px solid var(--border)', borderRadius: 6, color: 'var(--text-primary)', fontSize: 14, width: 180 }} />
           <span style={{ fontSize: 13, color: 'var(--text-muted)' }}>= </span>
@@ -223,7 +246,7 @@ export default function IEEE754View() {
 
         {/* Formula */}
         <div style={{ background: 'rgba(116,192,252,0.08)', borderRadius: 10, padding: 14, border: '1px solid rgba(116,192,252,0.25)', marginBottom: 16 }}>
-          <div style={{ fontSize: 11, fontWeight: 700, color: '#74c0fc', marginBottom: 8 }}>公式</div>
+          <div style={{ fontSize: 11, fontWeight: 700, color: '#74c0fc', marginBottom: 8 }}>{isZh ? '公式' : 'FORMULA'}</div>
           <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
             value = (−1)<sup>sign</sup> × 2<sup>(exp−{bias})</sup> × (1 + mantissa)
           </div>
@@ -232,25 +255,19 @@ export default function IEEE754View() {
 
         {/* Special values table */}
         <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
-          <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>特殊值 (float32)</div>
+          <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
+            {isZh ? '特殊值 (float32)' : 'Special Values (float32)'}
+          </div>
           <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 11 }}>
             <thead>
               <tr style={{ background: 'var(--bg-elevated)' }}>
-                {['值', 'Sign', 'Exponent', 'Mantissa', '说明'].map(h => (
+                {[isZh ? '值' : 'Value', 'Sign', 'Exponent', 'Mantissa', isZh ? '说明' : 'Description'].map(h => (
                   <th key={h} style={{ padding: '6px 10px', textAlign: 'left', color: 'var(--text-muted)', fontWeight: 600 }}>{h}</th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {[
-                ['+0',        '0','00000000','00000000000000000000000','零'],
-                ['-0',        '1','00000000','00000000000000000000000','负零（等于+0）'],
-                ['+∞',        '0','11111111','00000000000000000000000','正无穷'],
-                ['-∞',        '1','11111111','00000000000000000000000','负无穷'],
-                ['NaN',       '0','11111111','10000000000000000000000','非数字'],
-                ['最大正数',   '0','11111110','11111111111111111111111','≈ 3.4×10³⁸'],
-                ['最小正数',   '0','00000001','00000000000000000000000','≈ 1.18×10⁻³⁸'],
-              ].map(([v, s, e, m, d]) => (
+              {SPECIAL_ROWS.map(([v, s, e, m, d]) => (
                 <tr key={v} style={{ borderTop: '1px solid var(--border)' }}>
                   <td style={{ padding: '5px 10px', color: '#74c0fc', fontWeight: 700 }}>{v}</td>
                   <td style={{ padding: '5px 10px', color: '#ff6b6b' }}>{s}</td>

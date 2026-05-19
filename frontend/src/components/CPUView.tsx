@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
+import { useLang } from '../i18n/lang'
 
 type Stage = 'IF' | 'ID' | 'EX' | 'MEM' | 'WB' | 'STALL' | 'FLUSH'
 type HazardType = 'none' | 'data' | 'control' | 'structural'
@@ -10,7 +11,7 @@ const STAGE_COLOR: Record<Stage, string> = {
   IF: '#4d8fff', ID: '#a371f7', EX: '#ffa657', MEM: '#3fb950', WB: '#ff6b6b',
   STALL: '#555', FLUSH: '#ff453a',
 }
-const STAGE_DESC: Record<Stage, string> = {
+const STAGE_DESC_ZH: Record<Stage, string> = {
   IF: 'Instruction Fetch — 从内存/缓存取指令',
   ID: 'Instruction Decode — 解码，读寄存器',
   EX: 'Execute — ALU 运算/地址计算',
@@ -19,11 +20,21 @@ const STAGE_DESC: Record<Stage, string> = {
   STALL: 'Stall — 流水线停顿（等待数据）',
   FLUSH: 'Flush — 刷新无效指令（分支预测失败）',
 }
+const STAGE_DESC_EN: Record<Stage, string> = {
+  IF: 'Instruction Fetch — read instruction from memory/cache',
+  ID: 'Instruction Decode — decode, read registers',
+  EX: 'Execute — ALU operation / address calculation',
+  MEM: 'Memory Access — read/write data memory',
+  WB: 'Write Back — write result to register file',
+  STALL: 'Stall — pipeline paused (waiting for data)',
+  FLUSH: 'Flush — discard invalid instructions (branch misprediction)',
+}
 
-const PROGRAMS: { name: string; desc: string; instrs: Instruction[] }[] = [
+interface Program { name_zh: string; name_en: string; desc_zh: string; desc_en: string; instrs: Instruction[] }
+const PROGRAMS: Program[] = [
   {
-    name: '无冒险',
-    desc: '独立指令，无数据/控制依赖',
+    name_zh: '无冒险', name_en: 'No Hazards',
+    desc_zh: '独立指令，无数据/控制依赖', desc_en: 'Independent instructions, no data/control dependencies',
     instrs: [
       { asm: 'ADD R1, R2, R3',  type: 'ALU',   reads: ['R2','R3'], writes: ['R1'], memAccess: false },
       { asm: 'SUB R4, R5, R6',  type: 'ALU',   reads: ['R5','R6'], writes: ['R4'], memAccess: false },
@@ -33,8 +44,8 @@ const PROGRAMS: { name: string; desc: string; instrs: Instruction[] }[] = [
     ],
   },
   {
-    name: '数据冒险 (RAW)',
-    desc: '先写后读依赖：ADD 写 R1，下条立即用 R1',
+    name_zh: '数据冒险 (RAW)', name_en: 'Data Hazard (RAW)',
+    desc_zh: '先写后读依赖：ADD 写 R1，下条立即用 R1', desc_en: 'Read-after-write: ADD writes R1, next instr reads R1',
     instrs: [
       { asm: 'ADD R1, R2, R3',  type: 'ALU',  reads: ['R2','R3'], writes: ['R1'], memAccess: false },
       { asm: 'SUB R4, R1, R5',  type: 'ALU',  reads: ['R1','R5'], writes: ['R4'], memAccess: false },
@@ -44,8 +55,8 @@ const PROGRAMS: { name: string; desc: string; instrs: Instruction[] }[] = [
     ],
   },
   {
-    name: 'Load-Use 冒险',
-    desc: 'LW 取内存后立即使用：需强制停顿 1 周期',
+    name_zh: 'Load-Use 冒险', name_en: 'Load-Use Hazard',
+    desc_zh: 'LW 取内存后立即使用：需强制停顿 1 周期', desc_en: 'LW then immediate use — forced 1-cycle stall',
     instrs: [
       { asm: 'LW  R1, 0(R2)',   type: 'Load', reads: ['R2'],      writes: ['R1'], memAccess: true  },
       { asm: 'ADD R3, R1, R4',  type: 'ALU',  reads: ['R1','R4'], writes: ['R3'], memAccess: false },
@@ -55,8 +66,8 @@ const PROGRAMS: { name: string; desc: string; instrs: Instruction[] }[] = [
     ],
   },
   {
-    name: '控制冒险 (分支)',
-    desc: 'BEQ 分支：预测失败时 flush 2 条指令',
+    name_zh: '控制冒险 (分支)', name_en: 'Control Hazard (Branch)',
+    desc_zh: 'BEQ 分支：预测失败时 flush 2 条指令', desc_en: 'BEQ branch: flush 2 instructions on misprediction',
     instrs: [
       { asm: 'ADD R1, R2, R3',  type: 'ALU',    reads: ['R2','R3'], writes: ['R1'], memAccess: false },
       { asm: 'BEQ R1, R0, done',type: 'Branch', reads: ['R1','R0'], writes: [],     memAccess: false },
@@ -71,22 +82,16 @@ function computePipeline(instrs: Instruction[]): PipelineSlot[][] {
   const STAGES: Stage[] = ['IF','ID','EX','MEM','WB']
   const n = instrs.length
   const result: PipelineSlot[][] = []
-  const issued: number[] = [] // cycle when each instr entered IF
-  let cycle = 0
-
-  const stalls: { cycle: number; instrIdx: number }[] = []
+  const issued: number[] = []
 
   for (let i = 0; i < n; i++) {
     let startCycle = i === 0 ? 0 : (issued[i - 1] + 1)
     const instr = instrs[i]
     const prev = i > 0 ? instrs[i - 1] : null
 
-    // Load-use hazard: LW then immediate use → 1 stall
     if (prev?.type === 'Load' && instr.reads.some(r => prev.writes.includes(r))) {
       startCycle++
-      stalls.push({ cycle: startCycle - 1, instrIdx: i })
     }
-    // Data hazard RAW (simplified: just mark, no extra stall in this model)
     const hazard: HazardType = prev?.type === 'Load' && instr.reads.some(r => prev.writes.includes(r))
       ? 'data'
       : instr.type === 'Branch' ? 'control'
@@ -99,7 +104,6 @@ function computePipeline(instrs: Instruction[]): PipelineSlot[][] {
       if (!result[c]) result[c] = []
       result[c].push({ instr, stage: STAGES[s], cycle: c, hazard: s === 1 ? hazard : 'none' })
     }
-    // Branch: flush 2 cycles
     if (instr.type === 'Branch') {
       for (let f = 0; f < 2; f++) {
         const c = startCycle + 1 + f
@@ -112,6 +116,8 @@ function computePipeline(instrs: Instruction[]): PipelineSlot[][] {
 }
 
 export default function CPUView() {
+  const { lang } = useLang()
+  const isZh = lang === 'zh'
   const [progIdx, setProgIdx] = useState(0)
   const [cycle, setCycle] = useState(0)
   const [playing, setPlaying] = useState(false)
@@ -135,12 +141,29 @@ export default function CPUView() {
 
   const curSlots = pipeline[cycle] || []
   const STAGES: Stage[] = ['IF','ID','EX','MEM','WB']
+  const STAGE_DESC = isZh ? STAGE_DESC_ZH : STAGE_DESC_EN
+
+  const CONCEPTS_ZH = [
+    ['数据冒险 (RAW)', '#ff6b6b', '先写后读：指令 N+1 需要指令 N 的结果，N 还未完成 WB'],
+    ['Load-Use 冒险', '#ff6b6b', 'LW 取数后立即使用：MEM 阶段才有数据，需插入 1 个 bubble'],
+    ['控制冒险', '#ffa657', '分支跳转：结果在 EX 才知道，期间取的指令可能需要 flush'],
+    ['数据前递 (Forwarding)', '#51cf66', '将 EX/MEM 阶段结果直接传给下条指令，减少停顿'],
+    ['分支预测', '#74c0fc', '静态预测（总预测不跳）/ 动态预测（基于历史），降低 flush 频率'],
+  ]
+  const CONCEPTS_EN = [
+    ['Data Hazard (RAW)', '#ff6b6b', 'Read-after-write: instr N+1 needs result of N before WB completes'],
+    ['Load-Use Hazard', '#ff6b6b', 'LW then immediate use: data arrives at MEM stage — insert 1 bubble'],
+    ['Control Hazard', '#ffa657', 'Branch: outcome known only at EX — fetched instructions may be flushed'],
+    ['Data Forwarding', '#51cf66', 'Route EX/MEM result directly to next instr, reducing stalls'],
+    ['Branch Prediction', '#74c0fc', 'Static (always not-taken) / dynamic (history-based) — reduces flushes'],
+  ]
+  const concepts = isZh ? CONCEPTS_ZH : CONCEPTS_EN
 
   return (
     <div style={{ display: 'flex', height: '100%', overflow: 'hidden' }}>
       {/* Sidebar */}
       <div style={{ width: 200, flexShrink: 0, borderRight: '1px solid var(--border)', background: 'var(--bg-secondary)', padding: '12px 8px', overflowY: 'auto' }}>
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: 1 }}>示例程序</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8, letterSpacing: 1 }}>{isZh ? '示例程序' : 'PROGRAMS'}</div>
         {PROGRAMS.map((p, i) => (
           <button key={i} onClick={() => setProgIdx(i)} style={{
             display: 'block', width: '100%', marginBottom: 5, padding: '8px 10px',
@@ -149,12 +172,12 @@ export default function CPUView() {
             color: progIdx === i ? '#ffa657' : 'var(--text-secondary)',
             borderRadius: 7, cursor: 'pointer', fontSize: 12, textAlign: 'left',
           }}>
-            <div style={{ fontWeight: 600 }}>{p.name}</div>
-            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{p.desc}</div>
+            <div style={{ fontWeight: 600 }}>{isZh ? p.name_zh : p.name_en}</div>
+            <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2 }}>{isZh ? p.desc_zh : p.desc_en}</div>
           </button>
         ))}
 
-        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', margin: '14px 0 8px', letterSpacing: 1 }}>阶段图例</div>
+        <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', margin: '14px 0 8px', letterSpacing: 1 }}>{isZh ? '阶段图例' : 'STAGES'}</div>
         {STAGES.map(s => (
           <div key={s} onMouseEnter={() => setHovStage(s)} onMouseLeave={() => setHovStage(null)}
             style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '4px 6px', borderRadius: 5, marginBottom: 3,
@@ -172,27 +195,33 @@ export default function CPUView() {
       <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
         {/* Controls */}
         <div style={{ padding: '10px 20px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12, alignItems: 'center', background: 'var(--bg-secondary)' }}>
-          <span style={{ fontSize: 14, fontWeight: 700, color: '#ffa657' }}>{prog.name}</span>
-          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{prog.desc}</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#ffa657' }}>{isZh ? prog.name_zh : prog.name_en}</span>
+          <span style={{ fontSize: 12, color: 'var(--text-muted)' }}>{isZh ? prog.desc_zh : prog.desc_en}</span>
           <div style={{ marginLeft: 'auto', display: 'flex', gap: 8, alignItems: 'center' }}>
             <button onClick={() => setCycle(c => Math.max(0, c - 1))} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>◀</button>
             <button onClick={() => setPlaying(p => !p)} style={{ padding: '4px 14px', borderRadius: 5, border: 'none', background: playing ? '#ff6b6b' : '#3fb950', color: '#fff', cursor: 'pointer', fontWeight: 700 }}>
               {playing ? '⏸' : '▶'}
             </button>
             <button onClick={() => setCycle(c => Math.min(maxCycle, c + 1))} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer' }}>▶</button>
-            <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 80 }}>周期 {cycle} / {maxCycle}</span>
-            <button onClick={() => { setCycle(0); setPlaying(false) }} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>重置</button>
+            <span style={{ fontSize: 12, color: 'var(--text-muted)', minWidth: 80 }}>
+              {isZh ? `周期 ${cycle} / ${maxCycle}` : `Cycle ${cycle} / ${maxCycle}`}
+            </span>
+            <button onClick={() => { setCycle(0); setPlaying(false) }} style={{ padding: '4px 10px', borderRadius: 5, border: '1px solid var(--border)', background: 'transparent', color: 'var(--text-muted)', cursor: 'pointer', fontSize: 11 }}>
+              {isZh ? '重置' : 'Reset'}
+            </button>
           </div>
         </div>
 
         <div style={{ flex: 1, overflow: 'auto', padding: 20 }}>
-          {/* Pipeline diagram - time-space diagram */}
+          {/* Pipeline diagram */}
           <div style={{ marginBottom: 20, overflowX: 'auto' }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>时空图（行=指令，列=时钟周期）</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>
+              {isZh ? '时空图（行=指令，列=时钟周期）' : 'Time-Space Diagram (row=instruction, col=clock cycle)'}
+            </div>
             <table style={{ borderCollapse: 'collapse', fontSize: 11, minWidth: 400 }}>
               <thead>
                 <tr>
-                  <th style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)', minWidth: 140, fontWeight: 600 }}>指令</th>
+                  <th style={{ padding: '4px 8px', textAlign: 'left', color: 'var(--text-muted)', minWidth: 140, fontWeight: 600 }}>{isZh ? '指令' : 'Instruction'}</th>
                   {Array.from({ length: maxCycle + 1 }, (_, c) => (
                     <th key={c} style={{ padding: '4px 6px', textAlign: 'center', color: c === cycle ? '#ffa657' : 'var(--text-muted)', fontWeight: c === cycle ? 700 : 400, minWidth: 36, background: c === cycle ? 'rgba(255,166,87,0.08)' : 'transparent' }}>
                       {c}
@@ -232,7 +261,9 @@ export default function CPUView() {
 
           {/* Current cycle detail */}
           <div style={{ marginBottom: 16 }}>
-            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>周期 {cycle} — 流水线状态</div>
+            <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 8 }}>
+              {isZh ? `周期 ${cycle} — 流水线状态` : `Cycle ${cycle} — Pipeline State`}
+            </div>
             <div style={{ display: 'flex', gap: 8 }}>
               {STAGES.map(stage => {
                 const slot = curSlots.find(s => s.stage === stage && s.instr)
@@ -265,16 +296,12 @@ export default function CPUView() {
 
           {/* Concepts */}
           <div style={{ background: 'var(--bg-secondary)', borderRadius: 10, border: '1px solid var(--border)', overflow: 'hidden' }}>
-            <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>流水线关键概念</div>
-            {[
-              ['数据冒险 (RAW)', '#ff6b6b', '先写后读：指令 N+1 需要指令 N 的结果，N 还未完成 WB'],
-              ['Load-Use 冒险', '#ff6b6b', 'LW 取数后立即使用：MEM 阶段才有数据，需插入 1 个 bubble'],
-              ['控制冒险', '#ffa657', '分支跳转：结果在 EX 才知道，期间取的指令可能需要 flush'],
-              ['数据前递 (Forwarding)', '#51cf66', '将 EX/MEM 阶段结果直接传给下条指令，减少停顿'],
-              ['分支预测', '#74c0fc', '静态预测（总预测不跳）/ 动态预测（基于历史），降低 flush 频率'],
-            ].map(([k, c, v]) => (
+            <div style={{ padding: '8px 14px', borderBottom: '1px solid var(--border)', fontSize: 11, fontWeight: 700, color: 'var(--text-muted)' }}>
+              {isZh ? '流水线关键概念' : 'Key Pipeline Concepts'}
+            </div>
+            {concepts.map(([k, c, v]) => (
               <div key={k as string} style={{ padding: '7px 14px', borderBottom: '1px solid var(--border)', display: 'flex', gap: 12 }}>
-                <span style={{ fontSize: 12, fontWeight: 700, color: c as string, minWidth: 120 }}>{k as string}</span>
+                <span style={{ fontSize: 12, fontWeight: 700, color: c as string, minWidth: 140 }}>{k as string}</span>
                 <span style={{ fontSize: 12, color: 'var(--text-secondary)' }}>{v as string}</span>
               </div>
             ))}

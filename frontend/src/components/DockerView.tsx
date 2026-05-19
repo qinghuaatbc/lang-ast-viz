@@ -1,5 +1,6 @@
 import { useState } from 'react'
 import { useMobile } from '../hooks/useMobile'
+import { useLang } from '../i18n/lang'
 
 // ─── Shared style helpers ──────────────────────────────────────────────────────
 const CODE: React.CSSProperties = {
@@ -20,6 +21,8 @@ const BADGE = (bg: string): React.CSSProperties => ({
 // ─── Architecture Tab ──────────────────────────────────────────────────────────
 function ArchTab() {
   const [hover, setHover] = useState<string | null>(null)
+  const { lang } = useLang()
+  const isZh = lang === 'zh'
 
   const boxes = [
     { id: 'cli',      x: 40,  y: 60,  w: 160, h: 50, color: '#4d8fff', label: 'Docker CLI',        sub: 'docker run / build / push' },
@@ -46,11 +49,12 @@ function ArchTab() {
     { x1: 200, y1: 525, x2: 280, y2: 525, label: 'unshare flags' },
   ]
 
-  const info: Record<string, { title: string; detail: string; code: string }> = {
+  const info: Record<string, { title: string; detail_zh: string; detail_en: string; code: string }> = {
     cli: {
       title: 'Docker CLI',
-      detail: 'docker 命令通过 Unix domain socket 与 dockerd 通信，发送 HTTP REST 请求。',
-      code: `// docker run 实际发送的 HTTP 请求
+      detail_zh: 'docker 命令通过 Unix domain socket 与 dockerd 通信，发送 HTTP REST 请求。',
+      detail_en: 'The docker command communicates with dockerd over a Unix domain socket, sending HTTP REST requests.',
+      code: `// Actual HTTP request sent by docker run
 POST /v1.43/containers/create HTTP/1.1
 Host: localhost
 Content-Type: application/json
@@ -65,35 +69,37 @@ Content-Type: application/json
   }
 }
 
-// 然后
+// Then
 POST /v1.43/containers/{id}/start`
     },
     daemon: {
       title: 'dockerd — Docker Daemon',
-      detail: 'dockerd 是主进程，监听 /var/run/docker.sock，管理镜像、网络、卷，并调用 containerd。',
-      code: `// dockerd 内部伪代码 (Go)
+      detail_zh: 'dockerd 是主进程，监听 /var/run/docker.sock，管理镜像、网络、卷，并调用 containerd。',
+      detail_en: 'dockerd is the main process. It listens on /var/run/docker.sock, manages images, networks, and volumes, and delegates to containerd.',
+      code: `// dockerd internal pseudocode (Go)
 func (d *Daemon) ContainerStart(ctx context.Context, name string) error {
     ctr, err := d.GetContainer(name)
 
-    // 1. 通过 containerd gRPC 创建任务
+    // 1. Create task via containerd gRPC
     task, err := d.containerd.Create(ctx, &api.ContainerConfig{
         ID:    ctr.ID,
         Image: ctr.Image,
-        Spec:  generateOCISpec(ctr),  // 生成 OCI runtime spec
+        Spec:  generateOCISpec(ctr),  // generate OCI runtime spec
     })
 
-    // 2. 设置网络 (创建 veth pair, 接入 docker0 bridge)
+    // 2. Set up networking (create veth pair, attach to docker0 bridge)
     if err := d.netController.Connect(ctr.ID, "bridge"); err != nil { ... }
 
-    // 3. 启动任务
+    // 3. Start task
     return task.Start(ctx)
 }`
     },
     ctrd: {
       title: 'containerd',
-      detail: 'CNCF 项目。负责镜像拉取/存储、快照管理、任务生命周期，通过 gRPC 暴露 API。',
-      code: `// containerd 任务创建 (Go gRPC)
-// protobuf 定义
+      detail_zh: 'CNCF 项目。负责镜像拉取/存储、快照管理、任务生命周期，通过 gRPC 暴露 API。',
+      detail_en: 'A CNCF project. Handles image pull/storage, snapshot management, and task lifecycle. Exposes a gRPC API.',
+      code: `// containerd task creation (Go gRPC)
+// protobuf definition
 service Tasks {
     rpc Create(CreateTaskRequest) returns (CreateTaskResponse);
     rpc Start(StartRequest) returns (google.protobuf.Empty);
@@ -101,9 +107,9 @@ service Tasks {
     rpc Kill(KillRequest) returns (google.protobuf.Empty);
 }
 
-// containerd 内部: 准备快照(snapshot)
+// containerd internal: prepare snapshot
 func (s *service) prepareSnapshot(ctx context.Context, id, parent string) error {
-    // overlay2: 创建 upperdir + workdir
+    // overlay2: create upperdir + workdir
     snapshotter := s.getSnapshotter("overlayfs")
     return snapshotter.Prepare(ctx, id, parent)
     // → /var/lib/containerd/io.containerd.snapshotter.v1.overlayfs/
@@ -111,18 +117,19 @@ func (s *service) prepareSnapshot(ctx context.Context, id, parent string) error 
     },
     shim: {
       title: 'containerd-shim',
-      detail: '每个容器一个 shim 进程。containerd 重启时容器不受影响。shim 持有 runc 退出后的 stdio/exit-code。',
-      code: `// containerd-shim-runc-v2 核心逻辑 (Go)
+      detail_zh: '每个容器一个 shim 进程。containerd 重启时容器不受影响。shim 持有 runc 退出后的 stdio/exit-code。',
+      detail_en: 'One shim process per container. Containers survive containerd restarts. The shim holds stdio/exit-code after runc exits.',
+      code: `// containerd-shim-runc-v2 core logic (Go)
 func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.StartResponse, error) {
-    // exec runc 创建容器
+    // exec runc to create container
     cmd := exec.Command("runc", "create",
-        "--bundle", s.bundle,   // OCI bundle 目录
+        "--bundle", s.bundle,   // OCI bundle directory
         "--pid-file", s.pidFile,
         s.id,
     )
     if err := cmd.Run(); err != nil { ... }
 
-    // 读取 runc 设置好的 PID
+    // read PID set by runc
     pid, _ := readPidFile(s.pidFile)
 
     // exec runc start
@@ -132,14 +139,15 @@ func (s *service) Start(ctx context.Context, r *taskAPI.StartRequest) (*taskAPI.
     },
     runc: {
       title: 'runc — OCI Runtime',
-      detail: '实际调用 Linux 内核 API 创建容器：clone() 建立 namespace，pivot_root() 换根，exec() 启动进程。',
-      code: `// runc 核心: libcontainer (Go 调用 C)
-// 1. 读取 OCI spec (config.json)
+      detail_zh: '实际调用 Linux 内核 API 创建容器：clone() 建立 namespace，pivot_root() 换根，exec() 启动进程。',
+      detail_en: 'Directly invokes Linux kernel APIs to create containers: clone() establishes namespaces, pivot_root() switches the root filesystem, exec() starts the process.',
+      code: `// runc core: libcontainer (Go calling C)
+// 1. Load OCI spec (config.json)
 spec, _ := loadSpec("config.json")
 
-// 2. 初始化容器 (fork + clone)
-// nsenter: 使用 /proc/self/exe 重新执行自身进入 namespace
-// 等价于以下 C 代码:
+// 2. Initialize container (fork + clone)
+// nsenter: re-exec /proc/self/exe to enter namespace
+// Equivalent C code:
 
 #define _GNU_SOURCE
 #include <sched.h>
@@ -147,22 +155,22 @@ spec, _ := loadSpec("config.json")
 #include <sys/mount.h>
 #include <sys/wait.h>
 
-int clone_flags = CLONE_NEWPID   // 新 PID namespace
-                | CLONE_NEWNS    // 新 Mount namespace
-                | CLONE_NEWNET   // 新 Network namespace
-                | CLONE_NEWUTS   // 新 UTS (hostname) namespace
-                | CLONE_NEWIPC   // 新 IPC namespace
-                | CLONE_NEWUSER  // 新 User namespace
-                | CLONE_NEWCGROUP; // 新 Cgroup namespace
+int clone_flags = CLONE_NEWPID   // new PID namespace
+                | CLONE_NEWNS    // new Mount namespace
+                | CLONE_NEWNET   // new Network namespace
+                | CLONE_NEWUTS   // new UTS (hostname) namespace
+                | CLONE_NEWIPC   // new IPC namespace
+                | CLONE_NEWUSER  // new User namespace
+                | CLONE_NEWCGROUP; // new Cgroup namespace
 
 pid_t child = clone(container_init, stack_top,
                     clone_flags | SIGCHLD, &args);
 
-// 3. 在子进程 container_init() 中:
+// 3. In child process container_init():
 static int container_init(void *arg) {
     container_args *args = arg;
 
-    // pivot_root: 切换文件系统根
+    // pivot_root: switch filesystem root
     mount("overlay", args->rootfs, "overlay", MS_RDONLY|MS_REC,
           "lowerdir=/layers/3:/layers/2:/layers/1,"
           "upperdir=/containers/abc/upper,"
@@ -175,31 +183,32 @@ static int container_init(void *arg) {
     umount2("/.put_old", MNT_DETACH);
     rmdir("/.put_old");
 
-    // 挂载 /proc /sys /dev
+    // mount /proc /sys /dev
     mount("proc", "/proc", "proc", 0, NULL);
     mount("sysfs", "/sys", "sysfs", MS_RDONLY, NULL);
     mount("devtmpfs", "/dev", "devtmpfs", 0, NULL);
 
-    // 设置 hostname
+    // set hostname
     sethostname(args->hostname, strlen(args->hostname));
 
-    // 删除能力 (drop capabilities)
+    // drop capabilities
     prctl(PR_SET_KEEPCAPS, 0);
 
-    // 应用 seccomp 过滤器
+    // apply seccomp filter
     prctl(PR_SET_SECCOMP, SECCOMP_MODE_FILTER, &args->seccomp_prog);
 
-    // 执行容器进程
+    // exec container process
     execv(args->argv[0], args->argv);
     return 1; // unreachable
 }`
     },
     ctr: {
       title: 'Container Process',
-      detail: '容器内的进程以为自己是系统唯一的进程(PID=1)，看到独立的网络栈、文件系统、主机名。',
-      code: `// 容器内视角对比宿主机
+      detail_zh: '容器内的进程以为自己是系统唯一的进程(PID=1)，看到独立的网络栈、文件系统、主机名。',
+      detail_en: 'The process inside the container believes it is the only process in the system (PID=1), seeing an isolated network stack, filesystem, and hostname.',
+      code: `// Container view vs host view
 
-// 宿主机: ls /proc/$(docker inspect --format={{.State.Pid}} nginx)/ns/
+// Host: ls /proc/$(docker inspect --format={{.State.Pid}} nginx)/ns/
 lrwxrwxrwx cgroup -> cgroup:[4026532456]
 lrwxrwxrwx ipc    -> ipc:[4026532457]
 lrwxrwxrwx mnt    -> mnt:[4026532455]
@@ -208,20 +217,21 @@ lrwxrwxrwx pid    -> pid:[4026532458]
 lrwxrwxrwx uts    -> uts:[4026532454]
 lrwxrwxrwx user   -> user:[4026531837]  // shared with host
 
-// 容器内: cat /proc/1/status
+// Inside container: cat /proc/1/status
 Name:   nginx
-Pid:    1          // 容器内 PID=1 (宿主机实际是 23456)
-NSpid:  1          // namespace 内的 PID
+Pid:    1          // container PID=1 (actual host PID is 23456)
+NSpid:  1          // PID within namespace
 ...
 
-// 容器内: ip link show
+// Inside container: ip link show
 1: lo: <LOOPBACK,UP>
-2: eth0@if8: <BROADCAST,UP>  // veth pair 的一端
+2: eth0@if8: <BROADCAST,UP>  // one end of veth pair
    inet 172.17.0.2/16`
     },
     reg: {
       title: 'Container Registry',
-      detail: '镜像以 OCI Image Format 存储在 Registry，每层是一个 tar.gz，用 SHA256 内容寻址。',
+      detail_zh: '镜像以 OCI Image Format 存储在 Registry，每层是一个 tar.gz，用 SHA256 内容寻址。',
+      detail_en: 'Images are stored in the Registry in OCI Image Format. Each layer is a tar.gz, addressed by SHA256 content hash.',
       code: `// OCI Image Manifest (JSON)
 {
   "schemaVersion": 2,
@@ -245,19 +255,20 @@ NSpid:  1          // namespace 内的 PID
   ]
 }
 
-// 拉取协议: HTTP Range 请求 + Content-Addressable Storage
+// Pull protocol: HTTP Range requests + Content-Addressable Storage
 // GET /v2/nginx/blobs/sha256:2f140462...
 // Content-Length: 31379476
-// docker 验证 sha256 后存入 /var/lib/docker/overlay2/`
+// docker verifies sha256 then stores in /var/lib/docker/overlay2/`
     },
     overlay: {
-      title: 'OverlayFS — 联合文件系统',
-      detail: 'overlay2 把多个镜像层叠加为一个统一视图。写操作 Copy-on-Write 到 upperdir。',
-      code: `// OverlayFS 挂载 (等价于 docker 内部操作)
-// lowerdir: 只读镜像层 (从上到下: 最新→最旧)
-// upperdir: 可写容器层 (CoW)
-// workdir:  overlay 内部工作目录
-// merged:   最终挂载点 (容器看到的 /)
+      title: 'OverlayFS — Union Filesystem',
+      detail_zh: 'overlay2 把多个镜像层叠加为一个统一视图。写操作 Copy-on-Write 到 upperdir。',
+      detail_en: 'overlay2 stacks multiple image layers into a unified view. Write operations are Copy-on-Write into the upperdir.',
+      code: `// OverlayFS mount (equivalent to docker internal operation)
+// lowerdir: read-only image layers (top to bottom: newest→oldest)
+// upperdir: writable container layer (CoW)
+// workdir:  overlay internal work directory
+// merged:   final mount point (what the container sees as /)
 
 mount("overlay", "/var/lib/docker/overlay2/abc123/merged",
       "overlay", 0,
@@ -285,7 +296,8 @@ mount("overlay", "/var/lib/docker/overlay2/abc123/merged",
     },
     cgroup: {
       title: 'cgroup v2 — 资源隔离',
-      detail: '通过 cgroupfs 虚拟文件系统控制 CPU/内存/IO 限制，docker 写入对应文件实现限制。',
+      detail_zh: '通过 cgroupfs 虚拟文件系统控制 CPU/内存/IO 限制，docker 写入对应文件实现限制。',
+      detail_en: 'Controls CPU/memory/IO limits via the cgroupfs virtual filesystem — Docker writes constraints to corresponding files.',
       code: `// docker run --memory=256m --cpus=1.5 实际操作:
 
 // 1. 在 cgroup v2 层级下创建容器 cgroup
@@ -335,7 +347,8 @@ void setup_cgroup(const char *cgroup_path, pid_t pid) {
     },
     ns: {
       title: 'Linux 8 种 Namespace',
-      detail: 'Namespace 是内核的资源隔离机制，每种 namespace 隔离一类全局资源，通过 clone()/unshare()/setns() 操作。',
+      detail_zh: 'Namespace 是内核的资源隔离机制，每种 namespace 隔离一类全局资源，通过 clone()/unshare()/setns() 操作。',
+      detail_en: 'Namespaces are the kernel\'s resource isolation mechanism. Each namespace type isolates a class of global resources, operated via clone()/unshare()/setns().',
       code: `// 8 种 namespace 与对应 clone() flag
 
 #include <sched.h>
@@ -453,7 +466,7 @@ close(fd);
           <>
             <div style={{ ...CARD, borderColor: '#4d8fff' }}>
               <div style={H2}>{sel.title}</div>
-              <div style={{ fontSize: 13, color: '#8b949e', lineHeight: 1.6 }}>{sel.detail}</div>
+              <div style={{ fontSize: 13, color: '#8b949e', lineHeight: 1.6 }}>{sel[isZh ? 'detail_zh' : 'detail_en']}</div>
             </div>
             <div style={CODE}>{sel.code}</div>
           </>

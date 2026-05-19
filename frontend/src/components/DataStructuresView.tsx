@@ -1,6 +1,7 @@
 import { useState, useCallback } from 'react'
 import { useMobile } from '../hooks/useMobile'
 import { DS_LIST, DS_LANGS, DS_LANG_LABELS, DSLangId } from '../dataStructures'
+import { useLang } from '../i18n/lang'
 
 // ─── Real-language syntax highlighter ─────────────────────────────────────────
 
@@ -475,86 +476,88 @@ const DS_DIAGRAM: Record<string, React.FC> = {
 
 // ─── Main View ────────────────────────────────────────────────────────────────
 
-const DS_PROBLEMS: Record<string, { no: number; title: string; diff: 'Easy'|'Medium'|'Hard'; key: string }[]> = {
+const DS_PROBLEMS: Record<string, { no: number; title_zh?: string; title: string; diff: 'Easy'|'Medium'|'Hard'; key_zh: string; key_en: string }[]> = {
   linkedlist: [
-    { no: 206,  title: 'Reverse Linked List',              diff: 'Easy',   key: '迭代/递归翻转，必背模板' },
-    { no: 21,   title: 'Merge Two Sorted Lists',           diff: 'Easy',   key: '虚拟头节点，双指针合并' },
-    { no: 141,  title: 'Linked List Cycle',                diff: 'Easy',   key: '快慢指针判环（Floyd）' },
-    { no: 142,  title: 'Linked List Cycle II',             diff: 'Medium', key: '找环入口：相遇后一指针回头' },
-    { no: 19,   title: 'Remove Nth Node From End',         diff: 'Medium', key: '快慢指针，间距 N' },
-    { no: 23,   title: 'Merge K Sorted Lists',             diff: 'Hard',   key: '优先队列，O(n log k)' },
-    { no: 25,   title: 'Reverse Nodes in k-Group',         diff: 'Hard',   key: '分组翻转，递归或迭代' },
+    { no: 206,  title: 'Reverse Linked List',              diff: 'Easy',   key_zh: '迭代/递归翻转，必背模板',         key_en: 'Iterative/recursive reversal — must know' },
+    { no: 21,   title: 'Merge Two Sorted Lists',           diff: 'Easy',   key_zh: '虚拟头节点，双指针合并',          key_en: 'Dummy head, two-pointer merge' },
+    { no: 141,  title: 'Linked List Cycle',                diff: 'Easy',   key_zh: '快慢指针判环（Floyd）',            key_en: "Fast/slow pointers detect cycle (Floyd's)" },
+    { no: 142,  title: 'Linked List Cycle II',             diff: 'Medium', key_zh: '找环入口：相遇后一指针回头',       key_en: 'Find cycle entry: reset one pointer on meet' },
+    { no: 19,   title: 'Remove Nth Node From End',         diff: 'Medium', key_zh: '快慢指针，间距 N',                key_en: 'Fast/slow pointers, gap of N' },
+    { no: 23,   title: 'Merge K Sorted Lists',             diff: 'Hard',   key_zh: '优先队列，O(n log k)',             key_en: 'Priority queue, O(n log k)' },
+    { no: 25,   title: 'Reverse Nodes in k-Group',         diff: 'Hard',   key_zh: '分组翻转，递归或迭代',            key_en: 'Group reversal, recursive or iterative' },
   ],
   stack: [
-    { no: 20,   title: 'Valid Parentheses',                diff: 'Easy',   key: '栈匹配括号，经典模板' },
-    { no: 155,  title: 'Min Stack',                        diff: 'Medium', key: '辅助栈同步存最小值' },
-    { no: 739,  title: 'Daily Temperatures',               diff: 'Medium', key: '单调栈：下一个更大元素' },
-    { no: 84,   title: 'Largest Rectangle in Histogram',  diff: 'Hard',   key: '单调栈求面积，必考压轴题' },
-    { no: 85,   title: 'Maximal Rectangle',                diff: 'Hard',   key: '逐行转换为柱状图 + 84' },
-    { no: 394,  title: 'Decode String',                    diff: 'Medium', key: '双栈：数字栈 + 字符串栈' },
+    { no: 20,   title: 'Valid Parentheses',                diff: 'Easy',   key_zh: '栈匹配括号，经典模板',            key_en: 'Stack bracket matching — classic template' },
+    { no: 155,  title: 'Min Stack',                        diff: 'Medium', key_zh: '辅助栈同步存最小值',              key_en: 'Auxiliary stack tracking minimum' },
+    { no: 739,  title: 'Daily Temperatures',               diff: 'Medium', key_zh: '单调栈：下一个更大元素',          key_en: 'Monotone stack: next greater element' },
+    { no: 84,   title: 'Largest Rectangle in Histogram',  diff: 'Hard',   key_zh: '单调栈求面积，必考压轴题',         key_en: 'Monotone stack for area — hard classic' },
+    { no: 85,   title: 'Maximal Rectangle',                diff: 'Hard',   key_zh: '逐行转换为柱状图 + 84',            key_en: 'Row-by-row histogram + problem 84' },
+    { no: 394,  title: 'Decode String',                    diff: 'Medium', key_zh: '双栈：数字栈 + 字符串栈',         key_en: 'Dual stacks: number stack + string stack' },
   ],
   queue: [
-    { no: 102,  title: 'Binary Tree Level Order Traversal',diff: 'Medium', key: 'BFS 队列模板，必背' },
-    { no: 239,  title: 'Sliding Window Maximum',           diff: 'Hard',   key: '单调递减双端队列，O(n)' },
-    { no: 622,  title: 'Design Circular Queue',            diff: 'Medium', key: '循环队列实现，front/rear 指针' },
-    { no: 933,  title: 'Number of Recent Calls',           diff: 'Easy',   key: '队列维护时间窗口' },
+    { no: 102,  title: 'Binary Tree Level Order Traversal',diff: 'Medium', key_zh: 'BFS 队列模板，必背',              key_en: 'BFS queue template — must know' },
+    { no: 239,  title: 'Sliding Window Maximum',           diff: 'Hard',   key_zh: '单调递减双端队列，O(n)',           key_en: 'Monotone decreasing deque, O(n)' },
+    { no: 622,  title: 'Design Circular Queue',            diff: 'Medium', key_zh: '循环队列实现，front/rear 指针',    key_en: 'Circular queue with front/rear pointers' },
+    { no: 933,  title: 'Number of Recent Calls',           diff: 'Easy',   key_zh: '队列维护时间窗口',                key_en: 'Queue-based sliding time window' },
   ],
   bst: [
-    { no: 98,   title: 'Validate Binary Search Tree',      diff: 'Medium', key: '中序遍历有序 / 上下界递归' },
-    { no: 230,  title: 'Kth Smallest in BST',              diff: 'Medium', key: '中序第 K 个' },
-    { no: 235,  title: 'LCA of BST',                       diff: 'Medium', key: '利用 BST 有序性找公共祖先' },
-    { no: 450,  title: 'Delete Node in BST',               diff: 'Medium', key: '删除三种情况：叶/单子/双子' },
-    { no: 108,  title: 'Sorted Array to BST',              diff: 'Easy',   key: '取中点为根，递归建树' },
+    { no: 98,   title: 'Validate Binary Search Tree',      diff: 'Medium', key_zh: '中序遍历有序 / 上下界递归',        key_en: 'In-order sorted / recursive bounds' },
+    { no: 230,  title: 'Kth Smallest in BST',              diff: 'Medium', key_zh: '中序第 K 个',                    key_en: 'Kth in-order element' },
+    { no: 235,  title: 'LCA of BST',                       diff: 'Medium', key_zh: '利用 BST 有序性找公共祖先',        key_en: 'Use BST ordering to find LCA' },
+    { no: 450,  title: 'Delete Node in BST',               diff: 'Medium', key_zh: '删除三种情况：叶/单子/双子',       key_en: '3 cases: leaf / one child / two children' },
+    { no: 108,  title: 'Sorted Array to BST',              diff: 'Easy',   key_zh: '取中点为根，递归建树',            key_en: 'Mid-point as root, recursive build' },
   ],
   hashtable: [
-    { no: 1,    title: 'Two Sum',                          diff: 'Easy',   key: '哈希表O(n)，面试开场白' },
-    { no: 49,   title: 'Group Anagrams',                   diff: 'Medium', key: '排序/计数作 key' },
-    { no: 128,  title: 'Longest Consecutive Sequence',     diff: 'Medium', key: '哈希 O(n) 判断连续段' },
-    { no: 146,  title: 'LRU Cache',                        diff: 'Medium', key: '哈希表 + 双向链表，必考！' },
-    { no: 460,  title: 'LFU Cache',                        diff: 'Hard',   key: '哈希表 + 频率双链表' },
-    { no: 380,  title: 'RandomizedSet O(1) Insert/Delete', diff: 'Medium', key: '哈希表 + 数组实现 O(1)' },
+    { no: 1,    title: 'Two Sum',                          diff: 'Easy',   key_zh: '哈希表O(n)，面试开场白',          key_en: 'Hash table O(n) — interview opener' },
+    { no: 49,   title: 'Group Anagrams',                   diff: 'Medium', key_zh: '排序/计数作 key',                key_en: 'Sort/count chars as key' },
+    { no: 128,  title: 'Longest Consecutive Sequence',     diff: 'Medium', key_zh: '哈希 O(n) 判断连续段',            key_en: 'Hash set O(n) consecutive detection' },
+    { no: 146,  title: 'LRU Cache',                        diff: 'Medium', key_zh: '哈希表 + 双向链表，必考！',        key_en: 'Hash map + doubly-linked list — must know!' },
+    { no: 460,  title: 'LFU Cache',                        diff: 'Hard',   key_zh: '哈希表 + 频率双链表',             key_en: 'Hash map + frequency doubly-linked list' },
+    { no: 380,  title: 'RandomizedSet O(1) Insert/Delete', diff: 'Medium', key_zh: '哈希表 + 数组实现 O(1)',           key_en: 'Hash map + array for O(1) ops' },
   ],
   heap: [
-    { no: 215,  title: 'Kth Largest Element',              diff: 'Medium', key: '最小堆大小 K，O(n log k)' },
-    { no: 347,  title: 'Top K Frequent Elements',          diff: 'Medium', key: '频率统计 + 堆' },
-    { no: 295,  title: 'Find Median from Data Stream',     diff: 'Hard',   key: '大根堆+小根堆，必考！' },
-    { no: 23,   title: 'Merge K Sorted Lists',             diff: 'Hard',   key: '优先队列合并' },
-    { no: 1046, title: 'Last Stone Weight',                diff: 'Easy',   key: '最大堆模拟' },
-    { no: 355,  title: 'Design Twitter',                   diff: 'Medium', key: '堆合并 K 个有序 Feed' },
+    { no: 215,  title: 'Kth Largest Element',              diff: 'Medium', key_zh: '最小堆大小 K，O(n log k)',         key_en: 'Min-heap of size K, O(n log k)' },
+    { no: 347,  title: 'Top K Frequent Elements',          diff: 'Medium', key_zh: '频率统计 + 堆',                   key_en: 'Frequency count + heap' },
+    { no: 295,  title: 'Find Median from Data Stream',     diff: 'Hard',   key_zh: '大根堆+小根堆，必考！',            key_en: 'Max-heap + min-heap — must know!' },
+    { no: 23,   title: 'Merge K Sorted Lists',             diff: 'Hard',   key_zh: '优先队列合并',                    key_en: 'Priority queue K-way merge' },
+    { no: 1046, title: 'Last Stone Weight',                diff: 'Easy',   key_zh: '最大堆模拟',                      key_en: 'Max-heap simulation' },
+    { no: 355,  title: 'Design Twitter',                   diff: 'Medium', key_zh: '堆合并 K 个有序 Feed',             key_en: 'Heap merge K sorted feeds' },
   ],
   graph: [
-    { no: 200,  title: 'Number of Islands',                diff: 'Medium', key: 'DFS/BFS 连通分量，必考' },
-    { no: 207,  title: 'Course Schedule',                  diff: 'Medium', key: '拓扑排序判环（入度法）' },
-    { no: 210,  title: 'Course Schedule II',               diff: 'Medium', key: '拓扑排序返回顺序' },
-    { no: 743,  title: 'Network Delay Time',               diff: 'Medium', key: 'Dijkstra 单源最短路' },
-    { no: 684,  title: 'Redundant Connection',             diff: 'Medium', key: '并查集检测环' },
-    { no: 127,  title: 'Word Ladder',                      diff: 'Hard',   key: 'BFS 最短路 + 字符替换' },
+    { no: 200,  title: 'Number of Islands',                diff: 'Medium', key_zh: 'DFS/BFS 连通分量，必考',           key_en: 'DFS/BFS connected components — must know' },
+    { no: 207,  title: 'Course Schedule',                  diff: 'Medium', key_zh: '拓扑排序判环（入度法）',           key_en: 'Topological sort cycle detection (in-degree)' },
+    { no: 210,  title: 'Course Schedule II',               diff: 'Medium', key_zh: '拓扑排序返回顺序',                key_en: 'Topological sort return order' },
+    { no: 743,  title: 'Network Delay Time',               diff: 'Medium', key_zh: 'Dijkstra 单源最短路',             key_en: 'Dijkstra single-source shortest path' },
+    { no: 684,  title: 'Redundant Connection',             diff: 'Medium', key_zh: '并查集检测环',                    key_en: 'Union-Find cycle detection' },
+    { no: 127,  title: 'Word Ladder',                      diff: 'Hard',   key_zh: 'BFS 最短路 + 字符替换',            key_en: 'BFS shortest path + char substitution' },
   ],
   avl: [
-    { no: 1382, title: 'Balance a Binary Search Tree',     diff: 'Medium', key: '中序 + 有序数组建平衡 BST' },
-    { no: 110,  title: 'Balanced Binary Tree',             diff: 'Easy',   key: '递归判高度差 ≤ 1' },
-    { no: 108,  title: 'Convert Sorted Array to BST',      diff: 'Easy',   key: '二分取中点建平衡树' },
+    { no: 1382, title: 'Balance a Binary Search Tree',     diff: 'Medium', key_zh: '中序 + 有序数组建平衡 BST',        key_en: 'In-order + sorted array rebuild balanced BST' },
+    { no: 110,  title: 'Balanced Binary Tree',             diff: 'Easy',   key_zh: '递归判高度差 ≤ 1',                key_en: 'Recursive height difference ≤ 1 check' },
+    { no: 108,  title: 'Convert Sorted Array to BST',      diff: 'Easy',   key_zh: '二分取中点建平衡树',              key_en: 'Binary search mid-point for balanced tree' },
   ],
   trie: [
-    { no: 208,  title: 'Implement Trie',                   diff: 'Medium', key: 'Trie 节点数组/哈希，插入/查找' },
-    { no: 212,  title: 'Word Search II',                   diff: 'Hard',   key: 'Trie + DFS 回溯，剪枝' },
-    { no: 211,  title: 'Design Add and Search Words',      diff: 'Medium', key: 'Trie + . 通配符 DFS' },
-    { no: 648,  title: 'Replace Words',                    diff: 'Medium', key: 'Trie 最短前缀替换' },
-    { no: 421,  title: 'Maximum XOR of Two Numbers',       diff: 'Medium', key: '二进制 Trie 贪心 XOR' },
+    { no: 208,  title: 'Implement Trie',                   diff: 'Medium', key_zh: 'Trie 节点数组/哈希，插入/查找',    key_en: 'Trie node array/hash, insert/search' },
+    { no: 212,  title: 'Word Search II',                   diff: 'Hard',   key_zh: 'Trie + DFS 回溯，剪枝',            key_en: 'Trie + DFS backtrack with pruning' },
+    { no: 211,  title: 'Design Add and Search Words',      diff: 'Medium', key_zh: 'Trie + . 通配符 DFS',              key_en: 'Trie + wildcard . DFS' },
+    { no: 648,  title: 'Replace Words',                    diff: 'Medium', key_zh: 'Trie 最短前缀替换',               key_en: 'Trie shortest prefix replacement' },
+    { no: 421,  title: 'Maximum XOR of Two Numbers',       diff: 'Medium', key_zh: '二进制 Trie 贪心 XOR',             key_en: 'Binary Trie greedy XOR' },
   ],
   skiplist: [
-    { no: 1206, title: 'Design Skiplist',                  diff: 'Hard',   key: '实现跳表 insert/erase/search' },
-    { no: 1348, title: 'Tweet Counts Per Frequency',       diff: 'Medium', key: '有序结构范围查询' },
+    { no: 1206, title: 'Design Skiplist',                  diff: 'Hard',   key_zh: '实现跳表 insert/erase/search',     key_en: 'Implement skiplist insert/erase/search' },
+    { no: 1348, title: 'Tweet Counts Per Frequency',       diff: 'Medium', key_zh: '有序结构范围查询',                key_en: 'Ordered structure range query' },
   ],
   bloomfilter: [
-    { no: 0,    title: '设计题：URL 黑名单过滤',           diff: 'Hard',   key: '布隆过滤器：误判率 vs 空间权衡' },
-    { no: 0,    title: '设计题：缓存穿透防护',             diff: 'Medium', key: '不存在 key 用 BF 拦截，避免打穿 DB' },
+    { no: 0, title_zh: '设计题：URL 黑名单过滤', title: 'Design: URL Blacklist Filter', diff: 'Hard',   key_zh: '布隆过滤器：误判率 vs 空间权衡', key_en: 'Bloom filter: false-positive rate vs space trade-off' },
+    { no: 0, title_zh: '设计题：缓存穿透防护',   title: 'Design: Cache Penetration Guard', diff: 'Medium', key_zh: '不存在 key 用 BF 拦截，避免打穿 DB', key_en: 'BF intercepts missing keys, prevents DB hammering' },
   ],
 }
 
 const DIFF_COLOR_DS = { Easy: '#56d364', Medium: '#ffa657', Hard: '#ff7b72' }
 
 export default function DataStructuresView() {
+  const { lang } = useLang()
+  const isZh = lang === 'zh'
   const [selectedDs, setSelectedDs] = useState(DS_LIST[0].id)
   const [selectedLang, setSelectedLang] = useState<DSLangId>('c')
   const [rightTab, setRightTab] = useState<'code'|'problems'>('code')
@@ -649,12 +652,12 @@ export default function DataStructuresView() {
               color: rightTab === tab ? 'var(--text-primary)' : 'var(--text-muted)',
               fontSize: 12, fontWeight: rightTab === tab ? 700 : 400,
             }}>
-              {tab === 'code' ? '💻 多语言实现' : '📝 面试题'}
+              {tab === 'code' ? (isZh ? '💻 多语言实现' : '💻 Implementations') : (isZh ? '📝 面试题' : '📝 Problems')}
             </button>
           ))}
           {rightTab === 'problems' && DS_PROBLEMS[selectedDs] && (
             <span style={{ marginLeft: 'auto', padding: '8px 14px', fontSize: 11, color: 'var(--text-muted)' }}>
-              {DS_PROBLEMS[selectedDs].length} 题
+              {DS_PROBLEMS[selectedDs].length} {isZh ? '题' : 'problems'}
             </span>
           )}
         </div>
@@ -668,24 +671,24 @@ export default function DataStructuresView() {
               }}>
                 <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
                   {p.no > 0 && <span style={{ fontSize: 10, color: 'var(--text-muted)', minWidth: 34 }}>#{p.no}</span>}
-                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{p.title}</span>
+                  <span style={{ fontSize: 12, fontWeight: 600, color: 'var(--text-primary)', flex: 1 }}>{isZh && p.title_zh ? p.title_zh : p.title}</span>
                   <span style={{
                     fontSize: 10, padding: '2px 7px', borderRadius: 4, fontWeight: 700,
                     background: `${DIFF_COLOR_DS[p.diff]}20`, color: DIFF_COLOR_DS[p.diff],
                   }}>{p.diff}</span>
                 </div>
-                <div style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: p.no > 0 ? 40 : 0 }}>💡 {p.key}</div>
+                <div style={{ fontSize: 11, color: 'var(--text-muted)', paddingLeft: p.no > 0 ? 40 : 0 }}>💡 {isZh ? p.key_zh : p.key_en}</div>
               </div>
             ))}
             {!(DS_PROBLEMS[selectedDs]?.length) && (
-              <div style={{ color: 'var(--text-muted)', fontSize: 12, paddingTop: 20 }}>题目补充中…</div>
+              <div style={{ color: 'var(--text-muted)', fontSize: 12, paddingTop: 20 }}>{isZh ? '题目补充中…' : 'Problems coming soon…'}</div>
             )}
             {/* Complexity reminder */}
             <div style={{ background: 'var(--bg-secondary)', borderRadius: 7, padding: '12px 14px', border: '1px solid var(--border)', marginTop: 4 }}>
-              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>🎯 复杂度速记</div>
+              <div style={{ fontSize: 12, fontWeight: 700, color: 'var(--text-primary)', marginBottom: 6 }}>🎯 {isZh ? '复杂度速记' : 'Complexity Summary'}</div>
               <div style={{ display: 'flex', gap: 12, fontSize: 12 }}>
-                <span>时间 <code style={{ color: '#ffa657' }}>{ds.complexity.time}</code></span>
-                <span>空间 <code style={{ color: '#79c0ff' }}>{ds.complexity.space}</code></span>
+                <span>{isZh ? '时间' : 'Time'} <code style={{ color: '#ffa657' }}>{ds.complexity.time}</code></span>
+                <span>{isZh ? '空间' : 'Space'} <code style={{ color: '#79c0ff' }}>{ds.complexity.space}</code></span>
               </div>
               <div style={{ fontSize: 11, color: 'var(--text-secondary)', marginTop: 6 }}>{ds.description}</div>
             </div>

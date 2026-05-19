@@ -28,6 +28,7 @@ const GitView            = lazy(() => import('./components/GitView'))
 const ConcurrencyView    = lazy(() => import('./components/ConcurrencyView'))
 const WasmView           = lazy(() => import('./components/WasmView'))
 const DatabaseView       = lazy(() => import('./components/DatabaseView'))
+const ObjectBusView      = lazy(() => import('./components/ObjectBusView'))
 
 type TopMode = SearchTopMode
 
@@ -252,6 +253,7 @@ function AppInner() {
     { id: 'concurrency', label: t('tab.concurrency'), icon: '🔄' },
     { id: 'wasm',        label: t('tab.wasm'),        icon: '🕸' },
     { id: 'database',    label: t('tab.database'),    icon: '🗄' },
+    { id: 'objectbus',   label: t('tab.objectbus'),   icon: '🔌' },
   ]
 
   return (
@@ -315,7 +317,7 @@ function AppInner() {
       </header>
 
       {/* ── Lazy-loaded views ─────────────────────────────────────────────────── */}
-      {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86','hw','docker','sysdesign','git','concurrency','wasm','database'] as TopMode[]).includes(topMode) && (
+      {(['ds','linux','tlpi','algo','memory','regex','ieee754','network','cpu','x86','hw','docker','sysdesign','git','concurrency','wasm','database','objectbus'] as TopMode[]).includes(topMode) && (
         <div style={{ height: 'calc(100vh - var(--header-h, 130px))', overflow: 'hidden' }}>
           <ErrorBoundary fallback={
             <div style={{ display:'flex', flexDirection:'column', alignItems:'center', justifyContent:'center', height:'100%', gap:12, color:'var(--text-muted)' }}>
@@ -342,6 +344,7 @@ function AppInner() {
               {topMode === 'concurrency' && <ConcurrencyView />}
               {topMode === 'wasm'        && <WasmView />}
               {topMode === 'database'    && <DatabaseView />}
+              {topMode === 'objectbus'   && <ObjectBusView />}
             </Suspense>
           </ErrorBoundary>
         </div>
