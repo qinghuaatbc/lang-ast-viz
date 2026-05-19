@@ -1,6 +1,7 @@
 import { useState, useRef, useEffect } from 'react'
 import { useMobile } from '../hooks/useMobile'
 import { useLang } from '../i18n/lang'
+import LinuxBusView from './LinuxBusView'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -2415,6 +2416,7 @@ const TABS = [
   { id: 'vfs',       label: '📁 VFS',         comp: VfsTab },
   { id: 'ebpf',      label: '🔭 eBPF',        comp: EbpfTab },
   { id: 'containers',label: '📦 Containers',  comp: ContainersTab },
+  { id: 'bus',        label: '🔌 Bus Circuit', comp: LinuxBusView },
 ]
 
 export default function LinuxView() {
