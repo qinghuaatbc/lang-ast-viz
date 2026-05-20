@@ -350,6 +350,74 @@ const CATEGORIES: CatExample[] = [
     {caller:'UserRepo',callee:'ORM',method:'query',params:'id=42',ret:'Row',relation:'call'},
     {caller:'UserRepo',callee:'Cache',method:'set',params:'key,val',ret:'void',relation:'call'},
   ]},
+
+  // ── Complex Real-World Systems ──────────────────────────────
+  { cat_zh:'复杂系统', cat_en:'Complex', zh:'Web框架全栈', en:'Web Framework', chain:[
+    {caller:'Client',callee:'Router',method:'route',params:'GET /users',ret:'Handler',relation:'call'},
+    {caller:'Router',callee:'AuthMiddleware',method:'verify',params:'token',ret:'Claims',relation:'call'},
+    {caller:'AuthMiddleware',callee:'JWTService',method:'parse',params:'token',ret:'Claims',relation:'depend'},
+    {caller:'AuthMiddleware',callee:'UserController',method:'handle',params:'req',ret:'Resp',relation:'call'},
+    {caller:'UserController',callee:'UserService',method:'getUser',params:'id',ret:'User',relation:'call'},
+    {caller:'UserService',callee:'UserRepository',method:'findById',params:'id',ret:'User',relation:'depend'},
+    {caller:'UserRepository',callee:'PostgresDB',method:'query',params:'sql',ret:'Row',relation:'call'},
+    {caller:'UserService',callee:'CacheService',method:'get',params:'key',ret:'User',relation:'call'},
+    {caller:'CacheService',callee:'Redis',method:'hget',params:'key',ret:'bytes',relation:'call'},
+    {caller:'UserController',callee:'Logger',method:'info',params:'msg',ret:'void',relation:'call'},
+    {caller:'Logger',callee:'Formatter',method:'format',params:'msg',ret:'string',relation:'compose'},
+  ]},
+
+  { cat_zh:'复杂系统', cat_en:'Complex', zh:'游戏引擎', en:'Game Engine', chain:[
+    {caller:'GameLoop',callee:'World',method:'update',params:'dt',ret:'void',relation:'call'},
+    {caller:'World',callee:'EntityManager',method:'getEntities',params:'',ret:'Entity[]',relation:'compose'},
+    {caller:'World',callee:'PhysicsSystem',method:'step',params:'dt',ret:'void',relation:'call'},
+    {caller:'PhysicsSystem',callee:'CollisionDetector',method:'detect',params:'bodies',ret:'Hit[]',relation:'compose'},
+    {caller:'World',callee:'RenderSystem',method:'draw',params:'entities',ret:'void',relation:'call'},
+    {caller:'RenderSystem',callee:'GPU',method:'submit',params:'drawcalls',ret:'void',relation:'depend'},
+    {caller:'World',callee:'AudioSystem',method:'tick',params:'dt',ret:'void',relation:'call'},
+    {caller:'GameLoop',callee:'InputHandler',method:'poll',params:'',ret:'Events',relation:'call'},
+    {caller:'InputHandler',callee:'EventBus',method:'publish',params:'event',ret:'void',relation:'call'},
+    {caller:'EventBus',callee:'ScriptEngine',method:'dispatch',params:'event',ret:'void',relation:'call'},
+  ]},
+
+  { cat_zh:'复杂系统', cat_en:'Complex', zh:'编译器流水线', en:'Compiler Pipeline', chain:[
+    {caller:'Driver',callee:'Lexer',method:'tokenize',params:'src',ret:'Token[]',relation:'call'},
+    {caller:'Driver',callee:'Parser',method:'parse',params:'tokens',ret:'AST',relation:'call'},
+    {caller:'Parser',callee:'ASTBuilder',method:'build',params:'tokens',ret:'AST',relation:'compose'},
+    {caller:'Driver',callee:'TypeChecker',method:'check',params:'ast',ret:'TypedAST',relation:'call'},
+    {caller:'TypeChecker',callee:'SymbolTable',method:'resolve',params:'name',ret:'Type',relation:'compose'},
+    {caller:'Driver',callee:'IRGen',method:'lower',params:'typed',ret:'IR',relation:'call'},
+    {caller:'Driver',callee:'Optimizer',method:'optimize',params:'ir',ret:'IR',relation:'call'},
+    {caller:'Optimizer',callee:'DeadCodeElim',method:'run',params:'ir',ret:'IR',relation:'compose'},
+    {caller:'Driver',callee:'CodeGen',method:'emit',params:'ir',ret:'Asm',relation:'call'},
+    {caller:'CodeGen',callee:'Linker',method:'link',params:'objs',ret:'Binary',relation:'call'},
+  ]},
+
+  { cat_zh:'复杂系统', cat_en:'Complex', zh:'微服务网格', en:'Microservice Mesh', chain:[
+    {caller:'Client',callee:'APIGateway',method:'request',params:'route',ret:'Resp',relation:'call'},
+    {caller:'APIGateway',callee:'AuthService',method:'verify',params:'token',ret:'bool',relation:'call'},
+    {caller:'APIGateway',callee:'LoadBalancer',method:'pick',params:'svc',ret:'Addr',relation:'call'},
+    {caller:'LoadBalancer',callee:'ServiceRegistry',method:'lookup',params:'svc',ret:'Addr[]',relation:'call'},
+    {caller:'APIGateway',callee:'OrderService',method:'createOrder',params:'items',ret:'Order',relation:'call'},
+    {caller:'OrderService',callee:'InventoryService',method:'reserve',params:'sku',ret:'bool',relation:'call'},
+    {caller:'OrderService',callee:'PaymentService',method:'charge',params:'amt',ret:'Receipt',relation:'call'},
+    {caller:'PaymentService',callee:'MessageBroker',method:'publish',params:'event',ret:'void',relation:'call'},
+    {caller:'MessageBroker',callee:'NotificationService',method:'consume',params:'event',ret:'void',relation:'call'},
+    {caller:'OrderService',callee:'CircuitBreaker',method:'call',params:'fn',ret:'Resp',relation:'compose'},
+    {caller:'CircuitBreaker',callee:'Fallback',method:'handle',params:'err',ret:'Resp',relation:'call'},
+  ]},
+
+  { cat_zh:'复杂系统', cat_en:'Complex', zh:'操作系统内核', en:'OS Kernel', chain:[
+    {caller:'UserProcess',callee:'Syscall',method:'write',params:'fd,buf',ret:'int',relation:'call'},
+    {caller:'Syscall',callee:'VFS',method:'write',params:'inode,buf',ret:'int',relation:'call'},
+    {caller:'VFS',callee:'Ext4FS',method:'write',params:'block,data',ret:'int',relation:'depend'},
+    {caller:'Ext4FS',callee:'BlockDevice',method:'writeSector',params:'lba,buf',ret:'void',relation:'call'},
+    {caller:'Syscall',callee:'Scheduler',method:'yield',params:'',ret:'void',relation:'call'},
+    {caller:'Scheduler',callee:'RunQueue',method:'nextTask',params:'cpu',ret:'Task',relation:'compose'},
+    {caller:'Scheduler',callee:'MMU',method:'switchContext',params:'pgdir',ret:'void',relation:'call'},
+    {caller:'MMU',callee:'TLB',method:'flush',params:'',ret:'void',relation:'compose'},
+    {caller:'UserProcess',callee:'MemoryManager',method:'mmap',params:'size',ret:'addr',relation:'call'},
+    {caller:'MemoryManager',callee:'PageAllocator',method:'alloc',params:'pages',ret:'Frame',relation:'call'},
+  ]},
 ]
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -558,49 +626,91 @@ function checkConflict(step: BusStep): string | null {
 
 /* ── SVG Components ──────────────────────────────────────────── */
 
+/* ── Chip type detection ─────────────────────────────────────── */
+type ChipType = 'interface' | 'service' | 'controller' | 'repository' | 'factory' | 'infra' | 'default'
+
+function detectChipType(name: string): ChipType {
+  const n = name.toLowerCase()
+  if (/interface|abstract|trait|protocol/.test(n)) return 'interface'
+  if (/service|manager|engine|orchestr|saga|usecase/.test(n)) return 'service'
+  if (/controller|handler|router|gateway|api|middleware/.test(n)) return 'controller'
+  if (/repo|store|cache|db|database|orm|redis|postgres|mysql|mongo/.test(n)) return 'repository'
+  if (/factory|builder|provider|registry|loader/.test(n)) return 'factory'
+  if (/gpu|cpu|mmu|tlb|disk|net|driver|device|block|syscall|vfs/.test(n)) return 'infra'
+  return 'default'
+}
+
+const CHIP_TYPE_COLOR: Record<ChipType, string> = {
+  interface:  '#56d364',
+  service:    '#d2a8ff',
+  controller: '#79c0ff',
+  repository: '#ffa657',
+  factory:    '#ff7b72',
+  infra:      '#f0883e',
+  default:    '#58a6ff',
+}
+
+const CHIP_TYPE_LABEL: Record<ChipType, string> = {
+  interface:  'IF',
+  service:    'SVC',
+  controller: 'CTL',
+  repository: 'REPO',
+  factory:    'FAC',
+  infra:      'HW',
+  default:    'MOD',
+}
+
 function ChipModule({ name, sub, x, y, w, active, color, state: st, memLayout }: {
   name: string; sub: string; x: number; y: number; w: number; active: boolean; color: string; state?: Record<string, string>; memLayout?: any[]
 }) {
   const se = st ? Object.entries(st) : []
   const useLayout = memLayout && memLayout.length > 0
   const ch = useLayout ? 80 + memLayout!.length * 11 : 80
+  const chipType = detectChipType(name)
+  const typeColor = active ? CHIP_TYPE_COLOR[chipType] : CHIP_TYPE_COLOR[chipType] + '60'
+  const effectiveColor = active ? typeColor : '#334'
   const pinPositions = [14, 28, 42, 56, 70]
   const pinLen = 7
-  const pinColor = active ? '#4a5568' : '#2d3748'
+  const pinColor = active ? typeColor + '99' : '#2d3748'
   return (
     <g>
+      {/* Glow behind active chip */}
+      {active && <rect x={x-4} y={y-4} width={w+8} height={ch+8} rx={6} fill={typeColor} opacity={0.08} />}
       {/* IC pin stubs — left side */}
       {pinPositions.map((py, pi) => (
         <g key={`pl-${pi}`}>
           <rect x={x - pinLen - 2} y={y + py - 2} width={4} height={4} rx={0.5} fill={pinColor} />
-          <line x1={x - pinLen + 2} y1={y + py} x2={x} y2={y + py} stroke={pinColor} strokeWidth={1} />
-          <text x={x + 4} y={y + py + 3} fill={active ? '#3d4f60' : '#252f3a'} fontSize={5} fontFamily="monospace">{pi + 1}</text>
+          <line x1={x - pinLen + 2} y1={y + py} x2={x} y2={y + py} stroke={pinColor} strokeWidth={1.2} />
+          <text x={x + 4} y={y + py + 3} fill={active ? typeColor + '80' : '#252f3a'} fontSize={5} fontFamily="monospace">{pi + 1}</text>
         </g>
       ))}
       {/* IC pin stubs — right side */}
       {pinPositions.map((py, pi) => (
         <g key={`pr-${pi}`}>
-          <line x1={x + w} y1={y + py} x2={x + w + pinLen - 2} y2={y + py} stroke={pinColor} strokeWidth={1} />
+          <line x1={x + w} y1={y + py} x2={x + w + pinLen - 2} y2={y + py} stroke={pinColor} strokeWidth={1.2} />
           <rect x={x + w + pinLen - 2} y={y + py - 2} width={4} height={4} rx={0.5} fill={pinColor} />
-          <text x={x + w - 4} y={y + py + 3} fill={active ? '#3d4f60' : '#252f3a'} fontSize={5} fontFamily="monospace" textAnchor="end">{10 - pi}</text>
+          <text x={x + w - 4} y={y + py + 3} fill={active ? typeColor + '80' : '#252f3a'} fontSize={5} fontFamily="monospace" textAnchor="end">{10 - pi}</text>
         </g>
       ))}
       {/* Chip body */}
-      <rect x={x} y={y} width={w} height={ch} rx={3} fill="#1a2332" stroke={active ? color : '#334'} strokeWidth={1.5} />
+      <rect x={x} y={y} width={w} height={ch} rx={3} fill="#111a24" stroke={effectiveColor} strokeWidth={active ? 2 : 1} />
+      {/* Top color stripe by chip type */}
+      <rect x={x} y={y} width={w} height={6} rx={2} fill={typeColor} opacity={active ? 0.5 : 0.15} />
       {/* IC identification notch */}
-      <path d={`M${x+w/2-18} ${y} L${x+w/2-8} ${y-5} L${x+w/2+8} ${y-5} L${x+w/2+18} ${y} Z`} fill="#1a2332" stroke={active ? color : '#334'} strokeWidth={1} />
+      <path d={`M${x+w/2-14} ${y} L${x+w/2-6} ${y-4} L${x+w/2+6} ${y-4} L${x+w/2+14} ${y} Z`} fill="#111a24" stroke={effectiveColor} strokeWidth={1} />
       {/* Status LED */}
-      <circle cx={x+10} cy={y+7} r={2.5} fill={active ? color : '#334'} />
-      {active && <circle cx={x+10} cy={y+7} r={5} fill={color} opacity={0.25} />}
-      {/* VCC/GND labels */}
-      <text x={x+w-5} y={y+7} textAnchor="end" fill={active ? '#4a6' : '#334'} fontSize={5} fontFamily="monospace">VCC</text>
+      <circle cx={x+10} cy={y+13} r={2.5} fill={active ? typeColor : '#334'} />
+      {active && <circle cx={x+10} cy={y+13} r={5} fill={typeColor} opacity={0.3} />}
+      {/* Type badge */}
+      <rect x={x+w-28} y={y+8} width={24} height={9} rx={2} fill={typeColor} opacity={active ? 0.25 : 0.1} />
+      <text x={x+w-16} y={y+15} textAnchor="middle" fill={typeColor} fontSize={5} fontWeight="bold" fontFamily="monospace">{CHIP_TYPE_LABEL[chipType]}</text>
       {/* Chip name and sub-label */}
-      <text x={x+w/2} y={y+24} textAnchor="middle" fill={active ? 'var(--text-primary)' : 'var(--text-muted)'} fontSize={9} fontWeight="bold" fontFamily="monospace">{name}</text>
-      <text x={x+w/2} y={y+36} textAnchor="middle" fill={active ? 'var(--text-secondary)' : 'var(--text-muted)'} fontSize={7} fontFamily="monospace">{sub}</text>
+      <text x={x+w/2} y={y+30} textAnchor="middle" fill={active ? 'var(--text-primary)' : 'var(--text-muted)'} fontSize={9} fontWeight="bold" fontFamily="monospace">{name}</text>
+      <text x={x+w/2} y={y+41} textAnchor="middle" fill={active ? typeColor : 'var(--text-muted)'} fontSize={7} fontFamily="monospace">{sub}</text>
       {/* Divider */}
-      <line x1={x+4} y1={y+43} x2={x+w-4} y2={y+43} stroke={active ? color+'30' : '#222'} strokeWidth={0.5} />
+      <line x1={x+4} y1={y+48} x2={x+w-4} y2={y+48} stroke={active ? typeColor + '40' : '#222'} strokeWidth={0.5} />
       {useLayout ? (
-        <g transform={`translate(${x+4}, ${y+46})`}>
+        <g transform={`translate(${x+4}, ${y+51})`}>
           {memLayout!.map((ml, i) => (
             <g key={i} transform={`translate(0, ${i*11})`}>
               <rect x={0} y={0} width={w-8} height={10} rx={1} fill={ml.active ? color+'25' : 'transparent'} />
@@ -613,7 +723,7 @@ function ChipModule({ name, sub, x, y, w, active, color, state: st, memLayout }:
       ) : se.length > 0 ? (
         <g>
           {se.slice(0, 3).map(([k, v], i) => (
-            <text key={i} x={x+6} y={y+53+i*8} fill={active ? 'var(--text-secondary)' : 'var(--text-muted)'} fontSize={6} fontFamily="monospace">{k}={v}</text>
+            <text key={i} x={x+6} y={y+58+i*8} fill={active ? 'var(--text-secondary)' : 'var(--text-muted)'} fontSize={6} fontFamily="monospace">{k}={v}</text>
           ))}
         </g>
       ) : null}
@@ -666,35 +776,71 @@ function RelationGlyph({ x, y, rel, color, atSource }: { x: number; y: number; r
   return null
 }
 
-function RelationPath({ from, to, relation, isZh }: {
+function RelationPath({ from, to, relation, isZh, active, animPct }: {
   from: { x: number; y: number; w: number }
   to: { x: number; y: number; w: number }
   relation: string
   isZh: boolean
+  active?: boolean
+  animPct?: number  // 0..1 progress of signal dot
 }) {
   const rel = relation || 'call'
   const color = REL_COLORS[rel] || '#79c0ff'
   const fromX = from.x + from.w
-  const fromY = from.y + 30
+  const fromY = from.y + 40
   const toX = to.x
-  const toY = to.y + 30
+  const toY = to.y + 40
   const midX = (fromX + toX) / 2
+  const midY = (fromY + toY) / 2
   const isDashed = REL_STROKE[rel] === 'dashed'
   const label = isZh ? (REL_LABELS_ZH[rel] || rel) : (REL_LABELS_EN[rel] || rel)
-  // Shorten line to make room for glyphs
   const lineStart = rel === 'compose' || rel === 'aggregate' ? fromX + 8 : fromX
   const lineEnd = rel === 'inherit' ? toX - 8 : toX
+
+  // Orthogonal routing: horizontal then vertical
+  const sameRow = Math.abs(fromY - toY) < 5
+  const pathD = sameRow
+    ? `M${lineStart} ${fromY} L${lineEnd} ${toY}`
+    : `M${lineStart} ${fromY} L${midX} ${fromY} L${midX} ${toY} L${lineEnd} ${toY}`
+
+  // Signal dot position along path
+  let dotX = midX, dotY = midY
+  if (animPct !== undefined) {
+    const t = animPct
+    if (sameRow) {
+      dotX = lineStart + (lineEnd - lineStart) * t
+      dotY = fromY
+    } else {
+      const seg1 = Math.abs(midX - lineStart)
+      const seg2 = Math.abs(toY - fromY)
+      const seg3 = Math.abs(lineEnd - midX)
+      const total = seg1 + seg2 + seg3
+      const dist = t * total
+      if (dist <= seg1) { dotX = lineStart + dist; dotY = fromY }
+      else if (dist <= seg1 + seg2) { dotX = midX; dotY = fromY + (dist - seg1) * Math.sign(toY - fromY) }
+      else { dotX = midX + (dist - seg1 - seg2) * Math.sign(lineEnd - midX); dotY = toY }
+    }
+  }
+
   return (
     <g>
       <RelationGlyph x={fromX + 7} y={fromY} rel={rel} color={color} atSource={true} />
-      <line x1={lineStart} y1={fromY} x2={lineEnd} y2={toY}
-        stroke={color} strokeWidth={1.5}
-        strokeDasharray={isDashed ? '4 3' : 'none'}
+      {/* Glow trace when active */}
+      {active && <path d={pathD} stroke={color} strokeWidth={4} strokeOpacity={0.15} fill="none" />}
+      <path d={pathD} stroke={active ? color : color + '50'} strokeWidth={active ? 1.8 : 1}
+        strokeDasharray={isDashed ? '4 3' : 'none'} fill="none"
         markerEnd={rel === 'inherit' ? 'none' : `url(#arrow-${rel})`} />
       <RelationGlyph x={toX - 7} y={toY} rel={rel} color={color} atSource={false} />
-      <rect x={midX - 38} y={fromY - 15} width={76} height={12} rx={3}
-        fill="var(--bg-primary)" stroke={color+'60'} strokeWidth={0.5} />
-      <text x={midX} y={fromY - 5} textAnchor="middle" fill={color}
+      {/* Signal pulse dot */}
+      {active && animPct !== undefined && (
+        <g>
+          <circle cx={dotX} cy={dotY} r={4} fill={color} opacity={0.9} />
+          <circle cx={dotX} cy={dotY} r={8} fill={color} opacity={0.2} />
+        </g>
+      )}
+      <rect x={midX - 34} y={sameRow ? fromY - 16 : midY - 8} width={68} height={12} rx={3}
+        fill="var(--bg-primary)" stroke={active ? color + '80' : color + '30'} strokeWidth={0.5} />
+      <text x={midX} y={sameRow ? fromY - 6 : midY + 2} textAnchor="middle" fill={active ? color : color + '80'}
         fontSize={7} fontWeight="bold" fontFamily="monospace">{label}</text>
     </g>
   )
@@ -1031,23 +1177,89 @@ export default function CodeChipView() {
     })
   }
 
-  /* Auto Layout: max 5 chips per row */
-  const chipsPerRow = 4
-  const numChips = chain.length + 1
-  const numRows = Math.ceil(numChips / chipsPerRow)
-  const chipW = 110
-  const gapX = 36
+  /* ── Hierarchical layout ──────────────────────────────────── */
+  const chipW = 120
   const chipH = 80
-  const rowH = chipH + 140  // chip + bus space + margin
-  const svgW = Math.max(560, chipsPerRow * (chipW + gapX) + 60)
-  const svgH = numRows * rowH + 50
+  const gapX = 44
+  const gapY = 140
 
+  // Collect unique chip names in order
+  const chipNames = useMemo(() => {
+    const seen = new Set<string>()
+    const list: string[] = []
+    for (const c of chain) {
+      if (!seen.has(c.caller)) { seen.add(c.caller); list.push(c.caller) }
+      if (!seen.has(c.callee)) { seen.add(c.callee); list.push(c.callee) }
+    }
+    return list
+  }, [chain])
+
+  // Assign layers via longest-path DAG layering
+  const chipLayer = useMemo(() => {
+    const layer: Record<string, number> = {}
+    const inEdges: Record<string, string[]> = {}
+    for (const n of chipNames) { layer[n] = 0; inEdges[n] = [] }
+    for (const c of chain) { if (c.caller !== c.callee) inEdges[c.callee]?.push(c.caller) }
+    // topological propagation
+    for (let pass = 0; pass < chipNames.length; pass++) {
+      for (const n of chipNames) {
+        for (const p of (inEdges[n] || [])) {
+          layer[n] = Math.max(layer[n], (layer[p] ?? 0) + 1)
+        }
+      }
+    }
+    return layer
+  }, [chain, chipNames])
+
+  // Group by layer
+  const layers = useMemo(() => {
+    const m: Record<number, string[]> = {}
+    for (const n of chipNames) {
+      const l = chipLayer[n] ?? 0
+      if (!m[l]) m[l] = []
+      m[l].push(n)
+    }
+    return m
+  }, [chipNames, chipLayer])
+
+  const numCols = Object.keys(layers).length
+  const maxPerCol = Math.max(...Object.values(layers).map(a => a.length), 1)
+
+  const svgW = Math.max(600, numCols * (chipW + gapX) + 80)
+  const svgH = Math.max(300, maxPerCol * (chipH + gapY) + 60)
+
+  const chipPosMap = useMemo(() => {
+    const m: Record<string, { x: number; y: number }> = {}
+    const sortedLayers = Object.keys(layers).map(Number).sort((a, b) => a - b)
+    sortedLayers.forEach((l, li) => {
+      const col = layers[l]
+      const colH = col.length * (chipH + gapY) - gapY
+      const startY = (svgH - colH) / 2
+      col.forEach((name, ri) => {
+        m[name] = {
+          x: 30 + li * (chipW + gapX),
+          y: startY + ri * (chipH + gapY),
+        }
+      })
+    })
+    return m
+  }, [layers, chipH, gapY, svgH, svgW])
+
+  const numChips = chipNames.length
+  const chipsPerRow = 4  // kept for busLineY compat
+  const numRows = Math.ceil(numChips / chipsPerRow)
+  const rowH = chipH + gapY
+
+  // Chip index for bus positioning (keep bus lines at bottom)
   const chipPos = (idx: number) => {
-    const row = Math.floor(idx / chipsPerRow)
-    const col = idx % chipsPerRow
-    return { x: 18 + col * (chipW + gapX), y: 16 + row * rowH }
+    const name = chipNames[idx]
+    return chipPosMap[name] ?? { x: 18 + (idx % 4) * (chipW + gapX), y: 16 + Math.floor(idx / 4) * rowH }
   }
   const busLineY = (row: number, bus: BusType) => row * rowH + chipH + 30 + (bus === 'addr' ? -24 : bus === 'data' ? 24 : 0)
+
+  // Active connection for animation
+  const activeFromIdx = s.highlightLine ? Math.max(0, s.highlightLine - 2) : -1
+  const activeToIdx   = s.highlightLine ? s.highlightLine - 1 : -1
 
   return (
     <div style={{ height:'100%', display:'flex', flexDirection:'column', padding:'8px 12px', gap:6, overflow:'auto' }}>
@@ -1186,50 +1398,33 @@ export default function CodeChipView() {
               </defs>
               <rect width={svgW} height={svgH} fill="var(--bg-primary)" /><rect width={svgW} height={svgH} fill="url(#g)" />
 
-              {/* Relationship arrows between adjacent chips (same row) */}
-              {Array.from({ length: Math.max(0, numChips - 1) }, (_, i) => {
-                const p1 = chipPos(i)
-                const p2 = chipPos(i + 1)
-                if (Math.floor(i / chipsPerRow) !== Math.floor((i + 1) / chipsPerRow)) return null
-                const rel = chain[i]?.relation || 'call'
-                return <RelationPath key={`rel-${i}`} from={{...p1, w: chipW}} to={{...p2, w: chipW}} relation={rel} isZh={isZh} />
+              {/* Connection arrows — use chipPosMap for all connections */}
+              {chain.map((c, i) => {
+                const p1 = chipPosMap[c.caller]
+                const p2 = chipPosMap[c.callee]
+                if (!p1 || !p2 || c.caller === c.callee) return null
+                const isActive = i === activeToIdx
+                const animPct = isActive ? ((Date.now() % 1200) / 1200) : undefined
+                return <RelationPath key={`rel-${i}`}
+                  from={{...p1, w: chipW}} to={{...p2, w: chipW}}
+                  relation={c.relation || 'call'} isZh={isZh}
+                  active={isActive} animPct={isActive ? step / Math.max(1, allSteps.length) : undefined}
+                />
               })}
 
-              {/* Cross-row connection arrows (L-shaped path) */}
-              {Array.from({ length: Math.max(0, numChips - 1) }, (_, i) => {
-                const p1 = chipPos(i)
-                const p2 = chipPos(i + 1)
-                if (Math.floor(i / chipsPerRow) === Math.floor((i + 1) / chipsPerRow)) return null
-                const rel = chain[i]?.relation || 'call'
-                const color = REL_COLORS[rel] || '#79c0ff'
-                const isDashed = REL_STROKE[rel] === 'dashed'
-                const label = isZh ? (REL_LABELS_ZH[rel] || rel) : (REL_LABELS_EN[rel] || rel)
-                const fx = p1.x + chipW, fy = p1.y + 30
-                const tx = p2.x, ty = p2.y + 30
-                const rx = svgW - 16
-                const midLX = (fx + rx) / 2
-                return (
-                  <g key={`cross-${i}`}>
-                    <path d={`M ${fx} ${fy} L ${rx} ${fy} L ${rx} ${ty} L ${tx} ${ty}`}
-                      stroke={color} strokeWidth={1.5} fill="none"
-                      strokeDasharray={isDashed ? '4 3' : 'none'}
-                      markerEnd={`url(#arrow-${rel})`} />
-                    <rect x={midLX - 35} y={fy - 15} width={70} height={12} rx={3}
-                      fill="var(--bg-primary)" stroke={color + '60'} strokeWidth={0.5} />
-                    <text x={midLX} y={fy - 5} textAnchor="middle" fill={color}
-                      fontSize={7} fontWeight="bold" fontFamily="monospace">{label}</text>
-                  </g>
-                )
-              })}
-
-              {/* Chips */}
-              {Array.from({ length: numChips }, (_, i) => {
-                const p = chipPos(i)
-                const name = i === 0 ? chain[0]?.caller || 'Caller' : chain[i - 1]?.callee || `M${i}`
-                return <ChipModule key={i} name={name} sub={i === 0 ? (isZh ? '调用方' : 'Caller') : `#${i}`} x={p.x} y={p.y} w={chipW}
-                  active={i === 0 ? movingData.some(d => d.from === 0) : movingData.some(d => d.to === i || d.from === i)}
-                  color={i === 0 ? '#4d8fff' : [BUS_COLORS.addr,BUS_COLORS.data,BUS_COLORS.ctrl,'#d2a8ff','#ffa657'][(i-1)%5]}
-                  state={s.state} memLayout={showMem && i === numChips - 1 ? memLayout : undefined} />
+              {/* Chips — positioned by hierarchical layout */}
+              {chipNames.map((name, i) => {
+                const p = chipPosMap[name] ?? { x: 18, y: 16 }
+                const chipType = detectChipType(name)
+                const typeColor = CHIP_TYPE_COLOR[chipType]
+                const isActiveChip = chain.some((c, ci) => (c.caller === name || c.callee === name) && ci === activeToIdx)
+                return <ChipModule key={name} name={name}
+                  sub={CHIP_TYPE_LABEL[chipType]}
+                  x={p.x} y={p.y} w={chipW}
+                  active={isActiveChip}
+                  color={typeColor}
+                  state={s.state}
+                  memLayout={showMem && i === numChips - 1 ? memLayout : undefined} />
               })}
 
               {/* Buses per row */}
