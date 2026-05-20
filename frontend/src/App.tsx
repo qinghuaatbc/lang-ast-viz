@@ -153,13 +153,13 @@ function AppInner() {
     setVisited(getVisited())
   }
   const [code, setCode] = useState(() => {
-    const savedLang = localStorage.getItem('lav-lang') || 'rust'
+    const savedLang = localStorage.getItem('lav-lang') || 'go'
     const ex = examplesByLang[savedLang]
-    return ex && ex.length > 0 ? ex[0].code : examplesByLang.rust[0].code
+    return ex && ex.length > 0 ? ex[0].code : examplesByLang.go[0].code
   })
   const [state, dispatch] = useReducer(parseReducer, { result: null, loading: false, error: '' })
   const [activeTab, setActiveTab] = useState<'ast' | 'ir'>('ast')
-  const [language, setLanguage] = useState(() => localStorage.getItem('lav-lang') || 'rust')
+  const [language, setLanguage] = useState(() => localStorage.getItem('lav-lang') || 'go')
   const [showHelp, setShowHelp] = useState(false)
   const [autoRun, setAutoRun] = useState(false)
 
@@ -368,7 +368,7 @@ function AppInner() {
               onExampleSelect={handleExampleSelect}
               loading={state.loading}
               language={language}
-              examples={examplesByLang[language] || examplesByLang.rust}
+              examples={examplesByLang[language] || examplesByLang.go}
               errorLines={new Set<number>()}
             />
           </div>

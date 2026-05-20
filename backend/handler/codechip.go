@@ -500,7 +500,9 @@ func parsePython(code string) ChipParseResult {
 		chips = append(chips, chip)
 	}
 
-	return ChipParseResult{Chips: chips, Calls: deduplicateCalls(calls), Lang: "python"}
+	deduped := deduplicateCalls(calls)
+	tree := chipsToAST("python", chips, deduped)
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Lang: "python"}
 }
 
 /* ── Java ───────────────────────────────────────────────────── */
@@ -568,7 +570,9 @@ func parseJava(code string) ChipParseResult {
 		chips = append(chips, chip)
 	}
 
-	return ChipParseResult{Chips: chips, Calls: deduplicateCalls(calls), Lang: "java"}
+	deduped := deduplicateCalls(calls)
+	tree := chipsToAST("java", chips, deduped)
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Lang: "java"}
 }
 
 /* ── C++ ────────────────────────────────────────────────────── */
@@ -631,7 +635,9 @@ func parseCpp(code string) ChipParseResult {
 		chips = append(chips, chip)
 	}
 
-	return ChipParseResult{Chips: chips, Calls: deduplicateCalls(calls), Lang: "cpp"}
+	deduped := deduplicateCalls(calls)
+	tree := chipsToAST("cpp", chips, deduped)
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Lang: "cpp"}
 }
 
 /* ── TypeScript ─────────────────────────────────────────────── */
@@ -705,7 +711,9 @@ func parseTypeScript(code string) ChipParseResult {
 		chips = append(chips, chip)
 	}
 
-	return ChipParseResult{Chips: chips, Calls: deduplicateCalls(calls), Lang: "typescript"}
+	deduped := deduplicateCalls(calls)
+	tree := chipsToAST("typescript", chips, deduped)
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Lang: "typescript"}
 }
 
 /* ── Auto-detect language ───────────────────────────────────── */
@@ -725,6 +733,46 @@ func detectAndParse(code string) ChipParseResult {
 	default:
 		return parsePython(code)
 	}
+}
+
+/* ── Generic AST from chips+calls (non-Go languages) ────────── */
+
+func chipsToAST(lang string, chips []ChipInfo, calls []CallEdge) GenASTNode {
+	root := GenASTNode{Type: "Program", Value: lang}
+	for _, chip := range chips {
+		node := GenASTNode{Type: "Class", Value: chip.Name}
+		// fields
+		if len(chip.Fields) > 0 {
+			fields := GenASTNode{Type: "Fields"}
+			for _, f := range chip.Fields {
+				fields.Children = append(fields.Children, GenASTNode{Type: "Field", Value: f})
+			}
+			node.Children = append(node.Children, fields)
+		}
+		// methods
+		if len(chip.Methods) > 0 {
+			methods := GenASTNode{Type: "Methods"}
+			for _, m := range chip.Methods {
+				methods.Children = append(methods.Children, GenASTNode{Type: "Method", Value: m})
+			}
+			node.Children = append(node.Children, methods)
+		}
+		// relations involving this chip
+		rels := GenASTNode{Type: "Relations"}
+		for _, c := range calls {
+			if c.From == chip.Name {
+				rels.Children = append(rels.Children, GenASTNode{
+					Type:  c.Relation,
+					Value: c.To + "." + c.Method,
+				})
+			}
+		}
+		if len(rels.Children) > 0 {
+			node.Children = append(node.Children, rels)
+		}
+		root.Children = append(root.Children, node)
+	}
+	return root
 }
 
 /* ── Helpers ────────────────────────────────────────────────── */
