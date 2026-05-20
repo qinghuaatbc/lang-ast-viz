@@ -1110,7 +1110,6 @@ export default function CodeChipView() {
   const allSteps = useMemo(() => generateSteps(chain), [chain])
   const s = allSteps[step % allSteps.length]
   const conflict = checkConflict(s)
-  const movingData = s.movingData || []
 
   /* ── Fix: compute codeLines, hlLine, memLayout, detectCalls inside component ── */
   const codeLines = useMemo(() => {
@@ -1231,15 +1230,17 @@ export default function CodeChipView() {
   const maxPerCol = Math.max(...Object.values(layers).map(a => a.length), 1)
 
   const svgW = Math.max(600, numCols * (chipW + gapX) + 80)
-  const svgH = Math.max(300, maxPerCol * (chipH + gapY) + 60)
+  const chipAreaH = Math.max(220, maxPerCol * (chipH + gapY) + 60)
+  const svgH = chipAreaH + 90  // chip area + system bus zone
 
   const chipPosMap = useMemo(() => {
+    const aH = Math.max(220, maxPerCol * (chipH + gapY) + 60)
     const m: Record<string, { x: number; y: number }> = {}
     const sortedLayers = Object.keys(layers).map(Number).sort((a, b) => a - b)
     sortedLayers.forEach((l, li) => {
       const col = layers[l]
       const colH = col.length * (chipH + gapY) - gapY
-      const startY = (svgH - colH) / 2
+      const startY = (aH - colH) / 2
       col.forEach((name, ri) => {
         m[name] = {
           x: 30 + li * (chipW + gapX),
@@ -1248,23 +1249,12 @@ export default function CodeChipView() {
       })
     })
     return m
-  }, [layers, chipH, gapY, svgH, svgW])
+  }, [layers, chipH, gapY, maxPerCol, svgW])
 
   const numChips = chipNames.length
-  const chipsPerRow = 4  // kept for busLineY compat
-  const numRows = Math.ceil(numChips / chipsPerRow)
-  const rowH = chipH + gapY
 
-  // Chip index for bus positioning (keep bus lines at bottom)
-  const chipPos = (idx: number) => {
-    const name = chipNames[idx]
-    return chipPosMap[name] ?? { x: 18 + (idx % 4) * (chipW + gapX), y: 16 + Math.floor(idx / 4) * rowH }
-  }
-  const busLineY = (row: number, bus: BusType) => row * rowH + chipH + 30 + (bus === 'addr' ? -24 : bus === 'data' ? 24 : 0)
-
-  // Active connection for animation
-  const activeFromIdx = s.highlightLine ? Math.max(0, s.highlightLine - 2) : -1
-  const activeToIdx   = s.highlightLine ? s.highlightLine - 1 : -1
+  // Active connection index for animation
+  const activeToIdx = s.highlightLine ? s.highlightLine - 1 : -1
 
   return (
     <div style={{ height:'100%', display:'flex', flexDirection:'column', padding:'8px 12px', gap:6, overflow:'auto' }}>
@@ -1458,72 +1448,86 @@ export default function CodeChipView() {
                 )
               })}
 
-              {/* Buses per row */}
-              {Array.from({ length: numRows }, (_, row) => (
-                (['addr','ctrl','data'] as BusType[]).map(bus => (
-                  <g key={`${row}-${bus}`}>
-                    <line x1={0} y1={busLineY(row, bus)} x2={svgW} y2={busLineY(row, bus)} stroke={BUS_COLORS[bus]} strokeWidth={2} opacity={s[bus] !== '—' ? 1 : 0.12} />
-                    {Array.from({ length: Math.min(chipsPerRow, numChips - row * chipsPerRow) }, (_, ci) => {
-                      const idx = row * chipsPerRow + ci
-                      const p = chipPos(idx)
-                      const cx = idx === 0 ? p.x + chipW : p.x - 8
-                      return (<g key={ci}><line x1={cx} y1={p.y + 30} x2={cx} y2={busLineY(row, bus)} stroke={s[bus] !== '—' ? BUS_COLORS[bus] : '#222'} strokeWidth={1} strokeDasharray="3 2" /><circle cx={cx} cy={busLineY(row, bus)} r={3} fill={s[bus] !== '—' ? BUS_COLORS[bus] : '#333'} /></g>)
+              {/* System Bus — three horizontal rails below all chips */}
+              {(() => {
+                const busBaseY = chipAreaH + 12
+                const busOffs: Record<BusType, number> = { addr: 0, ctrl: 26, data: 52 }
+                const activeCaller = activeToIdx >= 0 && activeToIdx < chain.length ? chain[activeToIdx].caller : ''
+                const activeCallee = activeToIdx >= 0 && activeToIdx < chain.length ? chain[activeToIdx].callee : ''
+                return (
+                  <g>
+                    {/* Per-chip wires to bus */}
+                    {chipNames.map(name => {
+                      const p = chipPosMap[name]
+                      if (!p) return null
+                      const isActive = name === activeCaller || name === activeCallee
+                      const cx = p.x + chipW / 2
+                      const chipBottomY = p.y + chipH
+                      return (
+                        <g key={`bw-${name}`}>
+                          {(['addr', 'ctrl', 'data'] as BusType[]).map((bus, bi) => {
+                            const bx = cx + (bi - 1) * 5
+                            const busY = busBaseY + busOffs[bus]
+                            const active = isActive && s[bus] !== '—'
+                            return (
+                              <g key={bus}>
+                                <line x1={bx} y1={chipBottomY + 3} x2={bx} y2={busY}
+                                  stroke={active ? BUS_COLORS[bus] : '#1c2940'}
+                                  strokeWidth={active ? 1.5 : 0.8}
+                                  strokeDasharray={active ? 'none' : '3 3'} />
+                                <circle cx={bx} cy={busY} r={2.5} fill={active ? BUS_COLORS[bus] : '#243050'} />
+                              </g>
+                            )
+                          })}
+                        </g>
+                      )
                     })}
+                    {/* Bus rails */}
+                    {(['addr', 'ctrl', 'data'] as BusType[]).map(bus => {
+                      const busY = busBaseY + busOffs[bus]
+                      const active = s[bus] !== '—'
+                      return (
+                        <g key={`bl-${bus}`}>
+                          {active && <line x1={0} y1={busY} x2={svgW} y2={busY} stroke={BUS_COLORS[bus]} strokeWidth={5} opacity={0.07} />}
+                          <line x1={0} y1={busY} x2={svgW} y2={busY}
+                            stroke={BUS_COLORS[bus]} strokeWidth={active ? 1.8 : 1} opacity={active ? 0.85 : 0.12} />
+                          <rect x={4} y={busY - 9} width={46} height={10} rx={2}
+                            fill="var(--bg-primary)" stroke={BUS_COLORS[bus] + '50'} strokeWidth={0.8} />
+                          <text x={7} y={busY - 1} fill={BUS_COLORS[bus]} fontSize={6}
+                            fontWeight="bold" fontFamily="monospace">{bus.toUpperCase()} BUS</text>
+                          {active && (
+                            <g>
+                              <rect x={55} y={busY - 7} width={Math.min(s[bus].length * 6.5 + 10, 180)} height={12} rx={3}
+                                fill="var(--bg-primary)" stroke={BUS_COLORS[bus]} strokeWidth={1.2} />
+                              <text x={61} y={busY + 2} fill={BUS_COLORS[bus]} fontSize={7.5}
+                                fontWeight="bold" fontFamily="monospace">{s[bus]}</text>
+                            </g>
+                          )}
+                        </g>
+                      )
+                    })}
+                    {/* Signal pulses on bus rails */}
+                    {activeToIdx >= 0 && activeToIdx < chain.length && animProgress > 0 && (
+                      (['addr', 'ctrl', 'data'] as BusType[]).map(bus => {
+                        if (s[bus] === '—') return null
+                        const pFrom = chipPosMap[activeCaller]
+                        const pTo = chipPosMap[activeCallee]
+                        if (!pFrom || !pTo) return null
+                        const busY = busBaseY + busOffs[bus]
+                        const fx = pFrom.x + chipW / 2
+                        const tx = pTo.x + chipW / 2
+                        const cx = fx + (tx - fx) * animProgress
+                        return (
+                          <g key={`bp-${bus}`}>
+                            <circle cx={cx} cy={busY} r={5} fill={BUS_COLORS[bus]} opacity={0.9} />
+                            <circle cx={cx} cy={busY} r={10} fill={BUS_COLORS[bus]} opacity={0.15} />
+                          </g>
+                        )
+                      })
+                    )}
                   </g>
-                ))
-              ))}
-
-              {/* Bus labels */}
-              {Array.from({ length: numRows }, (_, row) => (([['addr','ADDR','#ff7b72'],['ctrl','CTRL','#79c0ff'],['data','DATA','#56d364']] as const).map(([b,n,c]) => (
-                <g key={`l-${row}-${n}`} transform={`translate(4, ${busLineY(row, b)-14})`}>
-                  <rect x={0} y={0} width={68} height={12} rx={2} fill="var(--bg-primary)" stroke={(c+'40')} strokeWidth={1} />
-                  <text x={3} y={9} fill={c} fontSize={7} fontFamily='monospace' fontWeight='bold'>{n} BUS</text>
-                </g>
-              ))))}
-
-              {/* Cross-row bus bridges — vertical connectors on right edge */}
-              {numRows > 1 && Array.from({ length: numRows - 1 }, (_, row) => (
-                (['addr','ctrl','data'] as BusType[]).map(bus => {
-                  const y1 = busLineY(row, bus)
-                  const y2 = busLineY(row + 1, bus)
-                  const bx = svgW - 6
-                  const color = BUS_COLORS[bus]
-                  const active = s[bus] !== '—'
-                  return (
-                    <g key={`bridge-${row}-${bus}`}>
-                      <line x1={bx} y1={y1} x2={bx} y2={y2}
-                        stroke={active ? color : color + '28'} strokeWidth={2}
-                        strokeDasharray={active ? 'none' : '4 3'} />
-                      <circle cx={bx} cy={y1} r={3} fill={active ? color : color + '50'} />
-                      <circle cx={bx} cy={y2} r={3} fill={active ? color : color + '50'} />
-                    </g>
-                  )
-                })
-              ))}
-
-              {/* Value labels */}
-              {(['addr','ctrl','data'] as BusType[]).map(b => (
-                <g key={b} transform={`translate(${chipW + 40}, ${busLineY(0, b)})`}>
-                  <BusValueLabel bus={b.toUpperCase()} label={s[b]} color={BUS_COLORS[b]} active={s[b] !== '—'} />
-                </g>
-              ))}
-
-              {/* Moving dots */}
-              {movingData.map((md, i) => {
-                const calleeIdx = md.to === 99 ? numChips - 1 : md.to
-                const callerIdx = md.from === 99 ? numChips - 1 : md.from
-                const p1 = chipPos(md.from === 0 ? 0 : callerIdx < numChips ? callerIdx : 0)
-                const p2 = chipPos(calleeIdx < numChips ? calleeIdx : numChips - 1)
-                const cx1 = md.from === 0 ? p1.x + chipW : p1.x
-                const cx2 = md.to === 99 ? p2.x + 150 : md.to === 0 ? p2.x + chipW : p2.x
-                const fromChipIdx = md.from === 0 ? 0 : (md.from === 99 ? numChips - 1 : md.from)
-                const toChipIdx = md.to === 0 ? 0 : (md.to === 99 ? numChips - 1 : md.to)
-                const rowFrom = Math.floor(fromChipIdx / chipsPerRow)
-                const rowTo = Math.floor(toChipIdx / chipsPerRow)
-                const y = busLineY(rowFrom, md.bus)
-                const fx = cx1 < cx2 ? cx1 : cx2; const tx = cx1 < cx2 ? cx2 : cx1
-                return <MovingDot key={i} progress={animProgress} fromX={fx} toX={tx} y={y} color={BUS_COLORS[md.bus]} label={md.label} />
-              })}
+                )
+              })()}
             </svg>
 
             {/* Chip Inspector Panel */}
