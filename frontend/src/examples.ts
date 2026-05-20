@@ -1,309 +1,356 @@
-import { Example } from './api/compile'
+export interface Example { name: string; code: string }
 
-const rust: Example[] = [
-  { name: 'Basic arithmetic', code: 'let x = 10;\nlet y = 20;\nprint x + y;' },
-  { name: 'Variable swap', code: 'let x = 1;\nlet y = 2;\nlet t = x;\nx = y;\ny = t;\nprint x;\nprint y;' },
-  { name: 'If/else branch', code: 'let a = 5;\nif a > 3 {\n  print a;\n} else {\n  print 0;\n}' },
-  { name: 'If/elif/else chain', code: 'let x = 2;\nif x == 1 {\n  print 1;\n} elif x == 2 {\n  print 2;\n} else {\n  print 3;\n}' },
-  { name: 'While loop', code: 'let i = 0;\nwhile i < 5 {\n  print i;\n  i = i + 1;\n}' },
-  { name: 'Operator precedence', code: 'let x = 1;\nlet y = 2;\nlet z = 3;\nprint x + y * z;\nprint (x + y) * z;\nprint x * y + z;' },
-  { name: 'Factorial', code: 'let n = 5;\nlet fact = 1;\nwhile n > 0 {\n  fact = fact * n;\n  n = n - 1;\n}\nprint fact;' },
-  { name: 'Sum 1 to 10', code: 'let sum = 0;\nlet i = 1;\nwhile i <= 10 {\n  sum = sum + i;\n  i = i + 1;\n}\nprint sum;' },
-  { name: 'Max of three', code: 'let x = 10;\nlet y = 20;\nlet z = 30;\nif x > y {\n  if x > z {\n    print x;\n  } else {\n    print z;\n  }\n} else {\n  if y > z {\n    print y;\n  } else {\n    print z;\n  }\n}' },
-  { name: 'Fibonacci', code: 'let a = 2;\nlet b = 1;\nwhile a < 100 {\n  print a;\n  let c = a + b;\n  b = a;\n  a = c;\n}' },
-  { name: 'Even/odd', code: 'let x = 7;\nif x % 2 == 0 {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Triangle numbers', code: 'let n = 1;\nlet m = 1;\nwhile n <= 5 {\n  let j = 1;\n  while j <= n {\n    print m;\n    m = m + 1;\n    j = j + 1;\n  }\n  n = n + 1;\n}' },
-  { name: 'Prime numbers', code: 'let i = 2;\nwhile i <= 20 {\n  let j = 2;\n  let prime = 1;\n  while j < i {\n    if i % j == 0 {\n      prime = 0;\n    }\n    j = j + 1;\n  }\n  if prime == 1 {\n    print i;\n  }\n  i = i + 1;\n}' },
-  { name: 'Object literal', code: 'let p = [x = 10, y = 20];\nprint p.x;\nprint p.y;' },
-  { name: 'Object expression', code: 'let p = [x = 5, y = 3];\nlet q = [x = p.x + p.y, y = p.x - p.y];\nprint q.x;\nprint q.y;' },
-  { name: 'Class definition', code: 'class Point {\n  x = 0;\n  y = 0;\n}\nlet p = Point(10, 20);\nprint p.x;\nprint p.y;' },
-  { name: 'Class with __init__', code: 'class Counter {\n  count = 0;\n}\nfn __init__(start) {\n  self.count = start;\n}\nlet c = Counter(5);\nprint c.count;' },
-  { name: 'Equality chain', code: 'let x = 1;\nlet y = 1;\nlet z = 1;\nif x == y {\n  if y == z {\n    print 1;\n  } else {\n    print 0;\n  }\n} else {\n  print 0;\n}' },
-  { name: 'String literal', code: 'let s = "hello";\nprint s;' },
-  { name: 'String concat', code: 'let a = "Hello, ";\nlet b = "World!";\nprint a + b;' },
-  { name: 'Countdown', code: 'let i = 10;\nwhile i > 0 {\n  print i;\n  i = i - 1;\n}' },
-  { name: 'Nested loops', code: 'let x = 0;\nwhile x < 3 {\n  let y = 0;\n  while y < 3 {\n    print x * 3 + y;\n    y = y + 1;\n  }\n  x = x + 1;\n}' },
-  { name: 'Multiplication table', code: 'let i = 1;\nwhile i <= 5 {\n  let j = 1;\n  while j <= 5 {\n    print i * j;\n    j = j + 1;\n  }\n  i = i + 1;\n}' },
-  { name: 'Power of two', code: 'let n = 1;\nlet i = 0;\nwhile i < 10 {\n  print n;\n  n = n * 2;\n  i = i + 1;\n}' },
-  { name: 'Arithmetic progression', code: 'let a = 2;\nlet d = 3;\nlet i = 0;\nwhile i < 10 {\n  print a + i * d;\n  i = i + 1;\n}' },
-  { name: 'Geometric progression', code: 'let a = 1;\nlet r = 2;\nlet i = 0;\nwhile i < 10 {\n  print a;\n  a = a * r;\n  i = i + 1;\n}' },
-  { name: 'Modulo loop', code: 'let i = 1;\nwhile i <= 20 {\n  if i % 3 == 0 {\n    print i;\n  }\n  i = i + 1;\n}' },
-  { name: 'Digit sum', code: 'let n = 12345;\nlet sum = 0;\nwhile n > 0 {\n  sum = sum + n % 10;\n  n = n / 10;\n}\nprint sum;' },
-  { name: 'Count digits', code: 'let n = 12345;\nlet count = 0;\nwhile n > 0 {\n  count = count + 1;\n  n = n / 10;\n}\nprint count;' },
-  { name: 'GCD', code: 'let a = 12;\nlet b = 8;\nwhile b > 0 {\n  let t = b;\n  b = a % b;\n  a = t;\n}\nprint a;' },
-  { name: 'LCM', code: 'let a = 6;\nlet b = 8;\nlet x = a;\nlet y = b;\nwhile y > 0 {\n  let t = y;\n  y = x % y;\n  x = t;\n}\nprint a * b / x;' },
-  { name: 'Is prime', code: 'let n = 17;\nlet i = 2;\nlet prime = 1;\nwhile i < n {\n  if n % i == 0 {\n    prime = 0;\n  }\n  i = i + 1;\n}\nprint prime;' },
-  { name: 'Reverse number', code: 'let n = 1234;\nlet rev = 0;\nwhile n > 0 {\n  rev = rev * 10 + n % 10;\n  n = n / 10;\n}\nprint rev;' },
-  { name: 'Palindrome check', code: 'let n = 1221;\nlet orig = n;\nlet rev = 0;\nwhile n > 0 {\n  rev = rev * 10 + n % 10;\n  n = n / 10;\n}\nif orig == rev {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Leap year', code: 'let y = 2024;\nif y % 400 == 0 {\n  print 1;\n} else {\n  if y % 100 == 0 {\n    print 0;\n  } else {\n    if y % 4 == 0 {\n      print 1;\n    } else {\n      print 0;\n    }\n  }\n}' },
-  { name: 'Sum of squares', code: 'let n = 5;\nlet sum = 0;\nlet i = 1;\nwhile i <= n {\n  sum = sum + i * i;\n  i = i + 1;\n}\nprint sum;' },
-  { name: 'Sum of cubes', code: 'let n = 5;\nlet sum = 0;\nlet i = 1;\nwhile i <= n {\n  sum = sum + i * i * i;\n  i = i + 1;\n}\nprint sum;' },
-  { name: 'Factorial loop', code: 'let n = 6;\nlet f = 1;\nlet i = 1;\nwhile i <= n {\n  f = f * i;\n  i = i + 1;\n}\nprint f;' },
-  { name: 'Binomial coefficient', code: 'let n = 5;\nlet k = 2;\nlet r = 1;\nlet i = 1;\nwhile i <= k {\n  r = r * (n - i + 1) / i;\n  i = i + 1;\n}\nprint r;' },
-  { name: 'Collatz sequence', code: 'let n = 13;\nwhile n > 1 {\n  print n;\n  if n % 2 == 0 {\n    n = n / 2;\n  } else {\n    n = n * 3 + 1;\n  }\n}\nprint n;' },
-  { name: 'Armstrong number', code: 'let n = 153;\nlet sum = 0;\nlet t = n;\nwhile t > 0 {\n  let d = t % 10;\n  sum = sum + d * d * d;\n  t = t / 10;\n}\nif sum == n {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Perfect number', code: 'let n = 28;\nlet sum = 0;\nlet i = 1;\nwhile i < n {\n  if n % i == 0 {\n    sum = sum + i;\n  }\n  i = i + 1;\n}\nif sum == n {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Power function', code: 'let b = 2;\nlet e = 10;\nlet r = 1;\nlet i = 0;\nwhile i < e {\n  r = r * b;\n  i = i + 1;\n}\nprint r;' },
-  { name: 'Nested if', code: 'let x = 15;\nif x > 10 {\n  if x < 20 {\n    print 1;\n  } else {\n    print 0;\n  }\n} else {\n  print 0;\n}' },
-  { name: 'Range check', code: 'let x = 7;\nif x >= 0 {\n  if x <= 10 {\n    print 1;\n  } else {\n    print 0;\n  }\n} else {\n  print 0;\n}' },
-  { name: 'Absolute value', code: 'let x = 7;\nif x >= 0 {\n  print x;\n} else {\n  print 0 - x;\n}' },
-  { name: 'Sign function', code: 'let x = 7;\nif x > 0 {\n  print 1;\n} else {\n  if x < 0 {\n    print 0 - 1;\n  } else {\n    print 0;\n  }\n}' },
-  { name: 'Min of two', code: 'let x = 10;\nlet y = 20;\nif x < y {\n  print x;\n} else {\n  print y;\n}' },
-  { name: 'Max of two', code: 'let x = 10;\nlet y = 20;\nif x > y {\n  print x;\n} else {\n  print y;\n}' },
-  { name: 'Clamp value', code: 'let x = 25;\nlet lo = 0;\nlet hi = 10;\nif x < lo {\n  print lo;\n} else {\n  if x > hi {\n    print hi;\n  } else {\n    print x;\n  }\n}' },
-  { name: 'FizzBuzz', code: 'let i = 1;\nwhile i <= 15 {\n  if i % 15 == 0 {\n    print 0;\n  } else {\n    if i % 3 == 0 {\n      print 3;\n    } else {\n      if i % 5 == 0 {\n        print 5;\n      } else {\n        print i;\n      }\n    }\n  }\n  i = i + 1;\n}' },
-  { name: 'Multiples of 3 or 5', code: 'let sum = 0;\nlet i = 1;\nwhile i < 10 {\n  if i % 3 == 0 {\n    sum = sum + i;\n  } else {\n    if i % 5 == 0 {\n      sum = sum + i;\n    }\n  }\n  i = i + 1;\n}\nprint sum;' },
-  { name: 'Array literal', code: 'let a = [1, 2, 3, 4, 5];\nprint a;' },
-  { name: 'Function add', code: 'fn add(a, b) {\n  return a + b;\n}\nprint add(3, 4);' },
-  { name: 'Function sub', code: 'fn sub(a, b) {\n  return a - b;\n}\nprint sub(10, 3);' },
-  { name: 'Function mul', code: 'fn mul(a, b) {\n  return a * b;\n}\nprint mul(6, 7);' },
-  { name: 'Function div', code: 'fn div(a, b) {\n  return a / b;\n}\nprint div(10, 3);' },
-  { name: 'Function fact', code: 'fn fact(n) {\n  if n <= 1 {\n    return 1;\n  }\n  return n * fact(n - 1);\n}\nprint fact(5);' },
-  { name: 'Function fib', code: 'fn fib(n) {\n  if n <= 1 {\n    return n;\n  }\n  return fib(n - 1) + fib(n - 2);\n}\nprint fib(10);' },
-  { name: 'Function max', code: 'fn max(a, b) {\n  if a > b {\n    return a;\n  }\n  return b;\n}\nprint max(10, 20);' },
-  { name: 'Function min', code: 'fn min(a, b) {\n  if a < b {\n    return a;\n  }\n  return b;\n}\nprint min(10, 20);' },
-  { name: 'Function gcd', code: 'fn gcd(a, b) {\n  while b > 0 {\n    let t = b;\n    b = a % b;\n    a = t;\n  }\n  return a;\n}\nprint gcd(12, 8);' },
-  { name: 'Function pow', code: 'fn pow(b, e) {\n  let r = 1;\n  let i = 0;\n  while i < e {\n    r = r * b;\n    i = i + 1;\n  }\n  return r;\n}\nprint pow(2, 10);' },
-  { name: 'Call function twice', code: 'fn double(x) {\n  return x * 2;\n}\nprint double(5);\nprint double(10);' },
-  { name: 'Compose functions', code: 'fn add1(x) {\n  return x + 1;\n}\nfn double(x) {\n  return x * 2;\n}\nprint double(add1(5));' },
-  { name: 'Multiple returns', code: 'fn analyze(x) {\n  if x > 0 {\n    return 1;\n  }\n  if x < 0 {\n    return 0 - 1;\n  }\n  return 0;\n}\nprint analyze(10);\nprint analyze(0 - 5);\nprint analyze(0);' },
-  { name: 'Early return', code: 'fn first(a) {\n  if a > 0 {\n    return 1;\n  }\n  return 0;\n}\nprint first(5);\nprint first(0 - 3);' },
-  { name: 'Nested function calls', code: 'fn add(a, b) {\n  return a + b;\n}\nfn mul(a, b) {\n  return a * b;\n}\nprint mul(add(2, 3), add(4, 5));' },
-  { name: 'String compare', code: 'let a = "abc";\nlet b = "abc";\nif a == b {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'String length via loop', code: 'let s = "hello";\nlet len = 0;\nprint len;' },
-  { name: 'Concat and print', code: 'let s = "count: ";\nprint s + 42;' },
-  { name: 'Class with 3 fields', code: 'class Vec3 {\n  x = 0;\n  y = 0;\n  z = 0;\n}\nlet v = Vec3(1, 2, 3);\nprint v.x;\nprint v.y;\nprint v.z;' },
-  { name: 'Class inheritance', code: 'class A {\n  a = 1;\n}\nclass B extends A {\n  b = 2;\n}\nlet obj = B();\nprint obj.a;\nprint obj.b;' },
-  { name: 'Scope shadowing', code: 'let x = 5;\nif true {\n  let x = 10;\n  print x;\n}\nprint x;' },
-  { name: 'Deep scope', code: 'let x = 1;\nif true {\n  let y = 2;\n  if true {\n    let z = 3;\n    print x + y + z;\n  }\n}' },
-  { name: 'While with break', code: 'let i = 0;\nwhile i < 10 {\n  if i == 5 {\n    break;\n  }\n  print i;\n  i = i + 1;\n}' },
-  { name: 'Triangle pattern', code: 'let i = 1;\nwhile i <= 5 {\n  let j = 1;\n  while j <= i {\n    print j;\n    j = j + 1;\n  }\n  i = i + 1;\n}' },
-  { name: 'Star pattern', code: 'let i = 1;\nwhile i <= 5 {\n  let j = 1;\n  while j <= i {\n    print 1;\n    j = j + 1;\n  }\n  i = i + 1;\n}' },
-  { name: 'Row sum', code: 'let i = 1;\nwhile i <= 5 {\n  let sum = 0;\n  let j = 1;\n  while j <= i {\n    sum = sum + j;\n    j = j + 1;\n  }\n  print sum;\n  i = i + 1;\n}' },
-  { name: 'Running total', code: 'let tot = 0;\nlet i = 1;\nwhile i <= 10 {\n  tot = tot + i;\n  print tot;\n  i = i + 1;\n}' },
-  { name: 'Factorial table', code: 'let n = 1;\nlet f = 1;\nwhile n <= 7 {\n  f = f * n;\n  print f;\n  n = n + 1;\n}' },
-  { name: 'Sequence squares', code: 'let i = 1;\nwhile i <= 10 {\n  print i * i;\n  i = i + 1;\n}' },
-  { name: 'Sequence cubes', code: 'let i = 1;\nwhile i <= 10 {\n  print i * i * i;\n  i = i + 1;\n}' },
-  { name: 'Even numbers', code: 'let i = 0;\nwhile i <= 20 {\n  print i;\n  i = i + 2;\n}' },
-  { name: 'Odd numbers', code: 'let i = 1;\nwhile i <= 20 {\n  print i;\n  i = i + 2;\n}' },
-  { name: 'Powers of 2', code: 'let p = 1;\nlet i = 0;\nwhile i <= 10 {\n  print p;\n  p = p * 2;\n  i = i + 1;\n}' },
-  { name: 'Powers of 3', code: 'let p = 1;\nlet i = 0;\nwhile i <= 8 {\n  print p;\n  p = p * 3;\n  i = i + 1;\n}' },
-  { name: 'Mixed arithmetic', code: 'print 1 + 2;\nprint 3 - 4;\nprint 5 * 6;\nprint 10 / 3;\nprint 17 % 5;' },
-  { name: 'Comparison ops', code: 'print 5 < 3;\nprint 5 > 3;\nprint 5 <= 5;\nprint 5 >= 5;\nprint 5 == 5;\nprint 5 != 3;' },
-  { name: 'Boolean logic', code: 'let t = 1;\nlet f = 0;\nif t == 1 {\n  if f == 0 {\n    print 1;\n  }\n}' },
-  { name: 'Nested comparison', code: 'let x = 5;\nif x > 0 {\n  if x < 10 {\n    print x;\n  }\n}' },
-  { name: 'Three-way compare', code: 'let a = 5;\nlet b = 5;\nif a == b {\n  print 0;\n} else {\n  if a > b {\n    print 1;\n  } else {\n    print 0 - 1;\n  }\n}' },
-  { name: 'Progression sum', code: 'let n = 10;\nprint n * (n + 1) / 2;' },
-  { name: 'Square root via loop', code: 'let n = 25;\nlet i = 0;\nwhile i * i < n {\n  i = i + 1;\n}\nif i * i == n {\n  print i;\n} else {\n  print 0;\n}' },
-  { name: 'Multiply by addition', code: 'let a = 7;\nlet b = 8;\nlet r = 0;\nlet i = 0;\nwhile i < b {\n  r = r + a;\n  i = i + 1;\n}\nprint r;' },
-  { name: 'Divide by subtraction', code: 'let a = 20;\nlet b = 3;\nlet q = 0;\nwhile a >= b {\n  a = a - b;\n  q = q + 1;\n}\nprint q;\nprint a;' },
-  { name: 'Hailstone steps', code: 'let n = 13;\nlet steps = 0;\nwhile n > 1 {\n  if n % 2 == 0 {\n    n = n / 2;\n  } else {\n    n = n * 3 + 1;\n  }\n  steps = steps + 1;\n}\nprint steps;' },
-  { name: 'Fibonacci range', code: 'let a = 0;\nlet b = 1;\nwhile a < 50 {\n  print a;\n  let c = a + b;\n  a = b;\n  b = c;\n}' },
-  { name: 'Tribonacci', code: 'let a = 0;\nlet b = 0;\nlet c = 1;\nlet i = 0;\nwhile i < 10 {\n  print a;\n  let t = a + b + c;\n  a = b;\n  b = c;\n  c = t;\n  i = i + 1;\n}' },
-  { name: 'Lucas numbers', code: 'let a = 2;\nlet b = 1;\nlet i = 0;\nwhile i < 10 {\n  print a;\n  let c = a + b;\n  a = b;\n  b = c;\n  i = i + 1;\n}' },
-  { name: 'Multiples of 2', code: 'let i = 2;\nwhile i <= 20 {\n  print i;\n  i = i + 2;\n}' },
-  { name: 'Multiples of 3', code: 'let i = 3;\nwhile i <= 30 {\n  print i;\n  i = i + 3;\n}' },
-  { name: 'Table of squares', code: 'let i = 1;\nwhile i <= 10 {\n  print i * i;\n  i = i + 1;\n}' },
-  { name: 'Table of cubes', code: 'let i = 1;\nwhile i <= 10 {\n  print i * i * i;\n  i = i + 1;\n}' },
-  { name: 'Inverse table', code: 'let i = 10;\nwhile i > 0 {\n  print i;\n  i = i - 1;\n}' },
-  { name: 'Two digit reverse', code: 'let n = 47;\nprint n % 10;\nprint n / 10;' },
-  { name: 'Two digit sum', code: 'let n = 47;\nprint n / 10 + n % 10;' },
-  { name: 'Divisible by both', code: 'let n = 12;\nif n % 3 == 0 {\n  if n % 4 == 0 {\n    print 1;\n  } else {\n    print 0;\n  }\n} else {\n  print 0;\n}' },
-  { name: 'Divisible by either', code: 'let n = 9;\nif n % 3 == 0 {\n  print 1;\n} else {\n  if n % 4 == 0 {\n    print 1;\n  } else {\n    print 0;\n  }\n}' },
-  { name: 'Not divisible', code: 'let n = 7;\nif n % 2 == 0 {\n  print 0;\n} else {\n  print 1;\n}' },
-  { name: 'Double and increment', code: 'let x = 5;\nx = x * 2 + 1;\nprint x;' },
-  { name: 'Chained assignment', code: 'let x = 0;\nlet y = 0;\nx = 5;\ny = x;\nprint y;' },
-  { name: 'Constant propagation', code: 'let a = 3;\nlet b = 4;\nlet c = a * a + b * b;\nprint c;' },
-  { name: 'Formula evaluation', code: 'let x = 2;\nlet y = 3;\nprint x * x + 2 * x * y + y * y;' },
-  { name: 'Midpoint', code: 'let x1 = 0;\nlet y1 = 0;\nlet x2 = 10;\nlet y2 = 20;\nprint (x1 + x2) / 2;\nprint (y1 + y2) / 2;' },
-  { name: 'Distance squared', code: 'let x1 = 0;\nlet y1 = 0;\nlet x2 = 3;\nlet y2 = 4;\nlet dx = x2 - x1;\nlet dy = y2 - y1;\nprint dx * dx + dy * dy;' },
-  { name: 'Slope', code: 'let x1 = 0;\nlet y1 = 0;\nlet x2 = 4;\nlet y2 = 8;\nprint (y2 - y1) / (x2 - x1);' },
-  { name: 'Area of rectangle', code: 'let w = 5;\nlet h = 3;\nprint w * h;' },
-  { name: 'Perimeter of rectangle', code: 'let w = 5;\nlet h = 3;\nprint 2 * (w + h);' },
-  { name: 'Circle area integer', code: 'let r = 7;\nprint 3 * r * r / 1;' },
-  { name: 'Simple interest', code: 'let p = 1000;\nlet r = 5;\nlet t = 2;\nprint p * r * t / 100;' },
-  { name: 'Speed calculation', code: 'let d = 100;\nlet t = 2;\nprint d / t;' },
-  { name: 'Temperature conversion', code: 'let c = 100;\nprint c * 9 / 5 + 32;' },
-  { name: 'Discount', code: 'let price = 200;\nlet disc = 10;\nprint price - price * disc / 100;' },
-  { name: 'Percentage', code: 'let part = 30;\nlet whole = 200;\nprint part * 100 / whole;' },
-  { name: 'Average of three', code: 'let a = 10;\nlet b = 20;\nlet c = 30;\nprint (a + b + c) / 3;' },
-  { name: 'Sum of digits squared', code: 'let n = 34;\nlet a = n / 10;\nlet b = n % 10;\nprint a * a + b * b;' },
-  { name: 'Carry of addition', code: 'let a = 18;\nlet b = 27;\nprint (a % 10 + b % 10) / 10;' },
-  { name: 'Ten times', code: 'let x = 7;\nprint x * 10;' },
-  { name: 'Hundred times', code: 'let x = 7;\nprint x * 100;' },
-  { name: 'Nearest even', code: 'let x = 7;\nif x % 2 == 0 {\n  print x;\n} else {\n  print x + 1;\n}' },
-  { name: 'Nearest odd', code: 'let x = 8;\nif x % 2 == 1 {\n  print x;\n} else {\n  print x + 1;\n}' },
-  { name: 'Absolute difference', code: 'let a = 10;\nlet b = 3;\nif a > b {\n  print a - b;\n} else {\n  print b - a;\n}' },
-  { name: 'Remainder check', code: 'let n = 10;\nlet d = 3;\nif n % d == 0 {\n  print 1;\n} else {\n  print n % d;\n}' },
-  { name: 'Odd or even', code: 'let n = 7;\nif n % 2 == 0 {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Positive or negative', code: 'let n = 7;\nif n > 0 {\n  print 1;\n} else {\n  if n < 0 {\n    print 0 - 1;\n  } else {\n    print 0;\n  }\n}' },
-  { name: 'Zero check', code: 'let n = 0;\nif n == 0 {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Non-zero check', code: 'let n = 5;\nif n != 0 {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Between check', code: 'let x = 7;\nif x > 0 {\n  if x < 10 {\n    print 1;\n  } else {\n    print 0;\n  }\n} else {\n  print 0;\n}' },
-  { name: 'Outside check', code: 'let x = 15;\nif x < 0 {\n  print 1;\n} else {\n  if x > 10 {\n    print 1;\n  } else {\n    print 0;\n  }\n}' },
-  { name: 'Composite number', code: 'let n = 15;\nlet i = 2;\nlet comp = 0;\nwhile i < n {\n  if n % i == 0 {\n    comp = 1;\n  }\n  i = i + 1;\n}\nprint comp;' },
-  { name: 'Twin prime check', code: 'let n = 11;\nlet m = 13;\nlet i = 2;\nlet pn = 1;\nlet pm = 1;\nwhile i < n {\n  if n % i == 0 { pn = 0; }\n  if m % i == 0 { pm = 0; }\n  i = i + 1;\n}\nif pn == 1 {\n  if pm == 1 {\n    if m - n == 2 {\n      print 1;\n    }\n  }\n}' },
-  { name: 'Reduce fraction', code: 'let a = 12;\nlet b = 8;\nlet x = a;\nlet y = b;\nwhile y > 0 {\n  let t = y;\n  y = x % y;\n  x = t;\n}\nprint a / x;\nprint b / x;' },
-  { name: 'Integer division', code: 'let a = 17;\nlet b = 5;\nprint a / b;\nprint a % b;' },
-  { name: 'Round to multiple', code: 'let n = 13;\nlet m = 5;\nprint (n / m) * m;' },
-  { name: 'Ceil division', code: 'let a = 17;\nlet b = 5;\nprint (a + b - 1) / b;' },
-  { name: 'Wrap around', code: 'let n = 7;\nlet m = 3;\nprint n % m;' },
-  { name: 'Cyclic shift', code: 'let n = 1234;\nlet d = n % 10;\nlet r = n / 10;\nprint d * 1000 + r;' },
-  { name: 'Power of two check', code: 'let n = 16;\nlet p = n;\nwhile p > 1 {\n  if p % 2 == 1 {\n    print 0;\n  }\n  p = p / 2;\n}\nprint 1;' },
-  { name: 'Sum of even digits', code: 'let n = 2468;\nlet s = 0;\nwhile n > 0 {\n  let d = n % 10;\n  if d % 2 == 0 {\n    s = s + d;\n  }\n  n = n / 10;\n}\nprint s;' },
-  { name: 'Sum of odd digits', code: 'let n = 1357;\nlet s = 0;\nwhile n > 0 {\n  let d = n % 10;\n  if d % 2 == 1 {\n    s = s + d;\n  }\n  n = n / 10;\n}\nprint s;' },
-  { name: 'Count even digits', code: 'let n = 1234;\nlet c = 0;\nwhile n > 0 {\n  if n % 2 == 0 {\n    c = c + 1;\n  }\n  n = n / 10;\n}\nprint c;' },
-  { name: 'First digit', code: 'let n = 1234;\nwhile n > 9 {\n  n = n / 10;\n}\nprint n;' },
-  { name: 'Last digit', code: 'let n = 1234;\nprint n % 10;' },
-  { name: 'Nth triangular', code: 'let n = 10;\nprint n * (n + 1) / 2;' },
-  { name: 'Nth pentagonal', code: 'let n = 6;\nprint n * (3 * n - 1) / 2;' },
-  { name: 'Nth hexagonal', code: 'let n = 5;\nprint n * (2 * n - 1);' },
-  { name: 'Prime factors', code: 'let n = 12;\nlet f = 2;\nwhile n > 1 {\n  while n % f == 0 {\n    print f;\n    n = n / f;\n  }\n  f = f + 1;\n}' },
-  { name: 'Goldbach pair', code: 'let n = 20;\nlet i = 2;\nlet j = 2;\nlet found = 0;\nwhile i < n {\n  j = n - i;\n  let pi = 1;\n  let pj = 1;\n  let k = 2;\n  while k < i {\n    if i % k == 0 { pi = 0; }\n    k = k + 1;\n  }\n  k = 2;\n  while k < j {\n    if j % k == 0 { pj = 0; }\n    k = k + 1;\n  }\n  if pi == 1 {\n    if pj == 1 {\n      found = 1;\n    }\n  }\n  if found == 1 {\n    print i;\n    print j;\n  }\n  i = i + 1;\n}' },
-  { name: 'Palindromic product', code: 'let n = 121;\nlet r = 0;\nlet t = n;\nwhile t > 0 {\n  r = r * 10 + t % 10;\n  t = t / 10;\n}\nprint n * r;' },
-  { name: 'Fraction sum', code: 'let a = 1;\nlet b = 3;\nlet c = 1;\nlet d = 3;\nprint a * d + b * c;\nprint b * d;' },
-  { name: 'Digital root', code: 'let n = 12345;\nlet s = n;\nwhile s > 9 {\n  let t = s;\n  s = 0;\n  while t > 0 {\n    s = s + t % 10;\n    t = t / 10;\n  }\n}\nprint s;' },
-  { name: 'Permutation count', code: 'let n = 5;\nlet r = 2;\nlet p = 1;\nlet i = n;\nwhile i > n - r {\n  p = p * i;\n  i = i - 1;\n}\nprint p;' },
-  { name: 'Combination count', code: 'let n = 5;\nlet r = 2;\nlet p = 1;\nlet i = 1;\nwhile i <= r {\n  p = p * (n - i + 1) / i;\n  i = i + 1;\n}\nprint p;' },
-  { name: 'Linear search', code: 'let key = 3;\nlet found = 0;\nlet a0 = 1;\nlet a1 = 2;\nlet a2 = 3;\nlet a3 = 4;\nlet a4 = 5;\nif a0 == key { found = 1; }\nif a1 == key { found = 1; }\nif a2 == key { found = 1; }\nif a3 == key { found = 1; }\nif a4 == key { found = 1; }\nprint found;' },
-  { name: 'Sum of array', code: 'let s = 0;\nlet a0 = 1;\nlet a1 = 2;\nlet a2 = 3;\nlet a3 = 4;\nlet a4 = 5;\ns = s + a0;\ns = s + a1;\ns = s + a2;\ns = s + a3;\ns = s + a4;\nprint s;' },
-  { name: 'Array max', code: 'let m = 0;\nlet a0 = 1;\nlet a1 = 7;\nlet a2 = 3;\nm = a0;\nif a1 > m { m = a1; }\nif a2 > m { m = a2; }\nprint m;' },
-  { name: 'Score grade', code: 'let s = 85;\nif s >= 90 {\n  print 4;\n} else {\n  if s >= 80 {\n    print 3;\n  } else {\n    if s >= 70 {\n      print 2;\n    } else {\n      if s >= 60 {\n        print 1;\n      } else {\n        print 0;\n      }\n    }\n  }\n}' },
-  { name: 'Shipping cost', code: 'let w = 5;\nlet base = 10;\nlet extra = 0;\nif w > 1 {\n  extra = (w - 1) * 5;\n}\nprint base + extra;' },
-  { name: 'Tax calculation', code: 'let inc = 50000;\nlet tax = 0;\nif inc > 30000 {\n  tax = tax + (inc - 30000) * 20 / 100;\n}\nprint tax;' },
-  { name: 'Compound interest', code: 'let p = 1000;\nlet r = 5;\nlet t = 3;\nlet a = p;\nlet i = 0;\nwhile i < t {\n  a = a + a * r / 100;\n  i = i + 1;\n}\nprint a - p;' },
-  { name: 'BMI', code: 'let w = 70;\nlet h = 175;\nlet hm = h * h;\nprint w * 10000 / hm;' },
-  { name: 'Fuel economy', code: 'let d = 300;\nlet f = 20;\nprint d / f;' },
-  { name: 'Work done', code: 'let f = 50;\nlet d = 10;\nprint f * d;' },
-  { name: 'Pressure', code: 'let f = 100;\nlet a = 25;\nprint f / a;' },
-  { name: 'Density', code: 'let m = 50;\nlet v = 10;\nprint m / v;' },
-  { name: 'Ohm law', code: 'let v = 12;\nlet r = 4;\nprint v / r;' },
-  { name: 'Power law', code: 'let v = 12;\nlet i = 3;\nprint v * i;' },
-  { name: 'Kinetic energy', code: 'let m = 10;\nlet v = 5;\nprint m * v * v / 2;' },
-  { name: 'Momentum', code: 'let m = 10;\nlet v = 5;\nprint m * v;' },
-  { name: 'Gravitational force', code: 'let m1 = 10;\nlet m2 = 20;\nlet r = 5;\nprint m1 * m2 / (r * r);' },
-  { name: 'Multiples of 7', code: 'let i = 7;\nwhile i <= 70 {\n  print i;\n  i = i + 7;\n}' },
-  { name: 'Multiples of 11', code: 'let i = 11;\nwhile i <= 110 {\n  print i;\n  i = i + 11;\n}' },
-  { name: 'Square numbers', code: 'let i = 1;\nwhile i <= 10 {\n  print i * i;\n  i = i + 1;\n}' },
-  { name: 'Cube numbers', code: 'let i = 1;\nwhile i <= 10 {\n  print i * i * i;\n  i = i + 1;\n}' },
-  { name: 'Power of 2 table', code: 'let p = 1;\nlet i = 0;\nwhile i <= 10 {\n  print p;\n  p = p * 2;\n  i = i + 1;\n}' },
-  { name: 'Divisible by 6', code: 'let i = 6;\nwhile i <= 60 {\n  print i;\n  i = i + 6;\n}' },
-  { name: 'Divisible by 9', code: 'let i = 9;\nwhile i <= 90 {\n  print i;\n  i = i + 9;\n}' },
-  { name: 'Digit extract', code: 'let n = 1234;\nprint n / 1000;\nprint (n / 100) % 10;\nprint (n / 10) % 10;\nprint n % 10;' },
-  { name: 'Build number', code: 'let a = 1;\nlet b = 2;\nlet c = 3;\nlet d = 4;\nprint a * 1000 + b * 100 + c * 10 + d;' },
-  { name: 'Scale number', code: 'let n = 42;\nlet s = 100;\nprint n * s;' },
-  { name: 'Round down', code: 'let n = 17;\nlet d = 5;\nprint n / d * d;' },
-  { name: 'Round up', code: 'let n = 17;\nlet d = 5;\nprint (n + d - 1) / d * d;' },
-  { name: 'Nearest multiple', code: 'let n = 13;\nlet m = 5;\nlet r = n % m;\nif r < m - r {\n  print n - r;\n} else {\n  print n + m - r;\n}' },
-  { name: 'Shift left by bits', code: 'let n = 3;\nlet s = 2;\nlet i = 0;\nwhile i < s {\n  n = n * 2;\n  i = i + 1;\n}\nprint n;' },
-  { name: 'Shift right by bits', code: 'let n = 12;\nlet s = 2;\nlet i = 0;\nwhile i < s {\n  n = n / 2;\n  i = i + 1;\n}\nprint n;' },
-  { name: 'Mean of two', code: 'let a = 10;\nlet b = 20;\nprint (a + b) / 2;' },
-  { name: 'Midrange of two', code: 'let a = 5;\nlet b = 15;\nprint (a + b) / 2;' },
-  { name: 'Range of two', code: 'let a = 5;\nlet b = 15;\nif a > b {\n  print a - b;\n} else {\n  print b - a;\n}' },
-  { name: 'Product of two', code: 'print 123 * 456;' },
-  { name: 'Large sum', code: 'print 100000 + 200000;' },
-  { name: 'Negative numbers', code: 'print 0 - 5;\nprint 0 - 10 + 3;' },
-  { name: 'Negation', code: 'let x = 7;\nprint 0 - x;' },
-  { name: 'Double negation', code: 'let x = 7;\nprint 0 - (0 - x);' },
-  { name: 'Sum of three', code: 'print 1 + 2 + 3;' },
-  { name: 'Product of three', code: 'print 2 * 3 * 4;' },
-  { name: 'Mixed ops', code: 'print 2 + 3 * 4;\nprint (2 + 3) * 4;' },
-  { name: 'Order of operations', code: 'print 10 - 2 * 3;\nprint (10 - 2) * 3;' },
-  { name: 'Division precedence', code: 'print 20 / 4 * 2;\nprint 20 / (4 * 2);' },
-  { name: 'Mod precedence', code: 'print 10 + 7 % 3;\nprint (10 + 7) % 3;' },
-  { name: 'Complex expression', code: 'print (2 + 3) * (4 + 5) - 6 / 2;' },
-  { name: 'Deep expression', code: 'print 1 + 2 * (3 + 4 * (5 + 6));' },
-  { name: 'Precedence chain', code: 'print 1 + 2 * 3 - 4 / 2 + 5 % 3;' },
-  { name: 'Let with expression', code: 'let x = 10 * 2 + 5;\nprint x;' },
-  { name: 'Assign with expr', code: 'let x = 0;\nx = 5 * 3 + 2;\nprint x;' },
-  { name: 'Multiple let', code: 'let a = 10;\nlet b = 20;\nlet c = a + b;\nprint c;' },
-  { name: 'Let shadow', code: 'let x = 1;\n{\n  let x = 2;\n  print x;\n}\nprint x;' },
-  { name: 'Empty block', code: 'let x = 5;\n{\n}\nprint x;' },
-  { name: 'Deep if nesting', code: 'let a = 1;\nlet b = 2;\nlet c = 3;\nif a == 1 {\n  if b == 2 {\n    if c == 3 {\n      print 1;\n    }\n  }\n}' },
-  { name: 'While true once', code: 'let i = 0;\nwhile i < 1 {\n  print 1;\n  i = i + 1;\n}' },
-  { name: 'While with continue', code: 'let i = 0;\nwhile i < 5 {\n  i = i + 1;\n  if i == 3 {\n    continue;\n  }\n  print i;\n}' },
-  { name: 'Loop with counter', code: 'let i = 1;\nlet s = 0;\nwhile i <= 100 {\n  s = s + i;\n  i = i + 1;\n}\nprint s;' },
-  { name: 'Double loop squares', code: 'let i = 1;\nwhile i <= 4 {\n  let j = 1;\n  while j <= 4 {\n    print i * j;\n    j = j + 1;\n  }\n  i = i + 1;\n}' },
-  { name: 'Triangular pattern', code: 'let n = 4;\nlet i = 1;\nwhile i <= n {\n  let j = 1;\n  let s = 0;\n  while j <= i {\n    s = s + j;\n    j = j + 1;\n  }\n  print s;\n  i = i + 1;\n}' },
-  { name: 'GCD extended', code: 'let a = 48;\nlet b = 18;\nlet x = a;\nlet y = b;\nwhile y > 0 {\n  let t = y;\n  y = x % y;\n  x = t;\n}\nprint x;' },
-  { name: 'LCM of two', code: 'let a = 12;\nlet b = 18;\nlet x = a;\nlet y = b;\nwhile y > 0 {\n  let t = y;\n  y = x % y;\n  x = t;\n}\nprint a * b / x;' },
-  { name: 'Factorial while', code: 'let n = 7;\nlet f = 1;\nwhile n > 0 {\n  f = f * n;\n  n = n - 1;\n}\nprint f;' },
-  { name: 'Consecutive sum', code: 'let n = 10;\nlet s = 0;\nlet i = 1;\nwhile i <= n {\n  s = s + i;\n  i = i + 1;\n}\nprint s;' },
-  { name: 'Consecutive product', code: 'let n = 5;\nlet p = 1;\nlet i = 1;\nwhile i <= n {\n  p = p * i;\n  i = i + 1;\n}\nprint p;' },
-  { name: 'Count by step', code: 'let i = 0;\nwhile i <= 20 {\n  print i;\n  i = i + 4;\n}' },
-  { name: 'While with flag', code: 'let done = 0;\nlet i = 1;\nwhile done == 0 {\n  print i;\n  i = i + 1;\n  if i > 5 {\n    done = 1;\n  }\n}' },
-  { name: 'Boolean short circuit', code: 'let x = 1;\nlet y = 0;\nif x == 1 {\n  if y == 0 {\n    print 1;\n  }\n}' },
-  { name: 'Nested condition', code: 'let x = 5;\nlet y = 10;\nif x < y {\n  if x * 2 == y {\n    print 1;\n  }\n}' },
-  { name: 'Discount tier', code: 'let amt = 150;\nif amt >= 200 {\n  print 20;\n} else {\n  if amt >= 100 {\n    print 10;\n  } else {\n    print 0;\n  }\n}' },
-  { name: 'Water state', code: 'let t = 105;\nif t >= 100 {\n  print 1;\n} else {\n  if t > 0 {\n    print 0;\n  } else {\n    print 0 - 1;\n  }\n}' },
-  { name: 'Day type', code: 'let d = 3;\nif d == 1 {\n  print 1;\n} else {\n  if d == 7 {\n    print 1;\n  } else {\n    print 0;\n  }\n}' },
-  { name: 'Traffic light', code: 'let c = 1;\nif c == 1 {\n  print 1;\n} else {\n  if c == 2 {\n    print 2;\n  } else {\n    print 3;\n  }\n}' },
-  { name: 'Season from month', code: 'let m = 3;\nif m >= 3 {\n  if m <= 5 {\n    print 1;\n  } else {\n    if m <= 8 {\n      print 2;\n    } else {\n      print 3;\n    }\n  }\n} else {\n  print 4;\n}' },
-  { name: 'Class default values', code: 'class R {\n  x = 10;\n  y = 20;\n}\nlet r = R();\nprint r.x;\nprint r.y;' },
-  { name: 'Class with one field', code: 'class C {\n  v = 0;\n}\nlet c = C(42);\nprint c.v;' },
-  { name: 'Class with two fields', code: 'class P {\n  x = 0;\n  y = 0;\n}\nlet p = P(3, 4);\nprint p.x;\nprint p.y;' },
-  { name: 'Class inheritance two', code: 'class Base {\n  a = 1;\n}\nclass Derived extends Base {\n  b = 2;\n}\nlet d = Derived();\nprint d.a;\nprint d.b;' },
-  { name: 'Object field get', code: 'let o = [x = 1, y = 2];\nprint o.x;\nprint o.y;' },
-  { name: 'Object field set', code: 'let o = [x = 0];\nprint o.x;' },
-  { name: 'Object math', code: 'let p = [x = 3, y = 4];\nprint p.x * p.x + p.y * p.y;' },
-  { name: 'Array literal 3', code: 'let a = [1, 2, 3];\nprint a;' },
-  { name: 'Array literal 5', code: 'let a = [1, 2, 3, 4, 5];\nprint a;' },
-  { name: 'Bool true', code: 'if true {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Bool false', code: 'if false {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Bool identity', code: 'print 1 == 1;\nprint 1 == 0;' },
-  { name: 'String equality', code: 'let s = "abc";\nlet t = "abc";\nif s == t {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'String inequality', code: 'let s = "abc";\nlet t = "def";\nif s == t {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Nil/zero condition', code: 'let x = 0;\nif x {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'Non-zero condition', code: 'let x = 5;\nif x {\n  print 1;\n} else {\n  print 0;\n}' },
-  { name: 'If else chain', code: 'let x = 2;\nif x == 1 {\n  print 1;\n} else {\n  if x == 2 {\n    print 2;\n  } else {\n    print 3;\n  }\n}' },
-  { name: 'While count', code: 'let c = 0;\nlet i = 0;\nwhile i < 10 {\n  c = c + 1;\n  i = i + 1;\n}\nprint c;' },
-  { name: 'While sum even', code: 'let s = 0;\nlet i = 0;\nwhile i <= 10 {\n  s = s + i;\n  i = i + 2;\n}\nprint s;' },
-  { name: 'While sum odd', code: 'let s = 0;\nlet i = 1;\nwhile i <= 10 {\n  s = s + i;\n  i = i + 2;\n}\nprint s;' },
-  { name: 'Squares sum', code: 'let s = 0;\nlet i = 1;\nwhile i <= 5 {\n  s = s + i * i;\n  i = i + 1;\n}\nprint s;' },
-  { name: 'Cubes sum', code: 'let s = 0;\nlet i = 1;\nwhile i <= 5 {\n  s = s + i * i * i;\n  i = i + 1;\n}\nprint s;' },
-  { name: 'Powers sum', code: 'let s = 0;\nlet p = 1;\nlet i = 0;\nwhile i <= 5 {\n  s = s + p;\n  p = p * 2;\n  i = i + 1;\n}\nprint s;' },
-  { name: 'Even indexed sums', code: 'let i = 0;\nlet s = 0;\nwhile i <= 10 {\n  s = s + i;\n  i = i + 2;\n}\nprint s;' },
-  { name: 'Odd indexed sums', code: 'let i = 1;\nlet s = 0;\nwhile i <= 10 {\n  s = s + i;\n  i = i + 2;\n}\nprint s;' },
-]
+const go: Example[] = [
+  { name: 'Interface + Impl', code: `package main
 
-const go: Example[] = rust.map(e => ({
-  name: e.name,
-  code: e.code.replace(/let /g, 'var '),
-}))
-
-const python: Example[] = rust.map(e => ({
-  name: e.name,
-  code: e.code
-    .replace(/^let /gm, '')
-    .replace(/;$/gm, '')
-    .replace(/print (\w+);/g, 'print($1)')
-    .replace(/if (.+) \{/g, 'if $1: {')
-    .replace(/} else \{/g, '} else: {')
-    .replace(/\/\//g, '#'),
-}))
-
-const typescript: Example[] = rust.map(e => ({
-  name: e.name,
-  code: e.code,
-}))
-
-const c: Example[] = rust.map(e => ({
-  name: e.name,
-  code: e.code
-    .replace(/^let /gm, 'int ')
-    .replace(/\bprint\b/g, 'printf'),
-}))
-
-function take<T>(a: T[], n: number): T[] {
-  const r: T[] = []
-  for (let i = 0; i < n && i < a.length; i++) r.push(a[i])
-  return r
+type Animal interface {
+	Sound() string
+	Move()  string
 }
 
+type Dog struct { Name string; Age int }
+func (d *Dog) Sound() string { return "woof" }
+func (d *Dog) Move()  string { return "run" }
+
+type Cat struct { Name string; Indoor bool }
+func (c *Cat) Sound() string { return "meow" }
+func (c *Cat) Move()  string { return "sneak" }` },
+
+  { name: 'Repository Pattern', code: `package main
+
+type User struct { ID int; Name string; Email string }
+
+type UserRepository interface {
+	FindByID(id int) (*User, error)
+	Save(u *User) error
+}
+
+type PostgresUserRepo struct { db *DB }
+
+func (r *PostgresUserRepo) FindByID(id int) (*User, error) {
+	return r.db.QueryUser(id)
+}
+func (r *PostgresUserRepo) Save(u *User) error {
+	return r.db.Exec("INSERT INTO users ...", u.Name, u.Email)
+}
+
+type UserService struct { repo UserRepository }
+
+func (s *UserService) GetUser(id int) (*User, error) {
+	return s.repo.FindByID(id)
+}` },
+
+  { name: 'Observer Pattern', code: `package main
+
+type Event struct { Type string; Data interface{} }
+
+type Handler interface { Handle(e Event) }
+
+type EventBus struct { handlers map[string][]Handler }
+
+func (b *EventBus) Subscribe(eventType string, h Handler) {
+	b.handlers[eventType] = append(b.handlers[eventType], h)
+}
+func (b *EventBus) Publish(e Event) {
+	for _, h := range b.handlers[e.Type] { h.Handle(e) }
+}
+
+type Logger struct{}
+func (l *Logger) Handle(e Event) { println("LOG:", e.Type) }` },
+
+  { name: 'Strategy Pattern', code: `package main
+
+type SortStrategy interface { Sort(data []int) []int }
+
+type QuickSort struct{}
+func (q *QuickSort) Sort(data []int) []int { return data }
+
+type MergeSort struct{}
+func (m *MergeSort) Sort(data []int) []int { return data }
+
+type Sorter struct { strategy SortStrategy }
+
+func (s *Sorter) SetStrategy(st SortStrategy) { s.strategy = st }
+func (s *Sorter) Sort(data []int) []int       { return s.strategy.Sort(data) }` },
+
+  { name: 'Worker Pool', code: `package main
+
+type Job    struct { ID int; Data []byte }
+type Result struct { JobID int; Out []byte; Err error }
+
+type Worker struct {
+	ID      int
+	jobs    <-chan Job
+	results chan<- Result
+}
+
+func (w *Worker) Run() {
+	for job := range w.jobs {
+		w.results <- Result{JobID: job.ID}
+	}
+}
+
+type Pool struct { workers []*Worker; jobs chan Job; results chan Result }
+func (p *Pool) Submit(j Job) { p.jobs <- j }` },
+]
+
+const python: Example[] = [
+  { name: 'Class Inheritance', code: `class Shape:
+    def __init__(self, color):
+        self.color = color
+
+    def area(self):
+        raise NotImplementedError
+
+class Circle(Shape):
+    def __init__(self, color, radius):
+        super().__init__(color)
+        self.radius = radius
+
+    def area(self):
+        return 3.14159 * self.radius ** 2
+
+class Rectangle(Shape):
+    def __init__(self, color, w, h):
+        super().__init__(color)
+        self.width = w
+        self.height = h
+
+    def area(self):
+        return self.width * self.height` },
+
+  { name: 'Repository + Service', code: `class UserRepository:
+    def __init__(self, db):
+        self.db = db
+
+    def find_by_id(self, user_id):
+        return self.db.query("SELECT * FROM users WHERE id=?", user_id)
+
+    def save(self, user):
+        return self.db.execute("INSERT INTO users ...", user)
+
+class EmailService:
+    def __init__(self, smtp):
+        self.smtp = smtp
+
+    def send_welcome(self, user):
+        return self.smtp.send(user["email"], "Welcome!")
+
+class UserService:
+    def __init__(self, repo, email_svc):
+        self.repo = repo
+        self.email_svc = email_svc
+
+    def register(self, name, email):
+        user = self.repo.save({"name": name, "email": email})
+        self.email_svc.send_welcome(user)
+        return user` },
+
+  { name: 'Observer Pattern', code: `class EventEmitter:
+    def __init__(self):
+        self.listeners = {}
+
+    def on(self, event, callback):
+        if event not in self.listeners:
+            self.listeners[event] = []
+        self.listeners[event].append(callback)
+
+    def emit(self, event, *args):
+        for cb in self.listeners.get(event, []):
+            cb(*args)
+
+class OrderService(EventEmitter):
+    def __init__(self):
+        super().__init__()
+        self.orders = []
+
+    def place_order(self, item, qty):
+        order = {"item": item, "qty": qty}
+        self.orders.append(order)
+        self.emit("order_placed", order)
+        return order` },
+]
+
+const java: Example[] = [
+  { name: 'Interface + Impl', code: `interface Repository<T> {
+    T findById(int id);
+    void save(T entity);
+}
+
+class User {
+    int id;
+    String name;
+    String email;
+    User(int id, String name, String email) {
+        this.id = id; this.name = name; this.email = email;
+    }
+}
+
+class UserRepository implements Repository<User> {
+    private Database db;
+    UserRepository(Database db) { this.db = db; }
+
+    public User findById(int id) {
+        return db.query("SELECT * FROM users WHERE id=?", id);
+    }
+    public void save(User user) {
+        db.execute("INSERT INTO users ...", user);
+    }
+}
+
+class UserService {
+    private UserRepository repo;
+    UserService(UserRepository repo) { this.repo = repo; }
+
+    public User getUser(int id) { return repo.findById(id); }
+}` },
+
+  { name: 'Factory Pattern', code: `interface Shape {
+    double area();
+    String type();
+}
+
+class Circle implements Shape {
+    private double radius;
+    Circle(double radius) { this.radius = radius; }
+    public double area()  { return Math.PI * radius * radius; }
+    public String type()  { return "Circle"; }
+}
+
+class Rectangle implements Shape {
+    private double width, height;
+    Rectangle(double w, double h) { width = w; height = h; }
+    public double area()  { return width * height; }
+    public String type()  { return "Rectangle"; }
+}
+
+class ShapeFactory {
+    public static Shape create(String type, double... p) {
+        if (type.equals("circle")) return new Circle(p[0]);
+        return new Rectangle(p[0], p[1]);
+    }
+}` },
+]
+
+const typescript: Example[] = [
+  { name: 'Generic Repository', code: `interface Entity { id: string }
+
+interface Repository<T extends Entity> {
+  findById(id: string): Promise<T | null>
+  save(entity: T): Promise<T>
+}
+
+class User implements Entity {
+  id: string; name: string; email: string
+  constructor(id: string, name: string, email: string) {
+    this.id = id; this.name = name; this.email = email
+  }
+}
+
+class UserRepository implements Repository<User> {
+  private db: Database
+  constructor(db: Database) { this.db = db }
+
+  async findById(id: string): Promise<User | null> {
+    return this.db.query('SELECT * FROM users WHERE id = ?', [id])
+  }
+  async save(user: User): Promise<User> {
+    return this.db.execute('INSERT INTO users ...', user)
+  }
+}
+
+class UserService {
+  private repo: UserRepository
+  constructor(repo: UserRepository) { this.repo = repo }
+
+  async getUser(id: string) { return this.repo.findById(id) }
+}` },
+
+  { name: 'Event System', code: `type EventMap = {
+  'user:created': { id: string; name: string }
+  'order:placed': { orderId: string; total: number }
+}
+
+class TypedEventEmitter<E extends Record<string, unknown>> {
+  private listeners: Partial<{ [K in keyof E]: ((d: E[K]) => void)[] }> = {}
+
+  on<K extends keyof E>(event: K, handler: (d: E[K]) => void) {
+    if (!this.listeners[event]) this.listeners[event] = []
+    this.listeners[event]!.push(handler)
+  }
+
+  emit<K extends keyof E>(event: K, data: E[K]) {
+    this.listeners[event]?.forEach(h => h(data))
+  }
+}
+
+class UserService extends TypedEventEmitter<EventMap> {
+  private repo: UserRepository
+  constructor(repo: UserRepository) { super(); this.repo = repo }
+
+  async createUser(name: string, email: string) {
+    const user = await this.repo.save(new User(crypto.randomUUID(), name, email))
+    this.emit('user:created', { id: user.id, name: user.name })
+    return user
+  }
+}` },
+]
+
+const cpp: Example[] = [
+  { name: 'Virtual Inheritance', code: `#include <string>
+
+class Animal {
+public:
+    std::string name;
+    Animal(const std::string& name) : name(name) {}
+    virtual std::string sound() const = 0;
+    virtual std::string move()  const = 0;
+    virtual ~Animal() = default;
+};
+
+class Dog : public Animal {
+public:
+    Dog(const std::string& name) : Animal(name) {}
+    std::string sound() const override { return "woof"; }
+    std::string move()  const override { return "run";  }
+};
+
+class Cat : public Animal {
+public:
+    Cat(const std::string& name) : Animal(name) {}
+    std::string sound() const override { return "meow";  }
+    std::string move()  const override { return "sneak"; }
+};` },
+
+  { name: 'CRTP Pattern', code: `template <typename Derived>
+class Serializable {
+public:
+    std::string serialize() const {
+        return static_cast<const Derived*>(this)->toJson();
+    }
+};
+
+class User : public Serializable<User> {
+public:
+    int id;
+    std::string name;
+    User(int id, const std::string& name) : id(id), name(name) {}
+    std::string toJson() const {
+        return "{\"id\":" + std::to_string(id) + "}";
+    }
+};
+
+class Order : public Serializable<Order> {
+public:
+    int orderId;
+    std::string toJson() const {
+        return "{\"orderId\":" + std::to_string(orderId) + "}";
+    }
+};` },
+]
+
 export const examplesByLang: Record<string, Example[]> = {
-  rust: take(rust, 60),
-  go: take(go, 60),
-  python: take(python, 60),
-  typescript: take(typescript, 60),
-  c: take(c, 60),
+  go, python, java, typescript, cpp,
+  rust: go,
+  c: cpp,
 }

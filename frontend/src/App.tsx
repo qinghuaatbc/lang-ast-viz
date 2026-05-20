@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useReducer, useRef, lazy, Suspense } from 'react'
-import { compileSource, CompileResult, LangInfo, fetchLanguages } from './api/compile'
+import { parseSource, ParseResult } from './api/compile'
 import { LangProvider, useLang } from './i18n/lang'
 import { ThemeProvider, useTheme } from './theme/theme'
 import { examplesByLang } from './examples'
@@ -7,8 +7,6 @@ import CodeEditor from './components/CodeEditor'
 import ErrorBoundary from './components/ErrorBoundary'
 import ASTViewer from './components/ASTViewer'
 import IRViewer from './components/IRViewer'
-import ASMViewer from './components/ASMViewer'
-import BytecodeViewer from './components/BytecodeViewer'
 import { searchEntries, TAB_LABELS, type TopMode as SearchTopMode } from './searchIndex'
 
 const DataStructuresView = lazy(() => import('./components/DataStructuresView'))
@@ -32,41 +30,25 @@ const CodeChipView       = lazy(() => import('./components/CodeChipView'))
 
 type TopMode = SearchTopMode
 
-function parseErrorLines(errors: string[]): Set<number> {
-  const s = new Set<number>()
-  for (const e of errors) {
-    const m = e.match(/line\s+(\d+)/i)
-    if (m) s.add(parseInt(m[1], 10))
-  }
-  return s
-}
 
-interface CompileState {
-  result: CompileResult | null
+interface ParseState {
+  result: ParseResult | null
   loading: boolean
   error: string
-  errorLines: Set<number>
 }
 
-type CompileAction =
+type ParseAction =
   | { type: 'START' }
-  | { type: 'DONE'; result: CompileResult }
+  | { type: 'DONE'; result: ParseResult }
   | { type: 'ERROR'; error: string }
-  | { type: 'ERRORS'; errors: string[] }
   | { type: 'CLEAR' }
 
-function compileReducer(state: CompileState, action: CompileAction): CompileState {
+function parseReducer(state: ParseState, action: ParseAction): ParseState {
   switch (action.type) {
-    case 'START':
-      return { ...state, loading: true, error: '' }
-    case 'DONE':
-      return { result: action.result, loading: false, error: '', errorLines: new Set<number>() }
-    case 'ERROR':
-      return { ...state, loading: false, error: action.error }
-    case 'ERRORS':
-      return { result: null, loading: false, error: action.errors.join('\n'), errorLines: parseErrorLines(action.errors) }
-    case 'CLEAR':
-      return { result: null, loading: false, error: '', errorLines: new Set<number>() }
+    case 'START': return { ...state, loading: true, error: '' }
+    case 'DONE':  return { result: action.result, loading: false, error: '' }
+    case 'ERROR': return { ...state, loading: false, error: action.error }
+    case 'CLEAR': return { result: null, loading: false, error: '' }
   }
 }
 
@@ -134,6 +116,7 @@ function SearchOverlay({ lang, onSelect, onClose }: { lang: 'zh'|'en'; onSelect:
 
 function AppInner() {
   const { t, lang, setLang } = useLang()
+  const isZh = lang === 'zh'
   const { theme, toggle: toggleTheme } = useTheme()
   const [topMode, setTopMode] = useState<TopMode>(() => {
     // URL hash takes priority: #tab=git
@@ -174,17 +157,11 @@ function AppInner() {
     const ex = examplesByLang[savedLang]
     return ex && ex.length > 0 ? ex[0].code : examplesByLang.rust[0].code
   })
-  const [state, dispatch] = useReducer(compileReducer, { result: null, loading: false, error: '', errorLines: new Set<number>() })
-  const [activeTab, setActiveTab] = useState<'ast' | 'ir' | 'asm' | 'bytecode'>('ast')
+  const [state, dispatch] = useReducer(parseReducer, { result: null, loading: false, error: '' })
+  const [activeTab, setActiveTab] = useState<'ast' | 'ir'>('ast')
   const [language, setLanguage] = useState(() => localStorage.getItem('lav-lang') || 'rust')
   const [showHelp, setShowHelp] = useState(false)
-  const [optMode, setOptMode] = useState(false)
-  const [languages, setLanguages] = useState<LangInfo[]>([])
   const [autoRun, setAutoRun] = useState(false)
-
-  useEffect(() => {
-    fetchLanguages().then(setLanguages).catch(() => {})
-  }, [])
 
   // Auto-run: debounced compile on code change
   const autoRunTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
@@ -217,14 +194,10 @@ function AppInner() {
   const handleCompile = useCallback(async () => {
     dispatch({ type: 'START' })
     try {
-      const res = await compileSource(code, language)
-      if (res.errors?.length > 0) {
-        dispatch({ type: 'ERRORS', errors: res.errors })
-      } else {
-        dispatch({ type: 'DONE', result: res })
-      }
-    } catch (err: any) {
-      dispatch({ type: 'ERROR', error: err.message || 'compile failed' })
+      const res = await parseSource(code, language)
+      dispatch({ type: 'DONE', result: res })
+    } catch (err: unknown) {
+      dispatch({ type: 'ERROR', error: (err as Error).message || 'parse failed' })
     }
   }, [code, language])
 
@@ -287,9 +260,11 @@ function AppInner() {
               <div className="lang-selector">
                 <label htmlFor="lang-select">{t('language')}:</label>
                 <select id="lang-select" value={language} onChange={(e) => handleLanguageChange(e.target.value)}>
-                  {languages.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
+                  <option value="go">Go</option>
+                  <option value="python">Python</option>
+                  <option value="java">Java</option>
+                  <option value="typescript">TypeScript</option>
+                  <option value="cpp">C++</option>
                 </select>
               </div>
             )}
@@ -394,46 +369,28 @@ function AppInner() {
               loading={state.loading}
               language={language}
               examples={examplesByLang[language] || examplesByLang.rust}
-              errorLines={state.errorLines}
+              errorLines={new Set<number>()}
             />
           </div>
 
           <div className="right-panel">
-            {state.error && <div className="error-bar">{state.error}</div>}
-
-            {state.result && state.result.output && state.result.output.length > 0 && (
-              <div className="output-bar">
-                <div className="output-label"><strong>{t('output')} ({state.result.language})</strong></div>
-                <div className="output-lines">
-                  {state.result.output.map((line, i) => (
-                    <div key={i} className="output-line">{line}</div>
-                  ))}
-                </div>
-              </div>
-            )}
 
             <div className="tab-bar">
               <button className={`tab ${activeTab === 'ast' ? 'active' : ''}`} onClick={() => setActiveTab('ast')}>{t('ast.tree')}</button>
-              <button className={`tab ${activeTab === 'ir' ? 'active' : ''}`} onClick={() => setActiveTab('ir')}>{t('ir.code')}</button>
-              <button className={`tab ${activeTab === 'asm' ? 'active' : ''}`} onClick={() => setActiveTab('asm')}>{t('x86.asm')}</button>
-              <button className={`tab ${activeTab === 'bytecode' ? 'active' : ''}`} onClick={() => setActiveTab('bytecode')}>{t('bytecode')}</button>
-              {state.result?.optIR && (
-                <button className={`tab opt-tab ${optMode ? 'active' : ''}`} onClick={() => setOptMode(o => !o)} style={{ color: optMode ? '#3fb950' : undefined }}>
-                  {optMode ? '✓ Optimized' : '⚙ Original'}
-                </button>
-              )}
+              <button className={`tab ${activeTab === 'ir' ? 'active' : ''}`} onClick={() => setActiveTab('ir')}>{isZh ? '调用图' : 'Call Graph'}</button>
             </div>
 
             {state.loading && (
               <div className="viewer-empty" style={{ padding: 16, textAlign: 'center', color: 'var(--text-muted)' }}>
-                {t('compiling')}
+                {isZh ? '解析中…' : 'Parsing…'}
               </div>
             )}
+            {state.error && !state.loading && (
+              <div className="error-bar">{state.error}</div>
+            )}
             <div className="tab-content">
-              <ErrorBoundary>{activeTab === 'ast' && <ASTViewer ast={state.result?.ast || null} />}</ErrorBoundary>
-              <ErrorBoundary>{activeTab === 'ir' && <IRViewer ir={optMode ? state.result?.optIR || null : state.result?.ir || null} />}</ErrorBoundary>
-              <ErrorBoundary>{activeTab === 'asm' && <ASMViewer assembly={optMode ? state.result?.optAssembly || null : state.result?.assembly || null} />}</ErrorBoundary>
-              <ErrorBoundary>{activeTab === 'bytecode' && <BytecodeViewer bytecode={optMode ? state.result?.optBytecode || null : state.result?.bytecode || null} />}</ErrorBoundary>
+              <ErrorBoundary>{activeTab === 'ast' && <ASTViewer ast={state.result?.ast} lang={state.result?.lang} />}</ErrorBoundary>
+              <ErrorBoundary>{activeTab === 'ir' && <IRViewer calls={state.result?.calls} chips={state.result?.chips} lang={state.result?.lang} />}</ErrorBoundary>
             </div>
           </div>
         </div>

@@ -1,3 +1,29 @@
+// Generic AST node — real-language parser (/api/parse)
+export interface GenASTNode {
+  type: string
+  value?: string
+  line?: number
+  children?: GenASTNode[]
+}
+
+export interface ParseResult {
+  chips: { name: string; methods: string[]; fields: string[] }[]
+  calls: { from: string; to: string; method: string; params: string; ret: string; relation: string }[]
+  ast?: GenASTNode
+  lang: string
+}
+
+export async function parseSource(source: string, language = 'auto'): Promise<ParseResult> {
+  const res = await fetch('/api/parse', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ code: source, lang: language }),
+  })
+  if (!res.ok) throw new Error(`parse failed (${res.status})`)
+  return res.json()
+}
+
+// Legacy MiniLang AST node
 export interface ASTNode {
   nodeType: number
   children: ASTNode[]

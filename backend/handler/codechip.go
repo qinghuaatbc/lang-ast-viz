@@ -31,10 +31,18 @@ type CallEdge struct {
 	Relation string `json:"relation"`
 }
 
+type GenASTNode struct {
+	Type     string       `json:"type"`
+	Value    string       `json:"value,omitempty"`
+	Line     int          `json:"line,omitempty"`
+	Children []GenASTNode `json:"children,omitempty"`
+}
+
 type ChipParseResult struct {
-	Chips []ChipInfo `json:"chips"`
-	Calls []CallEdge `json:"calls"`
-	Lang  string     `json:"lang"`
+	Chips []ChipInfo  `json:"chips"`
+	Calls []CallEdge  `json:"calls"`
+	AST   *GenASTNode `json:"ast,omitempty"`
+	Lang  string      `json:"lang"`
 }
 
 func (h *Handler) handleCodeChipParse(w http.ResponseWriter, r *http.Request) {
@@ -74,6 +82,11 @@ func (h *Handler) handleCodeChipParse(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(result)
+}
+
+// /api/parse — unified endpoint used by AST tab
+func (h *Handler) handleParse(w http.ResponseWriter, r *http.Request) {
+	h.handleCodeChipParse(w, r)
 }
 
 /* ── Go: stdlib go/ast ──────────────────────────────────────── */
@@ -190,7 +203,205 @@ func parseGo(code string) ChipParseResult {
 	for _, c := range chipMap {
 		chips = append(chips, *c)
 	}
-	return ChipParseResult{Chips: chips, Calls: deduplicateCalls(calls), Lang: "go"}
+	tree := goFileToGenAST(fset, f)
+	return ChipParseResult{Chips: chips, Calls: deduplicateCalls(calls), AST: &tree, Lang: "go"}
+}
+
+/* ── Go AST → GenASTNode tree ───────────────────────────────── */
+
+func goFileToGenAST(fset *token.FileSet, f *ast.File) GenASTNode {
+	root := GenASTNode{Type: "File", Value: f.Name.Name}
+	for _, decl := range f.Decls {
+		root.Children = append(root.Children, goNodeToGen(fset, decl))
+	}
+	return root
+}
+
+func goNodeToGen(fset *token.FileSet, node ast.Node) GenASTNode {
+	if node == nil {
+		return GenASTNode{Type: "nil"}
+	}
+	pos := fset.Position(node.Pos())
+	line := pos.Line
+
+	switch n := node.(type) {
+	case *ast.FuncDecl:
+		g := GenASTNode{Type: "FuncDecl", Value: n.Name.Name, Line: line}
+		if n.Recv != nil {
+			recv := GenASTNode{Type: "Receiver"}
+			for _, f := range n.Recv.List {
+				recv.Children = append(recv.Children, GenASTNode{Type: "Field", Value: exprString(f.Type)})
+			}
+			g.Children = append(g.Children, recv)
+		}
+		if n.Type.Params != nil {
+			params := GenASTNode{Type: "Params"}
+			for _, f := range n.Type.Params.List {
+				for _, nm := range f.Names {
+					params.Children = append(params.Children, GenASTNode{Type: "Param", Value: nm.Name + " " + exprString(f.Type)})
+				}
+			}
+			g.Children = append(g.Children, params)
+		}
+		if n.Type.Results != nil {
+			results := GenASTNode{Type: "Returns"}
+			for _, f := range n.Type.Results.List {
+				results.Children = append(results.Children, GenASTNode{Type: "Return", Value: exprString(f.Type)})
+			}
+			g.Children = append(g.Children, results)
+		}
+		if n.Body != nil {
+			g.Children = append(g.Children, goNodeToGen(fset, n.Body))
+		}
+		return g
+
+	case *ast.GenDecl:
+		g := GenASTNode{Type: n.Tok.String(), Line: line}
+		for _, spec := range n.Specs {
+			g.Children = append(g.Children, goNodeToGen(fset, spec))
+		}
+		return g
+
+	case *ast.TypeSpec:
+		g := GenASTNode{Type: "TypeSpec", Value: n.Name.Name, Line: line}
+		g.Children = append(g.Children, goNodeToGen(fset, n.Type))
+		return g
+
+	case *ast.StructType:
+		g := GenASTNode{Type: "Struct"}
+		if n.Fields != nil {
+			for _, f := range n.Fields.List {
+				if len(f.Names) == 0 {
+					g.Children = append(g.Children, GenASTNode{Type: "Embed", Value: exprString(f.Type)})
+				} else {
+					for _, nm := range f.Names {
+						g.Children = append(g.Children, GenASTNode{Type: "Field", Value: nm.Name + " " + exprString(f.Type)})
+					}
+				}
+			}
+		}
+		return g
+
+	case *ast.InterfaceType:
+		g := GenASTNode{Type: "Interface"}
+		if n.Methods != nil {
+			for _, m := range n.Methods.List {
+				if len(m.Names) > 0 {
+					g.Children = append(g.Children, GenASTNode{Type: "Method", Value: m.Names[0].Name})
+				} else {
+					g.Children = append(g.Children, GenASTNode{Type: "Embed", Value: exprString(m.Type)})
+				}
+			}
+		}
+		return g
+
+	case *ast.BlockStmt:
+		g := GenASTNode{Type: "Block", Line: line}
+		for _, s := range n.List {
+			g.Children = append(g.Children, goNodeToGen(fset, s))
+		}
+		return g
+
+	case *ast.AssignStmt:
+		g := GenASTNode{Type: "Assign", Value: n.Tok.String(), Line: line}
+		for _, l := range n.Lhs {
+			g.Children = append(g.Children, goNodeToGen(fset, l))
+		}
+		for _, r := range n.Rhs {
+			g.Children = append(g.Children, goNodeToGen(fset, r))
+		}
+		return g
+
+	case *ast.ExprStmt:
+		return goNodeToGen(fset, n.X)
+
+	case *ast.ReturnStmt:
+		g := GenASTNode{Type: "Return", Line: line}
+		for _, r := range n.Results {
+			g.Children = append(g.Children, goNodeToGen(fset, r))
+		}
+		return g
+
+	case *ast.IfStmt:
+		g := GenASTNode{Type: "If", Line: line}
+		g.Children = append(g.Children, GenASTNode{Type: "Cond", Children: []GenASTNode{goNodeToGen(fset, n.Cond)}})
+		g.Children = append(g.Children, goNodeToGen(fset, n.Body))
+		if n.Else != nil {
+			g.Children = append(g.Children, GenASTNode{Type: "Else", Children: []GenASTNode{goNodeToGen(fset, n.Else)}})
+		}
+		return g
+
+	case *ast.ForStmt:
+		g := GenASTNode{Type: "For", Line: line}
+		if n.Cond != nil {
+			g.Children = append(g.Children, GenASTNode{Type: "Cond", Children: []GenASTNode{goNodeToGen(fset, n.Cond)}})
+		}
+		g.Children = append(g.Children, goNodeToGen(fset, n.Body))
+		return g
+
+	case *ast.RangeStmt:
+		g := GenASTNode{Type: "Range", Line: line}
+		g.Children = append(g.Children, GenASTNode{Type: "Over", Children: []GenASTNode{goNodeToGen(fset, n.X)}})
+		g.Children = append(g.Children, goNodeToGen(fset, n.Body))
+		return g
+
+	case *ast.CallExpr:
+		g := GenASTNode{Type: "Call", Value: exprString(n.Fun), Line: line}
+		for _, arg := range n.Args {
+			g.Children = append(g.Children, goNodeToGen(fset, arg))
+		}
+		return g
+
+	case *ast.SelectorExpr:
+		return GenASTNode{Type: "Selector", Value: exprString(n.X) + "." + n.Sel.Name, Line: line}
+
+	case *ast.BinaryExpr:
+		g := GenASTNode{Type: "BinaryExpr", Value: n.Op.String(), Line: line}
+		g.Children = append(g.Children, goNodeToGen(fset, n.X))
+		g.Children = append(g.Children, goNodeToGen(fset, n.Y))
+		return g
+
+	case *ast.Ident:
+		return GenASTNode{Type: "Ident", Value: n.Name, Line: line}
+
+	case *ast.BasicLit:
+		return GenASTNode{Type: n.Kind.String(), Value: n.Value, Line: line}
+
+	case *ast.ValueSpec:
+		g := GenASTNode{Type: "Var", Line: line}
+		for _, nm := range n.Names {
+			g.Children = append(g.Children, GenASTNode{Type: "Name", Value: nm.Name})
+		}
+		if n.Type != nil {
+			g.Children = append(g.Children, GenASTNode{Type: "Type", Value: exprString(n.Type)})
+		}
+		return g
+
+	case *ast.ImportSpec:
+		v := ""
+		if n.Path != nil {
+			v = n.Path.Value
+		}
+		return GenASTNode{Type: "Import", Value: v, Line: line}
+
+	case *ast.DeclStmt:
+		return goNodeToGen(fset, n.Decl)
+
+	case *ast.UnaryExpr:
+		g := GenASTNode{Type: "UnaryExpr", Value: n.Op.String(), Line: line}
+		g.Children = append(g.Children, goNodeToGen(fset, n.X))
+		return g
+
+	case *ast.CompositeLit:
+		g := GenASTNode{Type: "CompositeLit", Value: exprString(n.Type), Line: line}
+		for _, elt := range n.Elts {
+			g.Children = append(g.Children, goNodeToGen(fset, elt))
+		}
+		return g
+
+	default:
+		return GenASTNode{Type: "Node", Line: line}
+	}
 }
 
 func exprString(e ast.Expr) string {
