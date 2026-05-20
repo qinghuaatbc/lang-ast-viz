@@ -776,13 +776,14 @@ function RelationGlyph({ x, y, rel, color, atSource }: { x: number; y: number; r
   return null
 }
 
-function RelationPath({ from, to, relation, isZh, active, animPct }: {
+function RelationPath({ from, to, relation, method, isZh, active, animPct }: {
   from: { x: number; y: number; w: number }
   to: { x: number; y: number; w: number }
   relation: string
+  method?: string
   isZh: boolean
   active?: boolean
-  animPct?: number  // 0..1 progress of signal dot
+  animPct?: number
 }) {
   const rel = relation || 'call'
   const color = REL_COLORS[rel] || '#79c0ff'
@@ -793,17 +794,18 @@ function RelationPath({ from, to, relation, isZh, active, animPct }: {
   const midX = (fromX + toX) / 2
   const midY = (fromY + toY) / 2
   const isDashed = REL_STROKE[rel] === 'dashed'
-  const label = isZh ? (REL_LABELS_ZH[rel] || rel) : (REL_LABELS_EN[rel] || rel)
+  const relLabel = isZh ? (REL_LABELS_ZH[rel] || rel) : (REL_LABELS_EN[rel] || rel)
+  // Show method name on path, with relation glyph as prefix
+  const labelText = method ? `.${method}()` : relLabel
+  const labelW = Math.min(Math.max(labelText.length * 6 + 8, 44), 110)
   const lineStart = rel === 'compose' || rel === 'aggregate' ? fromX + 8 : fromX
   const lineEnd = rel === 'inherit' ? toX - 8 : toX
 
-  // Orthogonal routing: horizontal then vertical
   const sameRow = Math.abs(fromY - toY) < 5
   const pathD = sameRow
     ? `M${lineStart} ${fromY} L${lineEnd} ${toY}`
     : `M${lineStart} ${fromY} L${midX} ${fromY} L${midX} ${toY} L${lineEnd} ${toY}`
 
-  // Signal dot position along path
   let dotX = midX, dotY = midY
   if (animPct !== undefined) {
     const t = animPct
@@ -822,26 +824,28 @@ function RelationPath({ from, to, relation, isZh, active, animPct }: {
     }
   }
 
+  const labelX = sameRow ? midX : midX
+  const labelY = sameRow ? fromY - 14 : midY - 7
+
   return (
     <g>
       <RelationGlyph x={fromX + 7} y={fromY} rel={rel} color={color} atSource={true} />
-      {/* Glow trace when active */}
       {active && <path d={pathD} stroke={color} strokeWidth={4} strokeOpacity={0.15} fill="none" />}
       <path d={pathD} stroke={active ? color : color + '50'} strokeWidth={active ? 1.8 : 1}
         strokeDasharray={isDashed ? '4 3' : 'none'} fill="none"
         markerEnd={rel === 'inherit' ? 'none' : `url(#arrow-${rel})`} />
       <RelationGlyph x={toX - 7} y={toY} rel={rel} color={color} atSource={false} />
-      {/* Signal pulse dot */}
       {active && animPct !== undefined && (
         <g>
           <circle cx={dotX} cy={dotY} r={4} fill={color} opacity={0.9} />
           <circle cx={dotX} cy={dotY} r={8} fill={color} opacity={0.2} />
         </g>
       )}
-      <rect x={midX - 34} y={sameRow ? fromY - 16 : midY - 8} width={68} height={12} rx={3}
-        fill="var(--bg-primary)" stroke={active ? color + '80' : color + '30'} strokeWidth={0.5} />
-      <text x={midX} y={sameRow ? fromY - 6 : midY + 2} textAnchor="middle" fill={active ? color : color + '80'}
-        fontSize={7} fontWeight="bold" fontFamily="monospace">{label}</text>
+      {/* Method label on path */}
+      <rect x={labelX - labelW / 2} y={labelY} width={labelW} height={11} rx={3}
+        fill="var(--bg-primary)" stroke={active ? color + '90' : color + '28'} strokeWidth={0.6} />
+      <text x={labelX} y={labelY + 8} textAnchor="middle" fill={active ? color : color + '80'}
+        fontSize={6.5} fontWeight="bold" fontFamily="monospace">{labelText}</text>
     </g>
   )
 }
@@ -1184,8 +1188,8 @@ export default function CodeChipView() {
   /* ── Hierarchical layout ──────────────────────────────────── */
   const chipW = 120
   const chipH = 80
-  const gapX = 44
-  const gapY = 140
+  const gapX = 50
+  const gapY = 70
 
   // Collect unique chip names in order
   const chipNames = useMemo(() => {
@@ -1421,7 +1425,7 @@ export default function CodeChipView() {
                 const isActive = i === activeToIdx
                 return <RelationPath key={`rel-${i}`}
                   from={{...p1, w: chipW}} to={{...p2, w: chipW}}
-                  relation={c.relation || 'call'} isZh={isZh}
+                  relation={c.relation || 'call'} method={c.method} isZh={isZh}
                   active={isActive} animPct={isActive ? animProgress : undefined}
                 />
               })}
