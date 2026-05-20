@@ -1045,6 +1045,7 @@ export default function CodeChipView() {
   const [selectedChip, setSelectedChip] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
+  const [panning, setPanning] = useState(false)
   const isPanning = useRef(false)
   const panStart = useRef({ x: 0, y: 0, px: 0, py: 0 })
   const [cuCaller, setCuCaller] = useState('App')
@@ -1398,14 +1399,62 @@ export default function CodeChipView() {
               ))}
               <div style={{ fontSize:8, color:'var(--text-muted)', textAlign:'center' }}>{Math.round(zoom*100)}%</div>
             </div>
+            {/* Minimap — shown when circuit has 4+ chips */}
+            {chipNames.length >= 4 && (() => {
+              const mW = 130, mH = 84
+              const sc = Math.min(mW / svgW, mH / svgH) * 0.92
+              const vpX = (-pan.x / zoom) * sc
+              const vpY = (-pan.y / zoom) * sc
+              const vpW = (svgW / zoom) * sc
+              const vpH = (svgH / zoom) * sc
+              return (
+                <div style={{ position:'absolute', bottom:6, left:6, zIndex:10, background:'rgba(13,17,23,0.92)', border:'1px solid var(--border)', borderRadius:4, padding:3 }}>
+                  <svg width={mW} height={mH} style={{ display:'block' }}>
+                    {chain.map((c, i) => {
+                      const p1 = chipPosMap[c.caller], p2 = chipPosMap[c.callee]
+                      if (!p1 || !p2 || c.caller === c.callee) return null
+                      const color = REL_COLORS[c.relation || 'call'] || '#79c0ff'
+                      const isActive = i === activeToIdx
+                      return (
+                        <line key={i}
+                          x1={(p1.x + chipW/2) * sc} y1={(p1.y + 40) * sc}
+                          x2={(p2.x + chipW/2) * sc} y2={(p2.y + 40) * sc}
+                          stroke={isActive ? color : color + '55'} strokeWidth={isActive ? 1.5 : 0.8} />
+                      )
+                    })}
+                    {chipNames.map(name => {
+                      const p = chipPosMap[name]
+                      if (!p) return null
+                      const chipType = detectChipType(name)
+                      const typeColor = CHIP_TYPE_COLOR[chipType]
+                      const isActiveChip = chain.some((c, ci) => (c.caller === name || c.callee === name) && ci === activeToIdx)
+                      const isSel = selectedChip === name
+                      return (
+                        <rect key={name}
+                          x={p.x * sc} y={p.y * sc}
+                          width={chipW * sc} height={chipH * sc} rx={2}
+                          fill={isActiveChip ? typeColor + '28' : '#111a24'}
+                          stroke={isSel ? typeColor : (isActiveChip ? typeColor : typeColor + '55')}
+                          strokeWidth={isSel || isActiveChip ? 1.5 : 0.7} />
+                      )
+                    })}
+                    {/* Viewport indicator */}
+                    <rect x={Math.max(0, vpX)} y={Math.max(0, vpY)}
+                      width={Math.min(mW, vpW)} height={Math.min(mH, vpH)}
+                      fill="rgba(100,180,255,0.05)" stroke="#4d8fff" strokeWidth={1}
+                      strokeDasharray="3 2" rx={2} />
+                  </svg>
+                </div>
+              )
+            })()}
             <svg ref={svgRef}
               viewBox={`${-pan.x/zoom} ${-pan.y/zoom} ${svgW/zoom} ${svgH/zoom}`}
-              style={{ width:'100%', height:'100%', display:'block', flex:1, cursor: isPanning.current ? 'grabbing' : 'grab' }}
+              style={{ width:'100%', height:'100%', display:'block', flex:1, cursor: panning ? 'grabbing' : 'grab' }}
               onWheel={e => { e.preventDefault(); setZoom(z => Math.max(0.3, Math.min(3, z * (e.deltaY < 0 ? 1.12 : 0.9)))) }}
-              onMouseDown={e => { isPanning.current = true; panStart.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y } }}
+              onMouseDown={e => { isPanning.current = true; setPanning(true); panStart.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y } }}
               onMouseMove={e => { if (!isPanning.current) return; setPan({ x: panStart.current.px + (e.clientX - panStart.current.x), y: panStart.current.py + (e.clientY - panStart.current.y) }) }}
-              onMouseUp={() => { isPanning.current = false }}
-              onMouseLeave={() => { isPanning.current = false }}
+              onMouseUp={() => { isPanning.current = false; setPanning(false) }}
+              onMouseLeave={() => { isPanning.current = false; setPanning(false) }}
             >
               <defs>
                 <pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--bg-elevated)" strokeWidth="0.5" /></pattern>
