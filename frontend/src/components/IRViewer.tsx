@@ -43,12 +43,12 @@ export default function IRViewer({ calls, chips, lang }: IRViewerProps) {
             {chips.map(chip => (
               <div key={chip.name} style={{ border: '1px solid var(--border)', borderRadius: 6, padding: '6px 10px', background: 'var(--bg-elevated)', minWidth: 100 }}>
                 <div style={{ fontSize: 11, fontWeight: 700, color: '#d2a8ff', marginBottom: 4 }}>{chip.name}</div>
-                {chip.methods.map(m => (
+                {(chip.methods ?? []).map(m => (
                   <div key={m} style={{ fontSize: 10, color: '#79c0ff', fontFamily: 'monospace' }}>
                     fn {m}()
                   </div>
                 ))}
-                {chip.fields.map(f => (
+                {(chip.fields ?? []).map(f => (
                   <div key={f} style={{ fontSize: 10, color: '#56d364', fontFamily: 'monospace' }}>
                     {f}
                   </div>

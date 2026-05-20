@@ -19,8 +19,8 @@ type chipParseRequest struct {
 
 type ChipInfo struct {
 	Name    string   `json:"name"`
-	Methods []string `json:"methods"`
-	Fields  []string `json:"fields"`
+	Methods []string `json:"methods,omitempty"`
+	Fields  []string `json:"fields,omitempty"`
 }
 
 type CallEdge struct {
