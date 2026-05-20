@@ -660,8 +660,8 @@ const CHIP_TYPE_LABEL: Record<ChipType, string> = {
   default:    'MOD',
 }
 
-function ChipModule({ name, sub, x, y, w, active, color, state: st, memLayout }: {
-  name: string; sub: string; x: number; y: number; w: number; active: boolean; color: string; state?: Record<string, string>; memLayout?: any[]
+function ChipModule({ name, sub, x, y, w, active, color, state: st, memLayout, inMethods, outMethods }: {
+  name: string; sub: string; x: number; y: number; w: number; active: boolean; color: string; state?: Record<string, string>; memLayout?: any[]; inMethods?: string[]; outMethods?: string[]
 }) {
   const se = st ? Object.entries(st) : []
   const useLayout = memLayout && memLayout.length > 0
@@ -724,6 +724,17 @@ function ChipModule({ name, sub, x, y, w, active, color, state: st, memLayout }:
         <g>
           {se.slice(0, 3).map(([k, v], i) => (
             <text key={i} x={x+6} y={y+58+i*8} fill={active ? 'var(--text-secondary)' : 'var(--text-muted)'} fontSize={6} fontFamily="monospace">{k}={v}</text>
+          ))}
+        </g>
+      ) : (inMethods && inMethods.length > 0) || (outMethods && outMethods.length > 0) ? (
+        <g>
+          {(inMethods || []).slice(0, 3).map((m, i) => (
+            <text key={`in-${i}`} x={x+4} y={y+56+i*9}
+              fill={active ? '#79c0ff70' : '#1e3050'} fontSize={5.5} fontFamily="monospace">←{m.slice(0, 8)}</text>
+          ))}
+          {(outMethods || []).slice(0, 3).map((m, i) => (
+            <text key={`out-${i}`} x={x+w-4} y={y+56+i*9} textAnchor="end"
+              fill={active ? '#56d36470' : '#1e3050'} fontSize={5.5} fontFamily="monospace">{m.slice(0, 8)}→</text>
           ))}
         </g>
       ) : null}
@@ -1495,6 +1506,8 @@ export default function CodeChipView() {
                 const typeColor = CHIP_TYPE_COLOR[chipType]
                 const isActiveChip = chain.some((c, ci) => (c.caller === name || c.callee === name) && ci === activeToIdx)
                 const isSelected = selectedChip === name
+                const inMethods = [...new Set(chain.filter(c => c.callee === name).map(c => c.method))]
+                const outMethods = [...new Set(chain.filter(c => c.caller === name).map(c => c.method))]
                 return (
                   <g key={name} onClick={() => setSelectedChip(selectedChip === name ? null : name)} style={{ cursor:'pointer' }}>
                     {isSelected && <rect x={p.x-6} y={p.y-6} width={chipW+12} height={chipH+12} rx={8}
@@ -1505,7 +1518,8 @@ export default function CodeChipView() {
                       active={isActiveChip}
                       color={typeColor}
                       state={s.state}
-                      memLayout={showMem && i === numChips - 1 ? memLayout : undefined} />
+                      memLayout={showMem && i === numChips - 1 ? memLayout : undefined}
+                      inMethods={inMethods} outMethods={outMethods} />
                   </g>
                 )
               })}
