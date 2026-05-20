@@ -7,7 +7,7 @@ interface Topic {
   id: string; icon: string; color: string
   label_zh: string; label_en: string
   desc_zh: string; desc_en: string
-  diagram: string
+  diagram?: string; diagram_zh?: string; diagram_en?: string
   code: string; codeTitle_zh: string; codeTitle_en: string
   notes_zh: string; notes_en: string
   concepts_zh: { term: string; def: string }[]
@@ -20,7 +20,43 @@ const TOPICS: Topic[] = [
     label_zh: 'WebAssembly 简介', label_en: 'WASM Overview',
     desc_zh: 'WebAssembly 是一种紧凑的二进制指令格式，为栈式虚拟机设计，在浏览器中以接近原生速度运行。可由 C/C++/Rust/Go 编译而来。',
     desc_en: 'WebAssembly is a compact binary instruction format for a stack-based VM that runs near-native speed in browsers. Compiled from C/C++/Rust/Go and more.',
-    diagram: `<svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowW" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- Source languages -->
+  <rect x="10" y="30" width="90" height="34" rx="6" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="55" y="52" textAnchor="middle" fill="#58a6ff" fontSize="11">C / C++</text>
+  <rect x="10" y="76" width="90" height="34" rx="6" fill="rgba(247,129,102,0.1)" stroke="#f78166" strokeWidth="1.2"/>
+  <text x="55" y="98" textAnchor="middle" fill="#f78166" fontSize="11">Rust</text>
+  <rect x="10" y="122" width="90" height="34" rx="6" fill="rgba(121,192,255,0.1)" stroke="#79c0ff" strokeWidth="1.2"/>
+  <text x="55" y="144" textAnchor="middle" fill="#79c0ff" fontSize="11">Go / Zig</text>
+  <!-- arrows to wasm -->
+  <line x1="102" y1="47"  x2="175" y2="80"  stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowW)"/>
+  <line x1="102" y1="93"  x2="175" y2="93"  stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowW)"/>
+  <line x1="102" y1="139" x2="175" y2="106" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowW)"/>
+  <!-- WASM module -->
+  <rect x="178" y="60" width="120" height="66" rx="8" fill="rgba(88,166,255,0.08)" stroke="#58a6ff" strokeWidth="1.6"/>
+  <text x="238" y="84" textAnchor="middle" fill="#58a6ff" fontSize="12" fontWeight="700">.wasm</text>
+  <text x="238" y="100" textAnchor="middle" fill="#888" fontSize="9">binary module</text>
+  <text x="238" y="114" textAnchor="middle" fill="#888" fontSize="9">~30% smaller than JS</text>
+  <!-- arrow to runtimes -->
+  <line x1="300" y1="93" x2="345" y2="60"  stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowW)"/>
+  <line x1="300" y1="93" x2="345" y2="93"  stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowW)"/>
+  <line x1="300" y1="93" x2="345" y2="126" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowW)"/>
+  <!-- runtimes -->
+  <rect x="348" y="40" width="120" height="30" rx="6" fill="rgba(63,185,80,0.08)" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="408" y="59" textAnchor="middle" fill="#3fb950" fontSize="10">Browser (V8/SpiderMonkey)</text>
+  <rect x="348" y="80" width="120" height="30" rx="6" fill="rgba(210,168,255,0.08)" stroke="#d2a8ff" strokeWidth="1.2"/>
+  <text x="408" y="99" textAnchor="middle" fill="#d2a8ff" fontSize="10">Wasmtime / Wasmer</text>
+  <rect x="348" y="120" width="120" height="30" rx="6" fill="rgba(240,136,62,0.08)" stroke="#f0883e" strokeWidth="1.2"/>
+  <text x="408" y="139" textAnchor="middle" fill="#f0883e" fontSize="10">Node.js / Deno</text>
+  <!-- guarantee badges -->
+  <text x="238" y="165" textAnchor="middle" fill="#888" fontSize="9">safe · portable · deterministic · compact</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowW" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -98,7 +134,42 @@ wasmtime run --invoke add module.wasm 3 4`,
     label_zh: 'WAT 文本格式', label_en: 'WAT Text Format',
     desc_zh: 'WAT（WebAssembly Text Format）是 WASM 二进制的人类可读表示。用 S-表达式语法描述模块、函数、类型、内存。',
     desc_en: 'WAT (WebAssembly Text Format) is the human-readable representation of WASM binary. Uses S-expression syntax to describe modules, functions, types, memory.',
-    diagram: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- Module structure -->
+  <rect x="10" y="10" width="460" height="160" rx="8" fill="rgba(255,255,255,0.02)" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="240" y="32" textAnchor="middle" fill="#3fb950" fontSize="11" fontWeight="700">(module ...)</text>
+  <!-- type section -->
+  <rect x="20" y="44" width="100" height="50" rx="6" fill="#0d1117" stroke="#58a6ff" strokeWidth="1"/>
+  <text x="70" y="62" textAnchor="middle" fill="#58a6ff" fontSize="9" fontWeight="700">type section</text>
+  <text x="70" y="76" textAnchor="middle" fill="#888" fontSize="8">(type (func</text>
+  <text x="70" y="88" textAnchor="middle" fill="#888" fontSize="8"> (param i32 i32)</text>
+  <!-- import section -->
+  <rect x="130" y="44" width="100" height="50" rx="6" fill="#0d1117" stroke="#d2a8ff" strokeWidth="1"/>
+  <text x="180" y="62" textAnchor="middle" fill="#d2a8ff" fontSize="9" fontWeight="700">import section</text>
+  <text x="180" y="76" textAnchor="middle" fill="#888" fontSize="8">(import "env"</text>
+  <text x="180" y="88" textAnchor="middle" fill="#888" fontSize="8"> "print" (func ...))</text>
+  <!-- func section -->
+  <rect x="240" y="44" width="100" height="50" rx="6" fill="#0d1117" stroke="#3fb950" strokeWidth="1"/>
+  <text x="290" y="62" textAnchor="middle" fill="#3fb950" fontSize="9" fontWeight="700">func section</text>
+  <text x="290" y="76" textAnchor="middle" fill="#888" fontSize="8">(func $add</text>
+  <text x="290" y="88" textAnchor="middle" fill="#888" fontSize="8"> i32.add)</text>
+  <!-- export section -->
+  <rect x="350" y="44" width="110" height="50" rx="6" fill="#0d1117" stroke="#f0883e" strokeWidth="1"/>
+  <text x="405" y="62" textAnchor="middle" fill="#f0883e" fontSize="9" fontWeight="700">export section</text>
+  <text x="405" y="76" textAnchor="middle" fill="#888" fontSize="8">(export "add"</text>
+  <text x="405" y="88" textAnchor="middle" fill="#888" fontSize="8"> (func $add))</text>
+  <!-- memory + stack -->
+  <rect x="20" y="108" width="210" height="52" rx="6" fill="#0d1117" stroke="#f78166" strokeWidth="1"/>
+  <text x="125" y="126" textAnchor="middle" fill="#f78166" fontSize="9" fontWeight="700">memory section</text>
+  <text x="125" y="142" textAnchor="middle" fill="#888" fontSize="8">(memory 1) = 64KB page</text>
+  <text x="125" y="155" textAnchor="middle" fill="#888" fontSize="8">(data (i32.const 0) "hello")</text>
+  <!-- stack machine -->
+  <rect x="242" y="108" width="218" height="52" rx="6" fill="#0d1117" stroke="#79c0ff" strokeWidth="1"/>
+  <text x="351" y="126" textAnchor="middle" fill="#79c0ff" fontSize="9" fontWeight="700">stack machine execution</text>
+  <text x="351" y="142" textAnchor="middle" fill="#888" fontSize="8">i32.const 3  → [3]</text>
+  <text x="351" y="155" textAnchor="middle" fill="#888" fontSize="8">i32.const 4  → [3,4]  i32.add → [7]</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- Module structure -->
   <rect x="10" y="10" width="460" height="160" rx="8" fill="rgba(255,255,255,0.02)" stroke="#3fb950" strokeWidth="1.2"/>
   <text x="240" y="32" textAnchor="middle" fill="#3fb950" fontSize="11" fontWeight="700">(module ...)</text>
@@ -185,10 +256,36 @@ console.log(exports.fib(10))  // 55`,
     label_zh: 'WASM 线性内存', label_en: 'WASM Linear Memory',
     desc_zh: 'WASM 模块有一块连续的线性内存（linear memory），以 64KB 为页，可动态扩展。C/Rust 的堆分配都在这块内存里。',
     desc_en: 'A WASM module has one contiguous linear memory, paged in 64KB units, growable at runtime. C/Rust heap allocations all happen in this memory.',
-    diagram: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- linear memory layout -->
   <rect x="10" y="20" width="460" height="140" rx="8" fill="rgba(255,255,255,0.02)" stroke="#d2a8ff" strokeWidth="1.2"/>
   <text x="240" y="42" textAnchor="middle" fill="#d2a8ff" fontSize="11" fontWeight="700">线性内存 Linear Memory (byte-addressable, 0 → max)</text>
+  <!-- sections -->
+  <rect x="20"  y="56" width="80" height="90" rx="4" fill="rgba(247,129,102,0.1)" stroke="#f78166" strokeWidth="1"/>
+  <text x="60"  y="76" textAnchor="middle" fill="#f78166" fontSize="9" fontWeight="700">data</text>
+  <text x="60"  y="91" textAnchor="middle" fill="#888" fontSize="8">static strings</text>
+  <text x="60"  y="104" textAnchor="middle" fill="#888" fontSize="8">global vars</text>
+  <text x="60"  y="117" textAnchor="middle" fill="#888" fontSize="8">addr 0x0...</text>
+  <rect x="108" y="56" width="100" height="90" rx="4" fill="rgba(63,185,80,0.1)" stroke="#3fb950" strokeWidth="1"/>
+  <text x="158" y="76" textAnchor="middle" fill="#3fb950" fontSize="9" fontWeight="700">stack (shadow)</text>
+  <text x="158" y="91" textAnchor="middle" fill="#888" fontSize="8">C local vars</text>
+  <text x="158" y="104" textAnchor="middle" fill="#888" fontSize="8">(not WASM stack)</text>
+  <rect x="216" y="56" width="160" height="90" rx="4" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" strokeWidth="1"/>
+  <text x="296" y="76" textAnchor="middle" fill="#58a6ff" fontSize="9" fontWeight="700">heap</text>
+  <text x="296" y="91" textAnchor="middle" fill="#888" fontSize="8">malloc / new</text>
+  <text x="296" y="104" textAnchor="middle" fill="#888" fontSize="8">grows upward →</text>
+  <text x="296" y="117" textAnchor="middle" fill="#888" fontSize="8">memory.grow to extend</text>
+  <rect x="384" y="56" width="76" height="90" rx="4" fill="rgba(255,255,255,0.02)" stroke="#333" strokeWidth="1" strokeDasharray="4,2"/>
+  <text x="422" y="76" textAnchor="middle" fill="#555" fontSize="9">free pages</text>
+  <text x="422" y="91" textAnchor="middle" fill="#555" fontSize="8">(unallocated)</text>
+  <!-- byte address labels -->
+  <text x="20" y="158" fill="#888" fontSize="8">0x0</text>
+  <text x="384" y="158" fill="#888" fontSize="8">current_pages × 64KB</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- linear memory layout -->
+  <rect x="10" y="20" width="460" height="140" rx="8" fill="rgba(255,255,255,0.02)" stroke="#d2a8ff" strokeWidth="1.2"/>
+  <text x="240" y="42" textAnchor="middle" fill="#d2a8ff" fontSize="11" fontWeight="700">Linear Memory (byte-addressable, 0 → max)</text>
   <!-- sections -->
   <rect x="20"  y="56" width="80" height="90" rx="4" fill="rgba(247,129,102,0.1)" stroke="#f78166" strokeWidth="1"/>
   <text x="60"  y="76" textAnchor="middle" fill="#f78166" fontSize="9" fontWeight="700">data</text>
@@ -263,7 +360,37 @@ i32[0] = 12345        // 4-byte write at offset 0`,
     label_zh: 'JS 互操作', label_en: 'JS Interop',
     desc_zh: 'WASM 只能直接传递数字类型（i32/i64/f32/f64）。传字符串、数组等需要手动通过线性内存传递，或使用 wasm-bindgen 等工具自动生成桥接代码。',
     desc_en: 'WASM can only pass numeric types (i32/i64/f32/f64) directly. Strings/arrays require manual linear memory transfer, or tools like wasm-bindgen to auto-generate bridge code.',
-    diagram: `<svg viewBox="0 0 480 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowJ" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- JS side -->
+  <rect x="10" y="30" width="170" height="120" rx="8" fill="rgba(240,136,62,0.05)" stroke="#f0883e" strokeWidth="1.4"/>
+  <text x="95" y="52" textAnchor="middle" fill="#f0883e" fontSize="11" fontWeight="700">JavaScript</text>
+  <text x="95" y="70" textAnchor="middle" fill="#888" fontSize="9">string "hello"</text>
+  <text x="95" y="84" textAnchor="middle" fill="#888" fontSize="9">Uint8Array [72,101,108...]</text>
+  <text x="95" y="98" textAnchor="middle" fill="#888" fontSize="9">import functions</text>
+  <text x="95" y="112" textAnchor="middle" fill="#888" fontSize="9">WebAssembly.Memory</text>
+  <!-- arrows -->
+  <line x1="182" y1="70" x2="245" y2="70" stroke="#f0883e" strokeWidth="1.3" markerEnd="url(#arrowJ)"/>
+  <text x="213" y="63" textAnchor="middle" fill="#f0883e" fontSize="8">encode → bytes</text>
+  <line x1="245" y1="110" x2="182" y2="110" stroke="#3fb950" strokeWidth="1.3" markerEnd="url(#arrowJ)" strokeDasharray="4,2"/>
+  <text x="213" y="128" textAnchor="middle" fill="#3fb950" fontSize="8">decode ← ptr+len</text>
+  <!-- linear memory middle -->
+  <rect x="248" y="50" width="100" height="80" rx="6" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.4"/>
+  <text x="298" y="72" textAnchor="middle" fill="#58a6ff" fontSize="10" fontWeight="700">Linear Memory</text>
+  <text x="298" y="88" textAnchor="middle" fill="#888" fontSize="8">[72,101,108,108,111]</text>
+  <text x="298" y="102" textAnchor="middle" fill="#888" fontSize="8">ptr=0, len=5</text>
+  <!-- WASM side -->
+  <line x1="350" y1="80" x2="395" y2="80" stroke="#888" strokeWidth="1.3" markerEnd="url(#arrowJ)"/>
+  <rect x="398" y="50" width="74" height="80" rx="6" fill="rgba(63,185,80,0.06)" stroke="#3fb950" strokeWidth="1.4"/>
+  <text x="435" y="72" textAnchor="middle" fill="#3fb950" fontSize="10" fontWeight="700">WASM fn</text>
+  <text x="435" y="88" textAnchor="middle" fill="#888" fontSize="8">(param i32 i32)</text>
+  <text x="435" y="102" textAnchor="middle" fill="#888" fontSize="8">ptr  len</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowJ" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -346,7 +473,31 @@ extern "C" {
     label_zh: 'Rust → WASM', label_en: 'Rust to WASM',
     desc_zh: 'Rust 是目前 WASM 开发体验最好的语言：零运行时、精确内存控制、wasm-bindgen 自动桥接、wasm-pack 一键发布 npm 包。',
     desc_en: 'Rust has the best WASM developer experience: zero runtime, precise memory control, wasm-bindgen auto-bridge, wasm-pack one-click npm publish.',
-    diagram: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowR2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <rect x="10"  y="40" width="100" height="80" rx="8" fill="rgba(247,129,102,0.08)" stroke="#f78166" strokeWidth="1.4"/>
+  <text x="60"  y="68" textAnchor="middle" fill="#f78166" fontSize="11" fontWeight="700">src/lib.rs</text>
+  <text x="60"  y="84" textAnchor="middle" fill="#888" fontSize="8">#[wasm_bindgen]</text>
+  <text x="60"  y="97" textAnchor="middle" fill="#888" fontSize="8">pub fn greet()</text>
+  <line x1="112" y1="80" x2="158" y2="80" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowR2)"/>
+  <text x="135" y="72" textAnchor="middle" fill="#888" fontSize="8">wasm-pack build</text>
+  <rect x="162" y="40" width="110" height="80" rx="8" fill="rgba(210,168,255,0.06)" stroke="#d2a8ff" strokeWidth="1.4"/>
+  <text x="217" y="68" textAnchor="middle" fill="#d2a8ff" fontSize="11" fontWeight="700">pkg/</text>
+  <text x="217" y="84" textAnchor="middle" fill="#888" fontSize="8">mylib.wasm</text>
+  <text x="217" y="97" textAnchor="middle" fill="#888" fontSize="8">mylib.js (glue)</text>
+  <text x="217" y="110" textAnchor="middle" fill="#888" fontSize="8">mylib.d.ts</text>
+  <line x1="274" y1="80" x2="318" y2="80" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowR2)"/>
+  <text x="296" y="72" textAnchor="middle" fill="#888" fontSize="8">npm publish</text>
+  <rect x="322" y="40" width="140" height="80" rx="8" fill="rgba(63,185,80,0.06)" stroke="#3fb950" strokeWidth="1.4"/>
+  <text x="392" y="68" textAnchor="middle" fill="#3fb950" fontSize="11" fontWeight="700">npm package</text>
+  <text x="392" y="84" textAnchor="middle" fill="#888" fontSize="8">import { greet } from 'mylib'</text>
+  <text x="392" y="97" textAnchor="middle" fill="#888" fontSize="8">works in any JS env</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowR2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -427,7 +578,35 @@ wasm-pack build --target bundler  # for webpack/vite`,
     label_zh: 'WASM SIMD & 性能', label_en: 'WASM SIMD & Performance',
     desc_zh: 'WASM SIMD（v128 类型）允许一次操作 16 个字节，实现 4×f32 或 2×f64 并行计算。对图像处理、ML 推理等场景有 2-4× 加速。',
     desc_en: 'WASM SIMD (v128 type) processes 16 bytes at once: 4×f32 or 2×f64 in parallel. Delivers 2-4× speedup for image processing, ML inference, and similar workloads.',
-    diagram: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- Scalar vs SIMD -->
+  <text x="100" y="22" textAnchor="middle" fill="#888" fontSize="11" fontWeight="700">Scalar</text>
+  <text x="340" y="22" textAnchor="middle" fill="#79c0ff" fontSize="11" fontWeight="700">SIMD (v128 / f32x4)</text>
+  <!-- Scalar: 4 sequential ops -->
+  <rect x="20"  y="34" width="30" height="30" rx="4" fill="rgba(240,136,62,0.15)" stroke="#f0883e" strokeWidth="1"/>
+  <text x="35"  y="54" textAnchor="middle" fill="#f0883e" fontSize="10">a[0]</text>
+  <rect x="55"  y="34" width="30" height="30" rx="4" fill="rgba(240,136,62,0.15)" stroke="#f0883e" strokeWidth="1"/>
+  <text x="70"  y="54" textAnchor="middle" fill="#f0883e" fontSize="10">a[1]</text>
+  <rect x="90"  y="34" width="30" height="30" rx="4" fill="rgba(240,136,62,0.15)" stroke="#f0883e" strokeWidth="1"/>
+  <text x="105" y="54" textAnchor="middle" fill="#f0883e" fontSize="10">a[2]</text>
+  <rect x="125" y="34" width="30" height="30" rx="4" fill="rgba(240,136,62,0.15)" stroke="#f0883e" strokeWidth="1"/>
+  <text x="140" y="54" textAnchor="middle" fill="#f0883e" fontSize="10">a[3]</text>
+  <text x="100" y="80" textAnchor="middle" fill="#888" fontSize="9">4 separate f32.add</text>
+  <text x="100" y="95" textAnchor="middle" fill="#888" fontSize="9">4 clock cycles</text>
+  <!-- SIMD: 1 op on 4 floats -->
+  <rect x="220" y="34" width="120" height="30" rx="4" fill="rgba(121,192,255,0.15)" stroke="#79c0ff" strokeWidth="1.6"/>
+  <text x="232" y="50" fill="#79c0ff" fontSize="10">a[0]</text>
+  <text x="262" y="50" fill="#79c0ff" fontSize="10">a[1]</text>
+  <text x="292" y="50" fill="#79c0ff" fontSize="10">a[2]</text>
+  <text x="322" y="50" fill="#79c0ff" fontSize="10">a[3]</text>
+  <text x="280" y="80" textAnchor="middle" fill="#888" fontSize="9">1 f32x4.add instruction</text>
+  <text x="280" y="95" textAnchor="middle" fill="#79c0ff" fontSize="9">1 clock cycle ← 4×faster!</text>
+  <!-- v128 bits breakdown -->
+  <rect x="20" y="118" width="440" height="34" rx="6" fill="rgba(121,192,255,0.05)" stroke="#79c0ff" strokeWidth="1"/>
+  <text x="240" y="134" textAnchor="middle" fill="#79c0ff" fontSize="9">v128 = 128 bits = i8x16 | i16x8 | i32x4 | i64x2 | f32x4 | f64x2</text>
+  <text x="240" y="147" textAnchor="middle" fill="#888" fontSize="8">interpret the same 128 bits as different lane types</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- Scalar vs SIMD -->
   <text x="100" y="22" textAnchor="middle" fill="#888" fontSize="11" fontWeight="700">Scalar</text>
   <text x="340" y="22" textAnchor="middle" fill="#79c0ff" fontSize="11" fontWeight="700">SIMD (v128 / f32x4)</text>
@@ -514,6 +693,7 @@ export default function WasmView() {
   const notes    = (t: Topic) => isZh ? t.notes_zh    : t.notes_en
   const concepts = (t: Topic) => isZh ? t.concepts_zh : t.concepts_en
   const codeTitle= (t: Topic) => isZh ? t.codeTitle_zh: t.codeTitle_en
+  const diagram  = (t: Topic) => isZh ? t.diagram_zh  : t.diagram_en
 
   const select = (id: string) => { setSelected(id); if (isMobile) setShowDetail(true) }
 
@@ -540,7 +720,7 @@ export default function WasmView() {
       <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>{desc(topic)}</p>
       <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '16px 20px', marginBottom: 20, border: '1px solid var(--border)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>{isZh ? '示意图' : 'Diagram'}</div>
-        <div dangerouslySetInnerHTML={{ __html: topic.diagram }} />
+        <div dangerouslySetInnerHTML={{ __html: diagram(topic) ?? '' }} />
       </div>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>{isZh ? '关键概念' : 'Key Concepts'}</div>

@@ -7,7 +7,7 @@ interface Topic {
   id: string; icon: string; color: string
   label_zh: string; label_en: string
   desc_zh: string; desc_en: string
-  diagram: string
+  diagram_zh: string; diagram_en: string
   code: string; codeTitle_zh: string; codeTitle_en: string
   notes_zh: string; notes_en: string
   concepts_zh: { term: string; def: string }[]
@@ -20,7 +20,7 @@ const TOPICS: Topic[] = [
     label_zh: '线程与进程', label_en: 'Threads vs Processes',
     desc_zh: '进程是资源隔离单元（独立内存空间），线程是调度单元（共享进程内存）。创建线程比进程快 10~100 倍。',
     desc_en: 'A process is a resource isolation unit (own memory space); a thread is a scheduling unit (shares process memory). Creating a thread is 10-100× faster than a process.',
-    diagram: `<svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- Process box -->
   <rect x="10" y="20" width="220" height="160" rx="10" fill="rgba(88,166,255,0.05)" stroke="#58a6ff" strokeWidth="1.4"/>
   <text x="120" y="42" textAnchor="middle" fill="#58a6ff" fontSize="12" fontWeight="700">Process A</text>
@@ -47,6 +47,34 @@ const TOPICS: Topic[] = [
   <!-- wall between -->
   <line x1="238" y1="20" x2="238" y2="180" stroke="#333" strokeWidth="1.5" strokeDasharray="6,3"/>
   <text x="239" y="196" textAnchor="middle" fill="#555" fontSize="9">内核隔离</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- Process box -->
+  <rect x="10" y="20" width="220" height="160" rx="10" fill="rgba(88,166,255,0.05)" stroke="#58a6ff" strokeWidth="1.4"/>
+  <text x="120" y="42" textAnchor="middle" fill="#58a6ff" fontSize="12" fontWeight="700">Process A</text>
+  <text x="120" y="58" textAnchor="middle" fill="#888" fontSize="9">own virtual address space</text>
+  <!-- threads inside -->
+  <rect x="22" y="68" width="88" height="44" rx="6" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" strokeWidth="1"/>
+  <text x="66" y="86" textAnchor="middle" fill="#58a6ff" fontSize="10">Thread 1</text>
+  <text x="66" y="100" textAnchor="middle" fill="#888" fontSize="8">Stack+Regs</text>
+  <rect x="122" y="68" width="88" height="44" rx="6" fill="rgba(88,166,255,0.1)" stroke="#58a6ff" strokeWidth="1"/>
+  <text x="166" y="86" textAnchor="middle" fill="#58a6ff" fontSize="10">Thread 2</text>
+  <text x="166" y="100" textAnchor="middle" fill="#888" fontSize="8">Stack+Regs</text>
+  <!-- shared -->
+  <rect x="22" y="124" width="188" height="44" rx="6" fill="rgba(255,255,255,0.04)" stroke="#444" strokeWidth="1"/>
+  <text x="116" y="144" textAnchor="middle" fill="#ccc" fontSize="10">Shared: Heap · Code · Files · Globals</text>
+  <text x="116" y="159" textAnchor="middle" fill="#888" fontSize="8">threads share all process resources</text>
+  <!-- Process B (separate) -->
+  <rect x="260" y="20" width="210" height="160" rx="10" fill="rgba(63,185,80,0.05)" stroke="#3fb950" strokeWidth="1.4"/>
+  <text x="365" y="42" textAnchor="middle" fill="#3fb950" fontSize="12" fontWeight="700">Process B</text>
+  <text x="365" y="58" textAnchor="middle" fill="#888" fontSize="9">separate virtual address space</text>
+  <rect x="272" y="68" width="186" height="44" rx="6" fill="rgba(63,185,80,0.1)" stroke="#3fb950" strokeWidth="1"/>
+  <text x="365" y="92" textAnchor="middle" fill="#3fb950" fontSize="10">Thread 1</text>
+  <rect x="272" y="124" width="186" height="44" rx="6" fill="rgba(255,255,255,0.04)" stroke="#444" strokeWidth="1"/>
+  <text x="365" y="150" textAnchor="middle" fill="#888" fontSize="9">own Heap / Files / Globals</text>
+  <!-- wall between -->
+  <line x1="238" y1="20" x2="238" y2="180" stroke="#333" strokeWidth="1.5" strokeDasharray="6,3"/>
+  <text x="239" y="196" textAnchor="middle" fill="#555" fontSize="9">kernel isolation</text>
 </svg>`,
     code: `// POSIX pthreads
 #include <pthread.h>
@@ -99,7 +127,29 @@ std::thread::spawn(|| {
     label_zh: '互斥锁 Mutex', label_en: 'Mutex & RWLock',
     desc_zh: 'Mutex 保证同一时刻只有一个线程进入临界区。读写锁（RWLock）允许多个并发读，写时独占。',
     desc_en: 'A mutex ensures only one thread enters the critical section at a time. RWLock allows concurrent reads but exclusive writes.',
-    diagram: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowMx" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- Mutex state machine -->
+  <circle cx="120" cy="90" r="50" fill="rgba(63,185,80,0.08)" stroke="#3fb950" strokeWidth="1.5"/>
+  <text x="120" y="85" textAnchor="middle" fill="#3fb950" fontSize="12" fontWeight="700">UNLOCKED</text>
+  <text x="120" y="102" textAnchor="middle" fill="#888" fontSize="9">free to acquire</text>
+  <circle cx="360" cy="90" r="50" fill="rgba(240,136,62,0.08)" stroke="#f0883e" strokeWidth="1.5"/>
+  <text x="360" y="85" textAnchor="middle" fill="#f0883e" fontSize="12" fontWeight="700">LOCKED</text>
+  <text x="360" y="102" textAnchor="middle" fill="#888" fontSize="9">owner: Thread X</text>
+  <!-- transitions -->
+  <path d="M168,70 Q240,20 312,70" fill="none" stroke="#3fb950" strokeWidth="1.4" markerEnd="url(#arrowMx)"/>
+  <text x="240" y="28" textAnchor="middle" fill="#3fb950" fontSize="10">lock() / pthread_mutex_lock()</text>
+  <path d="M312,110 Q240,160 168,110" fill="none" stroke="#f0883e" strokeWidth="1.4" markerEnd="url(#arrowMx)"/>
+  <text x="240" y="168" textAnchor="middle" fill="#f0883e" fontSize="10">unlock() / pthread_mutex_unlock()</text>
+  <!-- waiting threads -->
+  <rect x="320" y="30" width="80" height="20" rx="4" fill="#1a1f2d" stroke="#666" strokeWidth="1"/>
+  <text x="360" y="44" textAnchor="middle" fill="#888" fontSize="9">T2, T3 waiting (sleep)</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowMx" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -174,10 +224,33 @@ rw.Lock();   /* write */ rw.Unlock()`,
     label_zh: '信号量 Semaphore', label_en: 'Semaphore',
     desc_zh: '信号量是一个计数器，用于控制并发访问资源的数量。二值信号量（0/1）= mutex；计数信号量可控制有限资源池。',
     desc_en: 'A semaphore is a counter controlling concurrent access to resources. Binary semaphore (0/1) ≅ mutex; counting semaphore controls a resource pool.',
-    diagram: `<svg viewBox="0 0 480 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- Counting semaphore with capacity 3 -->
   <rect x="10" y="20" width="460" height="130" rx="8" fill="rgba(255,255,255,0.02)" stroke="#333" strokeWidth="1"/>
   <text x="240" y="44" textAnchor="middle" fill="#ccc" fontSize="12" fontWeight="700">计数信号量 (capacity = 3)</text>
+  <!-- slots -->
+  <rect x="40"  y="60" width="70" height="50" rx="6" fill="rgba(63,185,80,0.15)" stroke="#3fb950" strokeWidth="1.5"/>
+  <text x="75"  y="88" textAnchor="middle" fill="#3fb950" fontSize="10">Slot 1</text>
+  <text x="75"  y="103" textAnchor="middle" fill="#ccc" fontSize="9">T1 using</text>
+  <rect x="125" y="60" width="70" height="50" rx="6" fill="rgba(63,185,80,0.15)" stroke="#3fb950" strokeWidth="1.5"/>
+  <text x="160" y="88" textAnchor="middle" fill="#3fb950" fontSize="10">Slot 2</text>
+  <text x="160" y="103" textAnchor="middle" fill="#ccc" fontSize="9">T2 using</text>
+  <rect x="210" y="60" width="70" height="50" rx="6" fill="rgba(255,255,255,0.04)" stroke="#444" strokeWidth="1.5"/>
+  <text x="245" y="88" textAnchor="middle" fill="#888" fontSize="10">Slot 3</text>
+  <text x="245" y="103" textAnchor="middle" fill="#888" fontSize="9">free</text>
+  <!-- counter -->
+  <rect x="320" y="55" width="130" height="60" rx="8" fill="#1a1f2d" stroke="#58a6ff" strokeWidth="1.5"/>
+  <text x="385" y="78" textAnchor="middle" fill="#58a6ff" fontSize="11" fontWeight="700">count = 1</text>
+  <text x="385" y="95" textAnchor="middle" fill="#888" fontSize="9">sem_wait() → count-1</text>
+  <text x="385" y="108" textAnchor="middle" fill="#888" fontSize="9">sem_post() → count+1</text>
+  <!-- blocked thread -->
+  <rect x="310" y="130" width="150" height="15" rx="4" fill="rgba(240,136,62,0.1)" stroke="#f0883e" strokeWidth="1"/>
+  <text x="385" y="142" textAnchor="middle" fill="#f0883e" fontSize="8">T3 blocked (count was 0)</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 170" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- Counting semaphore with capacity 3 -->
+  <rect x="10" y="20" width="460" height="130" rx="8" fill="rgba(255,255,255,0.02)" stroke="#333" strokeWidth="1"/>
+  <text x="240" y="44" textAnchor="middle" fill="#ccc" fontSize="12" fontWeight="700">Counting Semaphore (capacity = 3)</text>
   <!-- slots -->
   <rect x="40"  y="60" width="70" height="50" rx="6" fill="rgba(63,185,80,0.15)" stroke="#3fb950" strokeWidth="1.5"/>
   <text x="75"  y="88" textAnchor="middle" fill="#3fb950" fontSize="10">Slot 1</text>
@@ -246,7 +319,38 @@ with s:
     label_zh: '死锁 Deadlock', label_en: 'Deadlock',
     desc_zh: '死锁：4 个 Coffman 条件同时满足。预防：破坏任一条件，最常见方式是固定锁顺序。',
     desc_en: 'Deadlock occurs when all 4 Coffman conditions hold simultaneously. Prevention: break any one condition; most common fix is consistent lock ordering.',
-    diagram: `<svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:400px">
+    diagram_zh: `<svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:400px">
+  <defs>
+    <marker id="arrowDL" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#f78166"/>
+    </marker>
+  </defs>
+  <!-- T1 holds R1, wants R2 -->
+  <circle cx="100" cy="80" r="36" fill="#1a1f2d" stroke="#58a6ff" strokeWidth="1.5"/>
+  <text x="100" y="75" textAnchor="middle" fill="#58a6ff" fontSize="11" fontWeight="700">Thread 1</text>
+  <text x="100" y="91" textAnchor="middle" fill="#888" fontSize="8">holds R1</text>
+  <!-- T2 holds R2, wants R1 -->
+  <circle cx="300" cy="80" r="36" fill="#1a1f2d" stroke="#3fb950" strokeWidth="1.5"/>
+  <text x="300" y="75" textAnchor="middle" fill="#3fb950" fontSize="11" fontWeight="700">Thread 2</text>
+  <text x="300" y="91" textAnchor="middle" fill="#888" fontSize="8">holds R2</text>
+  <!-- R1 -->
+  <rect x="70" y="150" width="60" height="32" rx="6" fill="#1a1f2d" stroke="#f78166" strokeWidth="1.5"/>
+  <text x="100" y="170" textAnchor="middle" fill="#f78166" fontSize="10" fontWeight="700">Lock R1</text>
+  <!-- R2 -->
+  <rect x="270" y="150" width="60" height="32" rx="6" fill="#1a1f2d" stroke="#f78166" strokeWidth="1.5"/>
+  <text x="300" y="170" textAnchor="middle" fill="#f78166" fontSize="10" fontWeight="700">Lock R2</text>
+  <!-- arrows: holds -->
+  <line x1="100" y1="116" x2="100" y2="148" stroke="#58a6ff" strokeWidth="1.5"/>
+  <text x="60" y="136" fill="#58a6ff" fontSize="8">holds</text>
+  <line x1="300" y1="116" x2="300" y2="148" stroke="#3fb950" strokeWidth="1.5"/>
+  <text x="304" y="136" fill="#3fb950" fontSize="8">holds</text>
+  <!-- arrows: wants (circular) -->
+  <path d="M134,65 Q200,10 266,65" fill="none" stroke="#f78166" strokeWidth="1.5" strokeDasharray="5,3" markerEnd="url(#arrowDL)"/>
+  <path d="M266,95 Q200,160 134,95" fill="none" stroke="#f78166" strokeWidth="1.5" strokeDasharray="5,3" markerEnd="url(#arrowDL)"/>
+  <text x="200" y="22" textAnchor="middle" fill="#f78166" fontSize="9">T1 wants R2</text>
+  <text x="200" y="188" textAnchor="middle" fill="#f78166" fontSize="9">T2 wants R1</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 400 200" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:400px">
   <defs>
     <marker id="arrowDL" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#f78166"/>
@@ -329,7 +433,36 @@ case <-ctx.Done():      // timed out
     label_zh: 'Channel / CSP', label_en: 'Channel / CSP',
     desc_zh: "Go 的 channel 实现了 CSP（通信顺序进程）模型——「不要通过共享内存通信，而应通过通信来共享内存」。",
     desc_en: 'Go channels implement CSP (Communicating Sequential Processes) — "Do not communicate by sharing memory; share memory by communicating."',
-    diagram: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowCh" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#79c0ff"/>
+    </marker>
+  </defs>
+  <!-- Goroutine A -->
+  <rect x="10" y="50" width="110" height="60" rx="8" fill="rgba(121,192,255,0.08)" stroke="#79c0ff" strokeWidth="1.4"/>
+  <text x="65" y="75" textAnchor="middle" fill="#79c0ff" fontSize="11" fontWeight="700">Goroutine A</text>
+  <text x="65" y="92" textAnchor="middle" fill="#888" fontSize="9">ch ← data</text>
+  <!-- buffered channel -->
+  <rect x="150" y="44" width="180" height="72" rx="8" fill="rgba(255,255,255,0.03)" stroke="#79c0ff" strokeWidth="1.4"/>
+  <text x="240" y="62" textAnchor="middle" fill="#79c0ff" fontSize="10" fontWeight="600">channel (buffer=3)</text>
+  <rect x="160" y="68" width="40" height="36" rx="4" fill="rgba(121,192,255,0.2)" stroke="#79c0ff" strokeWidth="1"/>
+  <text x="180" y="92" textAnchor="middle" fill="#79c0ff" fontSize="9">v1</text>
+  <rect x="202" y="68" width="40" height="36" rx="4" fill="rgba(121,192,255,0.2)" stroke="#79c0ff" strokeWidth="1"/>
+  <text x="222" y="92" textAnchor="middle" fill="#79c0ff" fontSize="9">v2</text>
+  <rect x="244" y="68" width="40" height="36" rx="4" fill="rgba(255,255,255,0.04)" stroke="#444" strokeWidth="1"/>
+  <text x="264" y="92" textAnchor="middle" fill="#555" fontSize="9">empty</text>
+  <!-- Goroutine B -->
+  <rect x="360" y="50" width="110" height="60" rx="8" fill="rgba(121,192,255,0.08)" stroke="#79c0ff" strokeWidth="1.4"/>
+  <text x="415" y="75" textAnchor="middle" fill="#79c0ff" fontSize="11" fontWeight="700">Goroutine B</text>
+  <text x="415" y="92" textAnchor="middle" fill="#888" fontSize="9">v := ← ch</text>
+  <!-- arrows -->
+  <line x1="122" y1="80" x2="148" y2="80" stroke="#79c0ff" strokeWidth="1.5" markerEnd="url(#arrowCh)"/>
+  <line x1="332" y1="80" x2="358" y2="80" stroke="#79c0ff" strokeWidth="1.5" markerEnd="url(#arrowCh)"/>
+  <!-- unbuffered label -->
+  <text x="240" y="140" textAnchor="middle" fill="#888" fontSize="9">unbuffered(0): sender blocks until receiver ready (rendezvous)</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowCh" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#79c0ff"/>
@@ -409,7 +542,28 @@ close(done)   // broadcast cancel to all goroutines watching done`,
     label_zh: 'Async / Await', label_en: 'Async / Await',
     desc_zh: 'Async/await 是协程（coroutine）的语法糖。单线程事件循环处理大量并发 I/O，无需多线程同步开销。',
     desc_en: 'Async/await is syntax sugar for coroutines. A single-threaded event loop handles massive concurrent I/O with no multi-thread synchronization overhead.',
-    diagram: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- Event loop -->
+  <rect x="10" y="20" width="460" height="150" rx="8" fill="rgba(255,255,255,0.02)" stroke="#333" strokeWidth="1"/>
+  <text x="240" y="42" textAnchor="middle" fill="#ccc" fontSize="12" fontWeight="700">Event Loop (single thread)</text>
+  <!-- task queue -->
+  <rect x="20" y="56" width="200" height="100" rx="6" fill="rgba(210,168,255,0.05)" stroke="#d2a8ff" strokeWidth="1.2"/>
+  <text x="120" y="74" textAnchor="middle" fill="#d2a8ff" fontSize="10" fontWeight="600">Task Queue</text>
+  <rect x="30" y="80" width="80" height="26" rx="4" fill="rgba(210,168,255,0.15)"/>
+  <text x="70" y="97" textAnchor="middle" fill="#d2a8ff" fontSize="9">fetch() done</text>
+  <rect x="120" y="80" width="88" height="26" rx="4" fill="rgba(210,168,255,0.15)"/>
+  <text x="164" y="97" textAnchor="middle" fill="#d2a8ff" fontSize="9">timer fired</text>
+  <rect x="30" y="116" width="80" height="26" rx="4" fill="rgba(210,168,255,0.08)"/>
+  <text x="70" y="133" textAnchor="middle" fill="#888" fontSize="9">I/O ready</text>
+  <!-- executor -->
+  <rect x="250" y="56" width="210" height="100" rx="6" fill="rgba(255,255,255,0.03)" stroke="#444" strokeWidth="1.2"/>
+  <text x="355" y="74" textAnchor="middle" fill="#ccc" fontSize="10" fontWeight="600">Executor / Reactor</text>
+  <text x="355" y="92" textAnchor="middle" fill="#888" fontSize="9">poll futures until Ready</text>
+  <text x="355" y="108" textAnchor="middle" fill="#888" fontSize="9">register wakers (epoll)</text>
+  <text x="355" y="124" textAnchor="middle" fill="#3fb950" fontSize="9">no blocking — yield on await</text>
+  <text x="355" y="140" textAnchor="middle" fill="#888" fontSize="9">Rust: tokio / async-std</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- Event loop -->
   <rect x="10" y="20" width="460" height="150" rx="8" fill="rgba(255,255,255,0.02)" stroke="#333" strokeWidth="1"/>
   <text x="240" y="42" textAnchor="middle" fill="#ccc" fontSize="12" fontWeight="700">Event Loop (single thread)</text>
@@ -482,7 +636,7 @@ async def main():
     label_zh: '原子操作 & CAS', label_en: 'Atomics & CAS',
     desc_zh: '原子操作是不可分割的 CPU 指令，无需锁即可实现线程安全的计数器、标志位等。CAS（Compare-And-Swap）是无锁数据结构的基础。',
     desc_en: 'Atomic operations are indivisible CPU instructions enabling lock-free counters and flags. CAS (Compare-And-Swap) is the foundation of lock-free data structures.',
-    diagram: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- CAS diagram -->
   <text x="240" y="24" textAnchor="middle" fill="#ccc" fontSize="12" fontWeight="700">CAS(addr, expected, desired) — 原子的</text>
   <!-- step 1: read -->
@@ -505,6 +659,30 @@ async def main():
   <rect x="10" y="110" width="460" height="40" rx="6" fill="rgba(247,129,102,0.06)" stroke="#f78166" strokeWidth="1"/>
   <text x="240" y="128" textAnchor="middle" fill="#f78166" fontSize="10" fontWeight="600">ABA 问题</text>
   <text x="240" y="144" textAnchor="middle" fill="#888" fontSize="9">值从 A→B→A，CAS 认为未变化实则已变。解决：版本号 (tagged pointer) 或 hazard pointer</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- CAS diagram -->
+  <text x="240" y="24" textAnchor="middle" fill="#ccc" fontSize="12" fontWeight="700">CAS(addr, expected, desired) — atomic</text>
+  <!-- step 1: read -->
+  <rect x="10" y="40" width="140" height="50" rx="6" fill="rgba(88,166,255,0.08)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="80" y="60" textAnchor="middle" fill="#58a6ff" fontSize="10" fontWeight="600">1. Read *addr</text>
+  <text x="80" y="78" textAnchor="middle" fill="#888" fontSize="9">*addr == expected?</text>
+  <!-- step 2: compare success -->
+  <rect x="170" y="40" width="140" height="50" rx="6" fill="rgba(63,185,80,0.08)" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="240" y="60" textAnchor="middle" fill="#3fb950" fontSize="10" fontWeight="600">2a. YES → Write</text>
+  <text x="240" y="78" textAnchor="middle" fill="#888" fontSize="9">*addr = desired; return true</text>
+  <!-- step 2 fail -->
+  <rect x="330" y="40" width="140" height="50" rx="6" fill="rgba(240,136,62,0.08)" stroke="#f0883e" strokeWidth="1.2"/>
+  <text x="400" y="60" textAnchor="middle" fill="#f0883e" fontSize="10" fontWeight="600">2b. NO → Fail</text>
+  <text x="400" y="78" textAnchor="middle" fill="#888" fontSize="9">return false; retry loop</text>
+  <!-- arrows -->
+  <line x1="150" y1="65" x2="168" y2="65" stroke="#3fb950" strokeWidth="1.2"/>
+  <line x1="150" y1="65" x2="168" y2="65" stroke="#3fb950" strokeWidth="1.2"/>
+  <line x1="310" y1="65" x2="328" y2="65" stroke="#f0883e" strokeWidth="1.2"/>
+  <!-- ABA note -->
+  <rect x="10" y="110" width="460" height="40" rx="6" fill="rgba(247,129,102,0.06)" stroke="#f78166" strokeWidth="1"/>
+  <text x="240" y="128" textAnchor="middle" fill="#f78166" fontSize="10" fontWeight="600">ABA Problem</text>
+  <text x="240" y="144" textAnchor="middle" fill="#888" fontSize="9">Value changes A→B→A; CAS falsely sees no change. Fix: tagged pointer (version) or hazard pointer</text>
 </svg>`,
     code: `// C++ atomics (C++11)
 #include <atomic>
@@ -559,7 +737,7 @@ val := atomic.LoadInt64(&counter)`,
     label_zh: '内存模型 & 数据竞争', label_en: 'Memory Model & Data Races',
     desc_zh: '内存模型定义多线程程序中读写的可见性规则。数据竞争（data race）是未定义行为——编译器可能生成任意错误代码。',
     desc_en: "The memory model defines visibility rules for reads and writes in multi-threaded programs. Data races are undefined behavior — the compiler may generate any code it wants.",
-    diagram: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- happens-before chain -->
   <text x="240" y="22" textAnchor="middle" fill="#ccc" fontSize="12" fontWeight="700">Happens-Before 关系</text>
   <rect x="20"  y="40" width="100" height="40" rx="6" fill="#1a1f2d" stroke="#58a6ff" strokeWidth="1.2"/>
@@ -576,6 +754,29 @@ val := atomic.LoadInt64(&counter)`,
   <text x="410" y="125" textAnchor="middle" fill="#f0883e" fontSize="10">Thread 2 read x → 1</text>
   <line x1="410" y1="80" x2="410" y2="98" stroke="#888" strokeWidth="1.2"/>
   <text x="240" y="148" textAnchor="middle" fill="#888" fontSize="9">happens-before 链保证 T2 看到 T1 的写入</text>
+  <defs>
+    <marker id="arrowDL" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- happens-before chain -->
+  <text x="240" y="22" textAnchor="middle" fill="#ccc" fontSize="12" fontWeight="700">Happens-Before Relationship</text>
+  <rect x="20"  y="40" width="100" height="40" rx="6" fill="#1a1f2d" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="70"  y="65" textAnchor="middle" fill="#58a6ff" fontSize="10">Thread 1 write x=1</text>
+  <rect x="180" y="40" width="120" height="40" rx="6" fill="#1a1f2d" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="240" y="65" textAnchor="middle" fill="#3fb950" fontSize="10">mutex unlock (release)</text>
+  <rect x="360" y="40" width="100" height="40" rx="6" fill="#1a1f2d" stroke="#d2a8ff" strokeWidth="1.2"/>
+  <text x="410" y="65" textAnchor="middle" fill="#d2a8ff" fontSize="10">mutex lock (acquire)</text>
+  <!-- chain arrow -->
+  <line x1="120" y1="60" x2="178" y2="60" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowDL)"/>
+  <line x1="300" y1="60" x2="358" y2="60" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowDL)"/>
+  <!-- thread 2 read -->
+  <rect x="360" y="100" width="100" height="40" rx="6" fill="#1a1f2d" stroke="#f0883e" strokeWidth="1.2"/>
+  <text x="410" y="125" textAnchor="middle" fill="#f0883e" fontSize="10">Thread 2 read x → 1</text>
+  <line x1="410" y1="80" x2="410" y2="98" stroke="#888" strokeWidth="1.2"/>
+  <text x="240" y="148" textAnchor="middle" fill="#888" fontSize="9">happens-before chain guarantees T2 sees T1's write</text>
   <defs>
     <marker id="arrowDL" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -638,6 +839,7 @@ export default function ConcurrencyView() {
   const notes   = (t: Topic) => isZh ? t.notes_zh    : t.notes_en
   const concepts = (t: Topic) => isZh ? t.concepts_zh : t.concepts_en
   const codeTitle = (t: Topic) => isZh ? t.codeTitle_zh : t.codeTitle_en
+  const diagram = (t: Topic) => isZh ? t.diagram_zh : t.diagram_en
 
   const select = (id: string) => { setSelected(id); if (isMobile) setShowDetail(true) }
 
@@ -669,7 +871,7 @@ export default function ConcurrencyView() {
       <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>{desc(topic)}</p>
       <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '16px 20px', marginBottom: 20, border: '1px solid var(--border)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>{isZh ? '示意图' : 'Diagram'}</div>
-        <div dangerouslySetInnerHTML={{ __html: topic.diagram }} />
+        <div dangerouslySetInnerHTML={{ __html: diagram(topic) }} />
       </div>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>{isZh ? '关键概念' : 'Key Concepts'}</div>

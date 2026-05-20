@@ -28,7 +28,7 @@ const GitView            = lazy(() => import('./components/GitView'))
 const ConcurrencyView    = lazy(() => import('./components/ConcurrencyView'))
 const WasmView           = lazy(() => import('./components/WasmView'))
 const DatabaseView       = lazy(() => import('./components/DatabaseView'))
-const ObjectBusView      = lazy(() => import('./components/ObjectBusView'))
+const CodeChipView       = lazy(() => import('./components/CodeChipView'))
 
 type TopMode = SearchTopMode
 
@@ -145,8 +145,25 @@ function AppInner() {
   const [visited, setVisited] = useState<Set<string>>(() => getVisited())
   const [showSearch, setShowSearch] = useState(false)
 
+  const TAB_GROUPS: { id: string; icon: string; label_zh: string; label_en: string; tabs: TopMode[] }[] = [
+    { id: 'compiler', icon: '🔬', label_zh: '编译器', label_en: 'Compiler',
+      tabs: ['ast', 'memory', 'ieee754', 'regex', 'x86', 'cpu'] },
+    { id: 'system',   icon: '🐧', label_zh: '系统',   label_en: 'System',
+      tabs: ['linux', 'tlpi', 'concurrency', 'wasm', 'hw', 'objectbus'] },
+    { id: 'cs',       icon: '📊', label_zh: '算法',   label_en: 'CS',
+      tabs: ['ds', 'algo', 'database'] },
+    { id: 'arch',     icon: '🏗',  label_zh: '架构',   label_en: 'Arch',
+      tabs: ['network', 'sysdesign', 'docker', 'git'] },
+  ]
+
+  const groupOfTab = (tab: TopMode) => TAB_GROUPS.find(g => g.tabs.includes(tab))?.id ?? 'compiler'
+  const [topGroup, setTopGroup] = useState(() => groupOfTab(
+    (localStorage.getItem('lav-top-mode') as TopMode) || 'ast'
+  ))
+
   const switchTop = (m: TopMode) => {
     setTopMode(m)
+    setTopGroup(groupOfTab(m))
     localStorage.setItem('lav-top-mode', m)
     window.location.hash = `tab=${m}`
     markVisited(m)
@@ -297,9 +314,24 @@ function AppInner() {
             </div>
           </div>
         </div>
-        {/* Row 2: tab bar — full width, scrollable */}
-        <div className="top-tab-bar">
-          {topTabs.map(tab => (
+        {/* Row 2: group selector + tab bar */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 0, marginTop: 6 }}>
+          {TAB_GROUPS.map(g => (
+            <button key={g.id} onClick={() => setTopGroup(g.id)}
+              style={{
+                padding: '4px 12px', border: 'none', borderRadius: '6px 6px 0 0', cursor: 'pointer',
+                fontSize: 11, fontWeight: topGroup === g.id ? 700 : 400,
+                background: topGroup === g.id ? 'var(--bg-elevated)' : 'transparent',
+                color: topGroup === g.id ? 'var(--text-primary)' : 'var(--text-muted)',
+                borderBottom: topGroup === g.id ? '2px solid var(--accent-green)' : '2px solid transparent',
+                transition: 'all 0.15s', whiteSpace: 'nowrap',
+              }}>
+              {g.icon} {lang === 'zh' ? g.label_zh : g.label_en}
+            </button>
+          ))}
+        </div>
+        <div className="top-tab-bar" style={{ marginTop: 0 }}>
+          {topTabs.filter(tab => TAB_GROUPS.find(g => g.id === topGroup)?.tabs.includes(tab.id)).map(tab => (
             <button
               key={tab.id}
               onClick={() => switchTop(tab.id)}
@@ -344,7 +376,7 @@ function AppInner() {
               {topMode === 'concurrency' && <ConcurrencyView />}
               {topMode === 'wasm'        && <WasmView />}
               {topMode === 'database'    && <DatabaseView />}
-              {topMode === 'objectbus'   && <ObjectBusView />}
+              {topMode === 'objectbus'   && <CodeChipView />}
             </Suspense>
           </ErrorBoundary>
         </div>

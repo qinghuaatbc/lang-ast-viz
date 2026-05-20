@@ -7,7 +7,7 @@ interface Topic {
   id: string; icon: string; color: string
   label_zh: string; label_en: string
   desc_zh: string; desc_en: string
-  diagram: string
+  diagram_zh: string; diagram_en: string
   code: string; codeTitle_zh: string; codeTitle_en: string
   notes_zh: string; notes_en: string
   concepts_zh: { term: string; def: string }[]
@@ -20,7 +20,7 @@ const TOPICS: Topic[] = [
     label_zh: 'B+ Tree 索引', label_en: 'B+ Tree Index',
     desc_zh: 'B+ Tree 是关系型数据库索引的核心数据结构（InnoDB/PostgreSQL）。所有数据在叶节点，叶节点通过链表连接，支持范围查询。',
     desc_en: 'B+ Tree is the core index data structure in relational databases (InnoDB/PostgreSQL). All data is in leaf nodes linked by a list, enabling efficient range queries.',
-    diagram: `<svg viewBox="0 0 480 210" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 210" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowBT" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -58,6 +58,50 @@ const TOPICS: Topic[] = [
   <line x1="208" y1="142" x2="212" y2="142" stroke="#3fb950" strokeWidth="1.2" markerEnd="url(#arrowBT)"/>
   <line x1="310" y1="142" x2="314" y2="142" stroke="#3fb950" strokeWidth="1.2" markerEnd="url(#arrowBT)"/>
   <text x="240" y="195" textAnchor="middle" fill="#888" fontSize="9">叶节点通过双向链表连接 → 支持 O(log n) 范围扫描</text>
+  <!-- lines internal to leaf -->
+  <line x1="80"  y1="96" x2="58"  y2="122" stroke="#333" strokeWidth="1"/>
+  <line x1="120" y1="96" x2="160" y2="122" stroke="#333" strokeWidth="1"/>
+  <line x1="220" y1="96" x2="262" y2="122" stroke="#333" strokeWidth="1"/>
+  <line x1="370" y1="96" x2="364" y2="122" stroke="#333" strokeWidth="1"/>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 210" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowBT" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- root -->
+  <rect x="170" y="10" width="140" height="32" rx="6" fill="#1a2d1a" stroke="#3fb950" strokeWidth="1.5"/>
+  <text x="240" y="31" textAnchor="middle" fill="#3fb950" fontSize="11" fontWeight="700">root: [20 | 40]</text>
+  <!-- internal nodes -->
+  <rect x="50"  y="68" width="120" height="28" rx="5" fill="#1a1f2d" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="110" y="86" textAnchor="middle" fill="#58a6ff" fontSize="10">[10 | 15]</text>
+  <rect x="190" y="68" width="100" height="28" rx="5" fill="#1a1f2d" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="240" y="86" textAnchor="middle" fill="#58a6ff" fontSize="10">[25 | 30]</text>
+  <rect x="320" y="68" width="140" height="28" rx="5" fill="#1a1f2d" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="390" y="86" textAnchor="middle" fill="#58a6ff" fontSize="10">[45 | 55]</text>
+  <!-- lines root to internal -->
+  <line x1="210" y1="42" x2="130" y2="66" stroke="#444" strokeWidth="1.2"/>
+  <line x1="240" y1="42" x2="240" y2="66" stroke="#444" strokeWidth="1.2"/>
+  <line x1="270" y1="42" x2="360" y2="66" stroke="#444" strokeWidth="1.2"/>
+  <!-- leaf nodes -->
+  <rect x="10"  y="124" width="96" height="36" rx="5" fill="#0d1117" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="58"  y="140" textAnchor="middle" fill="#3fb950" fontSize="9">5|data  8|data</text>
+  <text x="58"  y="155" textAnchor="middle" fill="#888" fontSize="8">10|data</text>
+  <rect x="112" y="124" width="96" height="36" rx="5" fill="#0d1117" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="160" y="140" textAnchor="middle" fill="#3fb950" fontSize="9">12|data 15|data</text>
+  <text x="160" y="155" textAnchor="middle" fill="#888" fontSize="8">18|data</text>
+  <rect x="214" y="124" width="96" height="36" rx="5" fill="#0d1117" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="262" y="140" textAnchor="middle" fill="#3fb950" fontSize="9">20|data 25|data</text>
+  <text x="262" y="155" textAnchor="middle" fill="#888" fontSize="8">28|data</text>
+  <rect x="316" y="124" width="96" height="36" rx="5" fill="#0d1117" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="364" y="140" textAnchor="middle" fill="#3fb950" fontSize="9">40|data 45|data</text>
+  <text x="364" y="155" textAnchor="middle" fill="#888" fontSize="8">50|data</text>
+  <!-- leaf chain -->
+  <line x1="106" y1="142" x2="110" y2="142" stroke="#3fb950" strokeWidth="1.2" markerEnd="url(#arrowBT)"/>
+  <line x1="208" y1="142" x2="212" y2="142" stroke="#3fb950" strokeWidth="1.2" markerEnd="url(#arrowBT)"/>
+  <line x1="310" y1="142" x2="314" y2="142" stroke="#3fb950" strokeWidth="1.2" markerEnd="url(#arrowBT)"/>
+  <text x="240" y="195" textAnchor="middle" fill="#888" fontSize="9">Leaf nodes linked by doubly linked list → O(log n) range scans</text>
   <!-- lines internal to leaf -->
   <line x1="80"  y1="96" x2="58"  y2="122" stroke="#333" strokeWidth="1"/>
   <line x1="120" y1="96" x2="160" y2="122" stroke="#333" strokeWidth="1"/>
@@ -110,7 +154,45 @@ SELECT name, status FROM users WHERE email = 'a@b.com';
     label_zh: 'WAL 预写日志', label_en: 'Write-Ahead Log (WAL)',
     desc_zh: 'WAL 是数据库持久性（Durability）的核心机制：先写日志再写数据页，崩溃后可通过重放日志恢复到一致状态。',
     desc_en: 'WAL is the core mechanism for database Durability: write to log before writing data pages. After a crash, replay the log to restore a consistent state.',
-    diagram: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowW2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- Transaction -->
+  <rect x="10" y="30" width="100" height="120" rx="8" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.3"/>
+  <text x="60" y="52" textAnchor="middle" fill="#58a6ff" fontSize="10" fontWeight="700">Transaction</text>
+  <text x="60" y="70" textAnchor="middle" fill="#888" fontSize="8">UPDATE users</text>
+  <text x="60" y="84" textAnchor="middle" fill="#888" fontSize="8">SET balance=90</text>
+  <text x="60" y="100" textAnchor="middle" fill="#888" fontSize="8">WHERE id=1</text>
+  <!-- arrows: 1. write WAL first -->
+  <line x1="112" y1="70" x2="165" y2="70" stroke="#f0883e" strokeWidth="1.5" markerEnd="url(#arrowW2)"/>
+  <text x="138" y="62" textAnchor="middle" fill="#f0883e" fontSize="8">① write first</text>
+  <!-- WAL / Redo log -->
+  <rect x="168" y="10" width="130" height="160" rx="8" fill="rgba(240,136,62,0.06)" stroke="#f0883e" strokeWidth="1.5"/>
+  <text x="233" y="32" textAnchor="middle" fill="#f0883e" fontSize="11" fontWeight="700">WAL / Redo Log</text>
+  <text x="233" y="50" textAnchor="middle" fill="#888" fontSize="8">(append-only, sequential)</text>
+  <rect x="178" y="58" width="110" height="22" rx="4" fill="rgba(240,136,62,0.15)"/>
+  <text x="233" y="73" textAnchor="middle" fill="#f0883e" fontSize="9">LSN 1001: BEGIN txn#5</text>
+  <rect x="178" y="84" width="110" height="22" rx="4" fill="rgba(240,136,62,0.15)"/>
+  <text x="233" y="99" textAnchor="middle" fill="#f0883e" fontSize="9">LSN 1002: page3 off12 90</text>
+  <rect x="178" y="110" width="110" height="22" rx="4" fill="rgba(240,136,62,0.2)"/>
+  <text x="233" y="125" textAnchor="middle" fill="#f0883e" fontSize="9">LSN 1003: COMMIT txn#5</text>
+  <text x="233" y="152" textAnchor="middle" fill="#888" fontSize="7">fsync() before COMMIT ack</text>
+  <!-- arrow 2: async write to data pages -->
+  <line x1="300" y1="90" x2="340" y2="90" stroke="#888" strokeWidth="1.3" markerEnd="url(#arrowW2)" strokeDasharray="5,3"/>
+  <text x="320" y="82" textAnchor="middle" fill="#888" fontSize="8">② async</text>
+  <!-- Data pages (buffer pool) -->
+  <rect x="343" y="30" width="130" height="120" rx="8" fill="rgba(63,185,80,0.06)" stroke="#3fb950" strokeWidth="1.3"/>
+  <text x="408" y="52" textAnchor="middle" fill="#3fb950" fontSize="10" fontWeight="700">Data Pages</text>
+  <text x="408" y="68" textAnchor="middle" fill="#888" fontSize="8">(buffer pool)</text>
+  <rect x="353" y="78" width="110" height="28" rx="4" fill="rgba(63,185,80,0.12)"/>
+  <text x="408" y="94" textAnchor="middle" fill="#3fb950" fontSize="9">page 3 (dirty)</text>
+  <text x="408" y="108" textAnchor="middle" fill="#888" fontSize="7">written to disk later</text>
+  <text x="408" y="130" textAnchor="middle" fill="#888" fontSize="7">checkpoint flushes dirty pages</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowW2" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -193,10 +275,38 @@ PRAGMA wal_checkpoint(FULL);   -- flush WAL to main database`,
     label_zh: 'MVCC 多版本并发', label_en: 'MVCC',
     desc_zh: 'MVCC（多版本并发控制）让读操作不阻塞写操作——每个事务看到数据库在其开始时的一个一致快照。PostgreSQL 和 InnoDB 都用 MVCC 实现快照隔离。',
     desc_en: 'MVCC (Multi-Version Concurrency Control) lets reads never block writes — each transaction sees a consistent snapshot of the database from its start time. Both PostgreSQL and InnoDB use MVCC for snapshot isolation.',
-    diagram: `<svg viewBox="0 0 480 190" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 190" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <!-- Timeline -->
   <line x1="20" y1="30" x2="460" y2="30" stroke="#333" strokeWidth="1.5"/>
   <text x="240" y="22" textAnchor="middle" fill="#888" fontSize="9">时间轴 →</text>
+  <!-- T1 (reader) -->
+  <circle cx="60" cy="30" r="5" fill="#58a6ff"/>
+  <text x="60" y="50" textAnchor="middle" fill="#58a6ff" fontSize="9">T1 BEGIN</text>
+  <circle cx="380" cy="30" r="5" fill="#58a6ff"/>
+  <text x="380" y="50" textAnchor="middle" fill="#58a6ff" fontSize="9">T1 SELECT</text>
+  <rect x="60" y="55" width="320" height="20" rx="4" fill="rgba(88,166,255,0.08)" stroke="#58a6ff" strokeWidth="1" strokeDasharray="4,2"/>
+  <text x="220" y="69" textAnchor="middle" fill="#58a6ff" fontSize="8">T1 snapshot: sees row version from before T2 started</text>
+  <!-- T2 (writer) -->
+  <circle cx="150" cy="30" r="5" fill="#3fb950"/>
+  <text x="150" y="88" textAnchor="middle" fill="#3fb950" fontSize="9">T2 BEGIN</text>
+  <circle cx="280" cy="30" r="5" fill="#3fb950"/>
+  <text x="280" y="88" textAnchor="middle" fill="#3fb950" fontSize="9">T2 UPDATE → COMMIT</text>
+  <!-- Row versions -->
+  <rect x="20" y="108" width="420" height="70" rx="8" fill="rgba(255,255,255,0.02)" stroke="#333" strokeWidth="1"/>
+  <text x="230" y="125" textAnchor="middle" fill="#ccc" fontSize="10" fontWeight="700">Row versions (tuple heap)</text>
+  <rect x="30"  y="134" width="130" height="36" rx="5" fill="rgba(88,166,255,0.08)" stroke="#58a6ff" strokeWidth="1"/>
+  <text x="95"  y="150" textAnchor="middle" fill="#58a6ff" fontSize="9">xmin=100 xmax=null</text>
+  <text x="95"  y="164" textAnchor="middle" fill="#888" fontSize="8">balance=100 (old)</text>
+  <rect x="170" y="134" width="130" height="36" rx="5" fill="rgba(63,185,80,0.08)" stroke="#3fb950" strokeWidth="1"/>
+  <text x="235" y="150" textAnchor="middle" fill="#3fb950" fontSize="9">xmin=T2 xmax=null</text>
+  <text x="235" y="164" textAnchor="middle" fill="#888" fontSize="8">balance=90 (new)</text>
+  <text x="340" y="155" textAnchor="middle" fill="#888" fontSize="8">T1 reads old version → 100</text>
+  <text x="340" y="168" textAnchor="middle" fill="#888" fontSize="8">T2 sees new version → 90</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 190" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <!-- Timeline -->
+  <line x1="20" y1="30" x2="460" y2="30" stroke="#333" strokeWidth="1.5"/>
+  <text x="240" y="22" textAnchor="middle" fill="#888" fontSize="9">Timeline →</text>
   <!-- T1 (reader) -->
   <circle cx="60" cy="30" r="5" fill="#58a6ff"/>
   <text x="60" y="50" textAnchor="middle" fill="#58a6ff" fontSize="9">T1 BEGIN</text>
@@ -268,7 +378,41 @@ SELECT age(datfrozenxid), datname FROM pg_database;
     label_zh: '查询执行引擎', label_en: 'Query Execution Engine',
     desc_zh: '查询从 SQL 文本到最终结果经过：词法解析 → AST → 语义分析 → 查询优化（代价估算）→ 物理计划 → 执行。优化器选择最优连接算法和访问路径。',
     desc_en: 'A query goes from SQL text to result through: lex/parse → AST → semantic analysis → optimization (cost estimation) → physical plan → execution. The optimizer selects the best join algorithm and access path.',
-    diagram: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowQ" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- pipeline -->
+  <rect x="5"   y="40" width="68" height="80" rx="6" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="39"  y="62" textAnchor="middle" fill="#58a6ff" fontSize="8" fontWeight="700">Parser</text>
+  <text x="39"  y="76" textAnchor="middle" fill="#888" fontSize="7">SQL → AST</text>
+  <text x="39"  y="89" textAnchor="middle" fill="#888" fontSize="7">tokens</text>
+  <line x1="75" y1="80" x2="90" y2="80" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowQ)"/>
+  <rect x="93"  y="40" width="72" height="80" rx="6" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="129" y="62" textAnchor="middle" fill="#58a6ff" fontSize="8" fontWeight="700">Rewriter</text>
+  <text x="129" y="76" textAnchor="middle" fill="#888" fontSize="7">views expand</text>
+  <text x="129" y="89" textAnchor="middle" fill="#888" fontSize="7">rules apply</text>
+  <line x1="167" y1="80" x2="182" y2="80" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowQ)"/>
+  <rect x="185" y="30" width="88" height="100" rx="6" fill="rgba(240,136,62,0.08)" stroke="#f0883e" strokeWidth="1.5"/>
+  <text x="229" y="52" textAnchor="middle" fill="#f0883e" fontSize="9" fontWeight="700">Optimizer</text>
+  <text x="229" y="68" textAnchor="middle" fill="#888" fontSize="7">statistics-based</text>
+  <text x="229" y="82" textAnchor="middle" fill="#888" fontSize="7">join order</text>
+  <text x="229" y="96" textAnchor="middle" fill="#888" fontSize="7">access method</text>
+  <text x="229" y="110" textAnchor="middle" fill="#888" fontSize="7">cost = rows × I/O</text>
+  <line x1="275" y1="80" x2="290" y2="80" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowQ)"/>
+  <rect x="293" y="40" width="76" height="80" rx="6" fill="rgba(63,185,80,0.06)" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="331" y="62" textAnchor="middle" fill="#3fb950" fontSize="8" fontWeight="700">Executor</text>
+  <text x="331" y="76" textAnchor="middle" fill="#888" fontSize="7">volcano model</text>
+  <text x="331" y="89" textAnchor="middle" fill="#888" fontSize="7">pull-based</text>
+  <line x1="371" y1="80" x2="386" y2="80" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowQ)"/>
+  <rect x="389" y="40" width="86" height="80" rx="6" fill="rgba(210,168,255,0.06)" stroke="#d2a8ff" strokeWidth="1.2"/>
+  <text x="432" y="62" textAnchor="middle" fill="#d2a8ff" fontSize="8" fontWeight="700">Result</text>
+  <text x="432" y="76" textAnchor="middle" fill="#888" fontSize="7">rows → client</text>
+  <text x="432" y="89" textAnchor="middle" fill="#888" fontSize="7">streaming</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 160" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowQ" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -351,7 +495,7 @@ RESET ALL;`,
     label_zh: 'ACID 事务', label_en: 'ACID Transactions',
     desc_zh: 'ACID 是关系型数据库事务的四个保证。分布式系统中 ACID 很难同时满足，BASE（基本可用、软状态、最终一致）是常见的权衡方案。',
     desc_en: 'ACID is the four-property guarantee for relational database transactions. In distributed systems, ACID is hard to achieve simultaneously; BASE (Basically Available, Soft state, Eventually consistent) is a common trade-off.',
-    diagram: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <rect x="10"  y="20" width="105" height="140" rx="8" fill="rgba(247,129,102,0.06)" stroke="#f78166" strokeWidth="1.4"/>
   <text x="62"  y="44"  textAnchor="middle" fill="#f78166" fontSize="12" fontWeight="700">A</text>
   <text x="62"  y="62"  textAnchor="middle" fill="#f78166" fontSize="10">Atomicity</text>
@@ -380,6 +524,32 @@ RESET ALL;`,
   <text x="412" y="96"  textAnchor="middle" fill="#888" fontSize="8">committed = permanent</text>
   <text x="412" y="110" textAnchor="middle" fill="#888" fontSize="7">WAL + fsync</text>
   <text x="412" y="124" textAnchor="middle" fill="#888" fontSize="7">replication for HA</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <rect x="10"  y="20" width="105" height="140" rx="8" fill="rgba(247,129,102,0.06)" stroke="#f78166" strokeWidth="1.4"/>
+  <text x="62"  y="44"  textAnchor="middle" fill="#f78166" fontSize="12" fontWeight="700">A</text>
+  <text x="62"  y="62"  textAnchor="middle" fill="#f78166" fontSize="10">Atomicity</text>
+  <text x="62"  y="80"  textAnchor="middle" fill="#888" fontSize="8">all-or-nothing</text>
+  <text x="62"  y="96"  textAnchor="middle" fill="#888" fontSize="8">undo log rollback</text>
+  <text x="62"  y="110" textAnchor="middle" fill="#888" fontSize="7">2PC for distributed</text>
+  <rect x="125" y="20" width="105" height="140" rx="8" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.4"/>
+  <text x="177" y="44"  textAnchor="middle" fill="#58a6ff" fontSize="12" fontWeight="700">C</text>
+  <text x="177" y="62"  textAnchor="middle" fill="#58a6ff" fontSize="10">Consistency</text>
+  <text x="177" y="80"  textAnchor="middle" fill="#888" fontSize="8">constraints hold</text>
+  <text x="177" y="96"  textAnchor="middle" fill="#888" fontSize="8">FK, CHECK, UNIQUE</text>
+  <text x="177" y="110" textAnchor="middle" fill="#888" fontSize="7">application invariants</text>
+  <rect x="240" y="20" width="105" height="140" rx="8" fill="rgba(63,185,80,0.06)" stroke="#3fb950" strokeWidth="1.4"/>
+  <text x="292" y="44"  textAnchor="middle" fill="#3fb950" fontSize="12" fontWeight="700">I</text>
+  <text x="292" y="62"  textAnchor="middle" fill="#3fb950" fontSize="10">Isolation</text>
+  <text x="292" y="80"  textAnchor="middle" fill="#888" fontSize="8">txns don't interfere</text>
+  <text x="292" y="96"  textAnchor="middle" fill="#888" fontSize="8">MVCC + locks</text>
+  <text x="292" y="110" textAnchor="middle" fill="#888" fontSize="7">4 isolation levels</text>
+  <rect x="355" y="20" width="115" height="140" rx="8" fill="rgba(210,168,255,0.06)" stroke="#d2a8ff" strokeWidth="1.4"/>
+  <text x="412" y="44"  textAnchor="middle" fill="#d2a8ff" fontSize="12" fontWeight="700">D</text>
+  <text x="412" y="62"  textAnchor="middle" fill="#d2a8ff" fontSize="10">Durability</text>
+  <text x="412" y="80"  textAnchor="middle" fill="#888" fontSize="8">committed = permanent</text>
+  <text x="412" y="96"  textAnchor="middle" fill="#888" fontSize="8">WAL + fsync</text>
+  <text x="412" y="110" textAnchor="middle" fill="#888" fontSize="7">replication for HA</text>
 </svg>`,
     code: `-- ACID in practice
 
@@ -433,7 +603,43 @@ COMMIT;`,
     label_zh: 'LSM Tree', label_en: 'LSM Tree',
     desc_zh: 'Log-Structured Merge Tree 把所有写入转换为顺序 I/O，写吞吐量极高。RocksDB/LevelDB/Cassandra/ClickHouse 使用此结构。适合写多读少场景。',
     desc_en: 'Log-Structured Merge Tree converts all writes to sequential I/O for extremely high write throughput. Used by RocksDB/LevelDB/Cassandra/ClickHouse. Best for write-heavy workloads.',
-    diagram: `<svg viewBox="0 0 480 190" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 190" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowL" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- Write path -->
+  <rect x="10"  y="10" width="90" height="40" rx="6" fill="rgba(121,192,255,0.1)" stroke="#79c0ff" strokeWidth="1.4"/>
+  <text x="55"  y="34" textAnchor="middle" fill="#79c0ff" fontSize="10" fontWeight="700">Write</text>
+  <line x1="102" y1="30" x2="130" y2="30" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowL)"/>
+  <!-- WAL -->
+  <rect x="133" y="10" width="70" height="40" rx="6" fill="rgba(240,136,62,0.08)" stroke="#f0883e" strokeWidth="1.2"/>
+  <text x="168" y="26" textAnchor="middle" fill="#f0883e" fontSize="8">WAL</text>
+  <text x="168" y="40" textAnchor="middle" fill="#888" fontSize="7">(sequential)</text>
+  <line x1="205" y1="30" x2="230" y2="30" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowL)"/>
+  <!-- Memtable -->
+  <rect x="233" y="10" width="90" height="40" rx="6" fill="rgba(63,185,80,0.1)" stroke="#3fb950" strokeWidth="1.4"/>
+  <text x="278" y="26" textAnchor="middle" fill="#3fb950" fontSize="9" fontWeight="700">Memtable</text>
+  <text x="278" y="40" textAnchor="middle" fill="#888" fontSize="7">in-memory sorted</text>
+  <!-- flush -->
+  <line x1="278" y1="52" x2="278" y2="75" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowL)" strokeDasharray="4,2"/>
+  <text x="295" y="68" fill="#888" fontSize="7">flush (immutable)</text>
+  <!-- L0 SSTables -->
+  <rect x="60" y="80" width="360" height="28" rx="5" fill="rgba(88,166,255,0.08)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="240" y="98" textAnchor="middle" fill="#58a6ff" fontSize="9" fontWeight="600">L0 SSTables (may overlap)</text>
+  <!-- compaction -->
+  <line x1="240" y1="110" x2="240" y2="126" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowL)" strokeDasharray="4,2"/>
+  <text x="290" y="122" fill="#888" fontSize="7">compaction</text>
+  <!-- L1 -->
+  <rect x="40" y="130" width="400" height="22" rx="4" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1"/>
+  <text x="240" y="145" textAnchor="middle" fill="#58a6ff" fontSize="8">L1 SSTables (sorted, non-overlapping, larger)</text>
+  <line x1="240" y1="154" x2="240" y2="168" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowL)" strokeDasharray="4,2"/>
+  <!-- L2 -->
+  <rect x="20" y="170" width="440" height="14" rx="3" fill="rgba(88,166,255,0.04)" stroke="#58a6ff" strokeWidth="0.8"/>
+  <text x="240" y="181" textAnchor="middle" fill="#888" fontSize="7">L2 (10× larger) ... Lmax (disk)</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 190" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowL" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -523,7 +729,7 @@ options.max_bytes_for_level_base = 256 << 20;  // 256MB`,
     label_zh: '复制与分片', label_en: 'Replication & Sharding',
     desc_zh: '复制（Replication）提供高可用和读扩展；分片（Sharding）提供写扩展和容量扩展。CAP 定理指出分区容错时，一致性和可用性不可兼得。',
     desc_en: 'Replication provides high availability and read scaling; sharding provides write scaling and capacity scaling. CAP theorem: under network partition, consistency and availability are mutually exclusive.',
-    diagram: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+    diagram_zh: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
   <defs>
     <marker id="arrowRep" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
       <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
@@ -546,6 +752,43 @@ options.max_bytes_for_level_base = 256 << 20;  // 256MB`,
   <!-- Sharding side -->
   <line x1="240" y1="10" x2="240" y2="175" stroke="#333" strokeWidth="1" strokeDasharray="4,3"/>
   <text x="360" y="18" textAnchor="middle" fill="#ccc" fontSize="10" fontWeight="700">水平分片 (Sharding)</text>
+  <rect x="260" y="28" width="200" height="30" rx="6" fill="rgba(63,185,80,0.06)" stroke="#3fb950" strokeWidth="1.2"/>
+  <text x="360" y="47" textAnchor="middle" fill="#3fb950" fontSize="9">Router / Proxy (consistent hash)</text>
+  <line x1="310" y1="60" x2="280" y2="88" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowRep)"/>
+  <line x1="360" y1="60" x2="360" y2="88" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowRep)"/>
+  <line x1="410" y1="60" x2="440" y2="88" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowRep)"/>
+  <rect x="250" y="90" width="80" height="50" rx="5" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="290" y="112" textAnchor="middle" fill="#58a6ff" fontSize="8">Shard 0</text>
+  <text x="290" y="127" textAnchor="middle" fill="#888" fontSize="7">uid % 3 == 0</text>
+  <rect x="340" y="90" width="80" height="50" rx="5" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="380" y="112" textAnchor="middle" fill="#58a6ff" fontSize="8">Shard 1</text>
+  <text x="380" y="127" textAnchor="middle" fill="#888" fontSize="7">uid % 3 == 1</text>
+  <rect x="430" y="90" width="40" height="50" rx="5" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="450" y="120" textAnchor="middle" fill="#58a6ff" fontSize="8">S2</text>
+</svg>`,
+    diagram_en: `<svg viewBox="0 0 480 180" xmlns="http://www.w3.org/2000/svg" style="width:100%;max-width:480px">
+  <defs>
+    <marker id="arrowRep" markerWidth="7" markerHeight="7" refX="5" refY="3" orient="auto">
+      <path d="M0,0 L0,6 L7,3 z" fill="#888"/>
+    </marker>
+  </defs>
+  <!-- Replication side -->
+  <text x="110" y="18" textAnchor="middle" fill="#ccc" fontSize="10" fontWeight="700">Primary-Replica Replication</text>
+  <rect x="50"  y="28" width="120" height="50" rx="7" fill="rgba(240,136,62,0.08)" stroke="#f0883e" strokeWidth="1.5"/>
+  <text x="110" y="48" textAnchor="middle" fill="#f0883e" fontSize="10" fontWeight="700">Primary</text>
+  <text x="110" y="64" textAnchor="middle" fill="#888" fontSize="8">writes + reads</text>
+  <line x1="110" y1="80" x2="60"  y2="108" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowRep)"/>
+  <line x1="110" y1="80" x2="160" y2="108" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowRep)"/>
+  <text x="70"  y="96" fill="#888" fontSize="7">WAL stream</text>
+  <rect x="20"  y="110" width="80" height="40" rx="5" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="60"  y="128" textAnchor="middle" fill="#58a6ff" fontSize="9">Replica 1</text>
+  <text x="60"  y="143" textAnchor="middle" fill="#888" fontSize="7">reads only</text>
+  <rect x="120" y="110" width="80" height="40" rx="5" fill="rgba(88,166,255,0.06)" stroke="#58a6ff" strokeWidth="1.2"/>
+  <text x="160" y="128" textAnchor="middle" fill="#58a6ff" fontSize="9">Replica 2</text>
+  <text x="160" y="143" textAnchor="middle" fill="#888" fontSize="7">reads only</text>
+  <!-- Sharding side -->
+  <line x1="240" y1="10" x2="240" y2="175" stroke="#333" strokeWidth="1" strokeDasharray="4,3"/>
+  <text x="360" y="18" textAnchor="middle" fill="#ccc" fontSize="10" fontWeight="700">Horizontal Sharding</text>
   <rect x="260" y="28" width="200" height="30" rx="6" fill="rgba(63,185,80,0.06)" stroke="#3fb950" strokeWidth="1.2"/>
   <text x="360" y="47" textAnchor="middle" fill="#3fb950" fontSize="9">Router / Proxy (consistent hash)</text>
   <line x1="310" y1="60" x2="280" y2="88" stroke="#888" strokeWidth="1.2" markerEnd="url(#arrowRep)"/>
@@ -619,6 +862,7 @@ export default function DatabaseView() {
   const notes    = (t: Topic) => isZh ? t.notes_zh    : t.notes_en
   const concepts = (t: Topic) => isZh ? t.concepts_zh : t.concepts_en
   const codeTitle= (t: Topic) => isZh ? t.codeTitle_zh: t.codeTitle_en
+  const diagram  = (t: Topic) => isZh ? t.diagram_zh  : t.diagram_en
 
   const select = (id: string) => { setSelected(id); if (isMobile) setShowDetail(true) }
 
@@ -645,7 +889,7 @@ export default function DatabaseView() {
       <p style={{ fontSize: 14, color: 'var(--text-secondary)', lineHeight: 1.6, marginBottom: 20 }}>{desc(topic)}</p>
       <div style={{ background: 'var(--surface)', borderRadius: 10, padding: '16px 20px', marginBottom: 20, border: '1px solid var(--border)' }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>{isZh ? '示意图' : 'Diagram'}</div>
-        <div dangerouslySetInnerHTML={{ __html: topic.diagram }} />
+        <div dangerouslySetInnerHTML={{ __html: diagram(topic) }} />
       </div>
       <div style={{ marginBottom: 20 }}>
         <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 10, letterSpacing: 0.5, textTransform: 'uppercase' }}>{isZh ? '关键概念' : 'Key Concepts'}</div>

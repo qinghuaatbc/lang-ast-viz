@@ -296,6 +296,60 @@ const CATEGORIES: CatExample[] = [
     {caller:'CPU',callee:'PIC',method:'registerIRQ',params:'irq=3',ret:'void',relation:'call'},
     {caller:'PIC',callee:'Handler',method:'handleIRQ',params:'irq',ret:'void',relation:'depend'},
   ]},
+
+  // Architecture (10)
+  { cat_zh:'架构', cat_en:'Architecture', zh:'整洁架构', en:'Clean Arch', chain:[
+    {caller:'Controller',callee:'UseCase',method:'execute',params:'req',ret:'Resp',relation:'call'},
+    {caller:'UseCase',callee:'Repository',method:'findById',params:'id=1',ret:'Entity',relation:'depend'},
+    {caller:'Repository',callee:'DB',method:'query',params:'sql',ret:'Row',relation:'call'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'六边形架构', en:'Hexagonal', chain:[
+    {caller:'HttpAdapter',callee:'Port',method:'handle',params:'req',ret:'Resp',relation:'call'},
+    {caller:'Port',callee:'DomainSvc',method:'process',params:'cmd',ret:'Result',relation:'depend'},
+    {caller:'DomainSvc',callee:'RepoPort',method:'save',params:'entity',ret:'void',relation:'depend'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'CQRS', en:'CQRS', chain:[
+    {caller:'App',callee:'CommandBus',method:'send',params:'cmd=Create',ret:'void',relation:'call'},
+    {caller:'App',callee:'QueryBus',method:'ask',params:'qry=GetAll',ret:'List',relation:'call'},
+    {caller:'CommandBus',callee:'WriteRepo',method:'save',params:'entity',ret:'void',relation:'depend'},
+    {caller:'QueryBus',callee:'ReadRepo',method:'findAll',params:'',ret:'List',relation:'depend'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'事件溯源', en:'Event Sourcing', chain:[
+    {caller:'App',callee:'EventStore',method:'append',params:'evt=Created',ret:'void',relation:'call'},
+    {caller:'EventStore',callee:'EventBus',method:'publish',params:'evt',ret:'void',relation:'compose'},
+    {caller:'EventBus',callee:'Projection',method:'on',params:'evt',ret:'void',relation:'aggregate'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'微服务调用', en:'Microservice', chain:[
+    {caller:'Client',callee:'ApiGateway',method:'route',params:'path=/order',ret:'Resp',relation:'call'},
+    {caller:'ApiGateway',callee:'OrderSvc',method:'create',params:'item',ret:'Order',relation:'call'},
+    {caller:'OrderSvc',callee:'InventorySvc',method:'reserve',params:'sku,qty',ret:'bool',relation:'depend'},
+    {caller:'OrderSvc',callee:'EventBus',method:'publish',params:'evt=ordered',ret:'void',relation:'call'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'Saga 编排', en:'Saga', chain:[
+    {caller:'SagaOrch',callee:'PaySvc',method:'debit',params:'amt=100',ret:'bool',relation:'call'},
+    {caller:'SagaOrch',callee:'InvSvc',method:'reserve',params:'sku=A',ret:'bool',relation:'call'},
+    {caller:'SagaOrch',callee:'ShipSvc',method:'dispatch',params:'addr',ret:'void',relation:'call'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'熔断器', en:'Circuit Breaker', chain:[
+    {caller:'App',callee:'CircuitBreaker',method:'call',params:'req',ret:'Resp',relation:'call'},
+    {caller:'CircuitBreaker',callee:'RemoteSvc',method:'invoke',params:'req',ret:'Resp',relation:'depend'},
+    {caller:'CircuitBreaker',callee:'Fallback',method:'handle',params:'err',ret:'Resp',relation:'call'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'DDD 聚合根', en:'DDD Aggregate', chain:[
+    {caller:'App',callee:'OrderAgg',method:'placeOrder',params:'items',ret:'void',relation:'call'},
+    {caller:'OrderAgg',callee:'OrderItem',method:'validate',params:'qty',ret:'bool',relation:'compose'},
+    {caller:'OrderAgg',callee:'DomainEvent',method:'raise',params:'evt=Placed',ret:'void',relation:'compose'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'MVC 请求', en:'MVC', chain:[
+    {caller:'Router',callee:'Controller',method:'handle',params:'req',ret:'void',relation:'call'},
+    {caller:'Controller',callee:'Model',method:'findAll',params:'filter',ret:'List',relation:'call'},
+    {caller:'Controller',callee:'View',method:'render',params:'data',ret:'HTML',relation:'call'},
+  ]},
+  { cat_zh:'架构', cat_en:'Architecture', zh:'仓储模式', en:'Repository', chain:[
+    {caller:'UseCase',callee:'UserRepo',method:'findById',params:'id=42',ret:'User',relation:'depend'},
+    {caller:'UserRepo',callee:'ORM',method:'query',params:'id=42',ret:'Row',relation:'call'},
+    {caller:'UserRepo',callee:'Cache',method:'set',params:'key,val',ret:'void',relation:'call'},
+  ]},
 ]
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -330,6 +384,143 @@ function generateCode(chain: ChainCall[]): string {
     calls.push(`    ${v}.${c.method}(${c.params.split('=')[0] || ''});`)
   }
   return `${code}\n\nint main() {\n${vars.join('\n')}\n${calls.join('\n')}\n    return 0;\n}`
+}
+
+/* ── Multi-language Code Generation ─────────────────────────── */
+
+function generateCodeGo(chain: ChainCall[]): string {
+  const structs = new Map<string, string>()
+  const ifaces = new Map<string, string>()
+  for (const c of chain) {
+    const rel = c.relation || 'call'
+    const paramNames = c.params.split(',').map(p => p.split('=')[0].trim()).filter(Boolean)
+    const paramStr = paramNames.map(p => `${p} interface{}`).join(', ')
+    const retStr = c.ret === 'void' ? '' : ' interface{}'
+    if (rel === 'inherit') {
+      if (!ifaces.has(c.callee)) ifaces.set(c.callee, `type ${c.callee} interface {\n\t${c.method}(${paramStr})${retStr}\n}`)
+    } else {
+      if (!structs.has(c.callee)) structs.set(c.callee, `type ${c.callee} struct{}\n\nfunc (x *${c.callee}) ${c.method}(${paramStr})${retStr} {\n\t// ${c.callee}.${c.method}\n}`)
+    }
+  }
+  const decls = [...ifaces.values(), ...structs.values()]
+  const created = new Set<string>()
+  const vars: string[] = []; const calls: string[] = []
+  for (const c of chain) {
+    const v = c.callee[0].toLowerCase() + c.callee.slice(1)
+    if (!created.has(c.callee)) { created.add(c.callee); vars.push(`\t${v} := &${c.callee}{}`) }
+    const args = c.params.split(',').map(p => { const v = p.split('='); return v[1] ? JSON.stringify(v[1].trim()) : 'nil' }).join(', ')
+    const retPart = c.ret !== 'void' ? `_ = ` : ''
+    calls.push(`\t${retPart}${v}.${c.method}(${args})`)
+  }
+  return `package main\n\nimport "fmt"\n\n${decls.join('\n\n')}\n\nfunc main() {\n${vars.join('\n')}\n${calls.join('\n')}\n\t_ = fmt.Sprintf // suppress import\n}`
+}
+
+function generateCodePy(chain: ChainCall[]): string {
+  const defs = new Map<string, string[]>()
+  for (const c of chain) {
+    const paramNames = c.params.split(',').map(p => p.split('=')[0].trim()).filter(Boolean)
+    const sig = ['self', ...paramNames].join(', ')
+    const retHint = c.ret !== 'void' ? ` -> '${c.ret}'` : ''
+    const body = `    def ${c.method}(${sig})${retHint}:\n        pass  # implement ${c.callee}`
+    if (!defs.has(c.callee)) defs.set(c.callee, [])
+    if (!defs.get(c.callee)!.some(b => b.includes(`def ${c.method}(`))) defs.get(c.callee)!.push(body)
+  }
+  const classes = [...defs.entries()].map(([name, methods]) => `class ${name}:\n${methods.join('\n\n')}`)
+  const created = new Set<string>(); const vars: string[] = []; const calls: string[] = []
+  for (const c of chain) {
+    const v = c.callee[0].toLowerCase() + c.callee.slice(1)
+    if (!created.has(c.callee)) { created.add(c.callee); vars.push(`    ${v} = ${c.callee}()`) }
+    const args = c.params.split(',').map(p => { const kv = p.split('='); return kv[1] ? kv[1].trim() : 'None' }).join(', ')
+    calls.push(`    ${v}.${c.method}(${args})`)
+  }
+  return `${classes.join('\n\n')}\n\n\nif __name__ == '__main__':\n${[...vars, ...calls].join('\n')}`
+}
+
+function generateCodeJava(chain: ChainCall[]): string {
+  const defs = new Map<string, { kind: string; methods: string[] }>()
+  for (const c of chain) {
+    const rel = c.relation || 'call'
+    const paramStr = c.params.split(',').map(p => `Object ${p.split('=')[0].trim() || 'arg'}`).join(', ')
+    const ret = c.ret === 'void' ? 'void' : 'Object'
+    if (!defs.has(c.callee)) defs.set(c.callee, { kind: rel === 'inherit' ? 'interface' : 'class', methods: [] })
+    const entry = defs.get(c.callee)!
+    const body = entry.kind === 'interface'
+      ? `    ${ret} ${c.method}(${paramStr});`
+      : `    public ${ret} ${c.method}(${paramStr}) {\n        // ${c.callee}.${c.method}\n    }`
+    if (!entry.methods.some(m => m.includes(`${c.method}(`))) entry.methods.push(body)
+  }
+  const classDecls = [...defs.entries()].map(([name, e]) => `${e.kind} ${name} {\n${e.methods.join('\n\n')}\n}`)
+  const created = new Set<string>(); const vars: string[] = []; const calls: string[] = []
+  for (const c of chain) {
+    const v = c.callee[0].toLowerCase() + c.callee.slice(1)
+    if (!created.has(c.callee)) { created.add(c.callee); vars.push(`        ${c.callee} ${v} = new ${c.callee}();`) }
+    const args = c.params.split(',').map(p => { const kv = p.split('='); return kv[1] ? `"${kv[1].trim()}"` : 'null' }).join(', ')
+    calls.push(`        ${v}.${c.method}(${args});`)
+  }
+  return `${classDecls.join('\n\n')}\n\npublic class Main {\n    public static void main(String[] args) {\n${vars.join('\n')}\n${calls.join('\n')}\n    }\n}`
+}
+
+type CodeLang = 'cpp' | 'go' | 'py' | 'java'
+
+function generateCodeLang(chain: ChainCall[], lang: CodeLang): string {
+  if (chain.length === 0) return ''
+  if (lang === 'go') return generateCodeGo(chain)
+  if (lang === 'py') return generateCodePy(chain)
+  if (lang === 'java') return generateCodeJava(chain)
+  return generateCode(chain)
+}
+
+/* ── Pattern Detector ────────────────────────────────────────── */
+
+type PatternMatch = { name_zh: string; name_en: string; desc_zh: string; desc_en: string; icon: string }
+
+function detectPattern(chain: ChainCall[]): PatternMatch | null {
+  if (chain.length === 0) return null
+  const methods = chain.map(c => c.method.toLowerCase())
+  const callees = chain.map(c => c.callee.toLowerCase())
+  const rels = chain.map(c => c.relation || 'call')
+
+  if (chain.length === 1 && (methods[0].includes('inst') || methods[0].includes('instance') || methods[0].includes('getinst')))
+    return { icon:'♟', name_zh:'单例', name_en:'Singleton', desc_zh:'全局唯一实例', desc_en:'Single global instance' }
+
+  if (methods.some(m => m.includes('subscribe') || m.includes('addlistener') || m.includes('attach')) &&
+      methods.some(m => m.includes('notify') || m.includes('emit') || m.includes('fire') || m.includes('broadcast')))
+    return { icon:'👁', name_zh:'观察者', name_en:'Observer', desc_zh:'被观察者通知所有观察者', desc_en:'Subject notifies all observers' }
+
+  if (methods[methods.length - 1] === 'build' && rels.some(r => r === 'compose'))
+    return { icon:'🔨', name_zh:'建造者', name_en:'Builder', desc_zh:'分步构建复杂对象', desc_en:'Build complex objects step-by-step' }
+
+  if (methods.some(m => m.includes('create') || m.startsWith('make') || m.startsWith('new')) && rels.some(r => r === 'compose'))
+    return { icon:'🏭', name_zh:'工厂', name_en:'Factory', desc_zh:'由工厂决定实例化哪个类', desc_en:'Factory decides which class to instantiate' }
+
+  if (callees.some(c => c.includes('decorator') || c.includes('wrapper') || c.includes('logger')) && rels.some(r => r === 'compose'))
+    return { icon:'🎀', name_zh:'装饰器', name_en:'Decorator', desc_zh:'包装对象，动态添加行为', desc_en:'Wrap objects to add behavior dynamically' }
+
+  if (callees.some(c => c.includes('proxy') || c.includes('stub')) && rels.some(r => r === 'compose'))
+    return { icon:'🔁', name_zh:'代理', name_en:'Proxy', desc_zh:'代理控制对真实对象的访问', desc_en:'Proxy controls access to the real object' }
+
+  if (methods.some(m => m.includes('setstrategy') || m.includes('setpolicy') || m.includes('setalgo')) || callees.some(c => c.includes('strategy') || c.includes('policy')))
+    return { icon:'🎯', name_zh:'策略', name_en:'Strategy', desc_zh:'运行时切换算法实现', desc_en:'Switch algorithm implementation at runtime' }
+
+  if (chain.length >= 3 && methods.every(m => m.includes('handle') || m.includes('process') || m.includes('filter')))
+    return { icon:'⛓', name_zh:'责任链', name_en:'Chain of Resp.', desc_zh:'请求沿处理链传递', desc_en:'Request passes along handler chain' }
+
+  if (methods.some(m => m === 'execute' || m === 'invoke' || m === 'exec') && (callees.some(c => c.includes('cmd') || c.includes('command')) || methods.some(m => m === 'undo' || m === 'redo')))
+    return { icon:'📋', name_zh:'命令', name_en:'Command', desc_zh:'将请求封装为对象，支持撤销', desc_en:'Encapsulate requests as objects with undo' }
+
+  if (callees.some(c => c.includes('query') || c.includes('read')) && callees.some(c => c.includes('command') || c.includes('write') || c.includes('cmd')))
+    return { icon:'↔', name_zh:'CQRS', name_en:'CQRS', desc_zh:'读写分离', desc_en:'Separate read/write responsibilities' }
+
+  if (callees.some(c => c.includes('eventstore') || c.includes('evtstore') || c.includes('eventbus')))
+    return { icon:'📜', name_zh:'事件溯源', name_en:'Event Sourcing', desc_zh:'状态由事件日志重建', desc_en:'State rebuilt from event log' }
+
+  if (callees.some(c => c.includes('port') || c.includes('adapter')) && callees.some(c => c.includes('domain') || c.includes('usecase')))
+    return { icon:'⬡', name_zh:'六边形架构', name_en:'Hexagonal', desc_zh:'领域与外部通过端口适配器隔离', desc_en:'Domain isolated by ports and adapters' }
+
+  if (rels.some(r => r === 'inherit') && chain.length >= 2)
+    return { icon:'🌳', name_zh:'继承', name_en:'Inheritance', desc_zh:'子类继承父类行为', desc_en:'Subclass inherits parent behavior' }
+
+  return null
 }
 
 function generateSteps(chain: ChainCall[]): BusStep[] {
@@ -370,22 +561,48 @@ function checkConflict(step: BusStep): string | null {
 function ChipModule({ name, sub, x, y, w, active, color, state: st, memLayout }: {
   name: string; sub: string; x: number; y: number; w: number; active: boolean; color: string; state?: Record<string, string>; memLayout?: any[]
 }) {
-  const h = 60
   const se = st ? Object.entries(st) : []
   const useLayout = memLayout && memLayout.length > 0
-  const ch = useLayout ? 60 + memLayout!.length * 11 : 60
+  const ch = useLayout ? 80 + memLayout!.length * 11 : 80
+  const pinPositions = [14, 28, 42, 56, 70]
+  const pinLen = 7
+  const pinColor = active ? '#4a5568' : '#2d3748'
   return (
     <g>
-      <rect x={x} y={y} width={w} height={ch} rx={4} fill="#1a2332" stroke={active ? color : '#334'} strokeWidth={1.5} />
-      <path d={`M${x+w/2-20} ${y} L${x+w/2-10} ${y-5} L${x+w/2+10} ${y-5} L${x+w/2+20} ${y} Z`} fill="#1a2332" stroke={active ? color : '#334'} strokeWidth={1} />
-      <circle cx={x+12} cy={y+6} r={3} fill={active ? color : '#334'} />
-      <text x={x+w/2} y={y+16} textAnchor="middle" fill={active ? 'var(--text-primary)' : 'var(--text-muted)'} fontSize={8} fontWeight="bold" fontFamily="monospace">{name}</text>
-      <text x={x+w/2} y={y+27} textAnchor="middle" fill={active ? 'var(--text-secondary)' : 'var(--text-muted)'} fontSize={7} fontFamily="monospace">{sub}</text>
+      {/* IC pin stubs — left side */}
+      {pinPositions.map((py, pi) => (
+        <g key={`pl-${pi}`}>
+          <rect x={x - pinLen - 2} y={y + py - 2} width={4} height={4} rx={0.5} fill={pinColor} />
+          <line x1={x - pinLen + 2} y1={y + py} x2={x} y2={y + py} stroke={pinColor} strokeWidth={1} />
+          <text x={x + 4} y={y + py + 3} fill={active ? '#3d4f60' : '#252f3a'} fontSize={5} fontFamily="monospace">{pi + 1}</text>
+        </g>
+      ))}
+      {/* IC pin stubs — right side */}
+      {pinPositions.map((py, pi) => (
+        <g key={`pr-${pi}`}>
+          <line x1={x + w} y1={y + py} x2={x + w + pinLen - 2} y2={y + py} stroke={pinColor} strokeWidth={1} />
+          <rect x={x + w + pinLen - 2} y={y + py - 2} width={4} height={4} rx={0.5} fill={pinColor} />
+          <text x={x + w - 4} y={y + py + 3} fill={active ? '#3d4f60' : '#252f3a'} fontSize={5} fontFamily="monospace" textAnchor="end">{10 - pi}</text>
+        </g>
+      ))}
+      {/* Chip body */}
+      <rect x={x} y={y} width={w} height={ch} rx={3} fill="#1a2332" stroke={active ? color : '#334'} strokeWidth={1.5} />
+      {/* IC identification notch */}
+      <path d={`M${x+w/2-18} ${y} L${x+w/2-8} ${y-5} L${x+w/2+8} ${y-5} L${x+w/2+18} ${y} Z`} fill="#1a2332" stroke={active ? color : '#334'} strokeWidth={1} />
+      {/* Status LED */}
+      <circle cx={x+10} cy={y+7} r={2.5} fill={active ? color : '#334'} />
+      {active && <circle cx={x+10} cy={y+7} r={5} fill={color} opacity={0.25} />}
+      {/* VCC/GND labels */}
+      <text x={x+w-5} y={y+7} textAnchor="end" fill={active ? '#4a6' : '#334'} fontSize={5} fontFamily="monospace">VCC</text>
+      {/* Chip name and sub-label */}
+      <text x={x+w/2} y={y+24} textAnchor="middle" fill={active ? 'var(--text-primary)' : 'var(--text-muted)'} fontSize={9} fontWeight="bold" fontFamily="monospace">{name}</text>
+      <text x={x+w/2} y={y+36} textAnchor="middle" fill={active ? 'var(--text-secondary)' : 'var(--text-muted)'} fontSize={7} fontFamily="monospace">{sub}</text>
+      {/* Divider */}
+      <line x1={x+4} y1={y+43} x2={x+w-4} y2={y+43} stroke={active ? color+'30' : '#222'} strokeWidth={0.5} />
       {useLayout ? (
-        <g transform={`translate(${x+4}, ${y+33})`}>
-          <line x1={0} y1={0} x2={w-8} y2={0} stroke={active ? color+'40' : '#222'} strokeWidth={0.5} />
+        <g transform={`translate(${x+4}, ${y+46})`}>
           {memLayout!.map((ml, i) => (
-            <g key={i} transform={`translate(0, ${3+i*11})`}>
+            <g key={i} transform={`translate(0, ${i*11})`}>
               <rect x={0} y={0} width={w-8} height={10} rx={1} fill={ml.active ? color+'25' : 'transparent'} />
               <text x={3} y={8} fill={ml.active ? color : '#555'} fontSize={6} fontFamily="monospace">{ml.offset}</text>
               <text x={30} y={8} fill={ml.active ? 'var(--text-primary)' : 'var(--text-muted)'} fontSize={6} fontFamily="monospace">{ml.field}</text>
@@ -395,9 +612,8 @@ function ChipModule({ name, sub, x, y, w, active, color, state: st, memLayout }:
         </g>
       ) : se.length > 0 ? (
         <g>
-          <line x1={x+4} y1={y+36} x2={x+w-4} y2={y+36} stroke={active ? color+'40' : '#222'} strokeWidth={0.5} />
           {se.slice(0, 3).map(([k, v], i) => (
-            <text key={i} x={x+6} y={y+46+i*7} fill={active ? 'var(--text-secondary)' : 'var(--text-muted)'} fontSize={6} fontFamily="monospace">{k}={v}</text>
+            <text key={i} x={x+6} y={y+53+i*8} fill={active ? 'var(--text-secondary)' : 'var(--text-muted)'} fontSize={6} fontFamily="monospace">{k}={v}</text>
           ))}
         </g>
       ) : null}
@@ -430,6 +646,26 @@ function MovingDot({ progress, fromX, toX, y, color, label }: { progress: number
 
 /* ── Relationship Arrow ──────────────────────────────────────── */
 
+function RelationGlyph({ x, y, rel, color, atSource }: { x: number; y: number; rel: string; color: string; atSource: boolean }) {
+  const s = 7
+  if (rel === 'compose') {
+    // Filled diamond at source
+    if (!atSource) return null
+    return <polygon points={`${x},${y-s} ${x+s*0.6},${y} ${x},${y+s} ${x-s*0.6},${y}`} fill={color} />
+  }
+  if (rel === 'aggregate') {
+    // Open diamond at source
+    if (!atSource) return null
+    return <polygon points={`${x},${y-s} ${x+s*0.6},${y} ${x},${y+s} ${x-s*0.6},${y}`} fill="var(--bg-primary)" stroke={color} strokeWidth={1.2} />
+  }
+  if (rel === 'inherit') {
+    // Open triangle at destination
+    if (atSource) return null
+    return <polygon points={`${x},${y} ${x-s},${y-s*0.6} ${x-s},${y+s*0.6}`} fill="var(--bg-primary)" stroke={color} strokeWidth={1.2} />
+  }
+  return null
+}
+
 function RelationPath({ from, to, relation, isZh }: {
   from: { x: number; y: number; w: number }
   to: { x: number; y: number; w: number }
@@ -445,15 +681,18 @@ function RelationPath({ from, to, relation, isZh }: {
   const midX = (fromX + toX) / 2
   const isDashed = REL_STROKE[rel] === 'dashed'
   const label = isZh ? (REL_LABELS_ZH[rel] || rel) : (REL_LABELS_EN[rel] || rel)
+  // Shorten line to make room for glyphs
+  const lineStart = rel === 'compose' || rel === 'aggregate' ? fromX + 8 : fromX
+  const lineEnd = rel === 'inherit' ? toX - 8 : toX
   return (
     <g>
-      <line x1={fromX} y1={fromY} x2={toX} y2={toY}
+      <RelationGlyph x={fromX + 7} y={fromY} rel={rel} color={color} atSource={true} />
+      <line x1={lineStart} y1={fromY} x2={lineEnd} y2={toY}
         stroke={color} strokeWidth={1.5}
         strokeDasharray={isDashed ? '4 3' : 'none'}
-        markerEnd={`url(#arrow-${rel})`} />
-      <polygon points={`${toX-6},${toY-4} ${toX},${toY} ${toX-6},${toY+4}`}
-        fill={color} opacity={0} />
-      <rect x={midX - 40} y={fromY - 16} width={80} height={14} rx={3}
+        markerEnd={rel === 'inherit' ? 'none' : `url(#arrow-${rel})`} />
+      <RelationGlyph x={toX - 7} y={toY} rel={rel} color={color} atSource={false} />
+      <rect x={midX - 38} y={fromY - 15} width={76} height={12} rx={3}
         fill="var(--bg-primary)" stroke={color+'60'} strokeWidth={0.5} />
       <text x={midX} y={fromY - 5} textAnchor="middle" fill={color}
         fontSize={7} fontWeight="bold" fontFamily="monospace">{label}</text>
@@ -461,31 +700,125 @@ function RelationPath({ from, to, relation, isZh }: {
   )
 }
 
+/* ── Generated Code Preview ─────────────────────────────────── */
+
+function GeneratedCodeBlock({ chain, hlLine, isZh }: {
+  chain: ChainCall[]
+  hlLine: (line: string) => { text: string; color: string }[]
+  isZh: boolean
+}) {
+  const [codeLang, setCodeLang] = useState<CodeLang>('cpp')
+  if (chain.length === 0) return null
+  const code = generateCodeLang(chain, codeLang)
+  const lines = code.split('\n')
+  const langLabels: Record<CodeLang, string> = { cpp:'C++', go:'Go', py:'Python', java:'Java' }
+  return (
+    <div style={{ marginTop:4, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-elevated)', overflow:'hidden' }}>
+      <div style={{ padding:'4px 8px', fontSize:9, fontWeight:700, color:'var(--text-secondary)', borderBottom:'1px solid var(--border)', display:'flex', alignItems:'center', gap:6 }}>
+        <span>{isZh ? '生成代码' : 'Generated Code'}</span>
+        <div style={{ marginLeft:'auto', display:'flex', gap:2 }}>
+          {(['cpp','go','py','java'] as CodeLang[]).map(l => (
+            <button key={l} onClick={() => setCodeLang(l)} style={{
+              padding:'1px 6px', borderRadius:3, border:'none', cursor:'pointer', fontSize:8, fontWeight:700,
+              background: codeLang === l ? '#4d8fff' : 'transparent',
+              color: codeLang === l ? '#fff' : 'var(--text-muted)',
+            }}>{langLabels[l]}</button>
+          ))}
+        </div>
+      </div>
+      <pre style={{ margin:0, padding:'6px 8px', fontSize:9.5, lineHeight:1.5, fontFamily:"'SF Mono','Fira Code',monospace", overflow:'auto', maxHeight:220 }}>
+        {lines.map((line, i) => (
+          <div key={i}>
+            <span style={{ color:'#484f58', marginRight:8, userSelect:'none', fontSize:8 }}>{i+1}</span>
+            {hlLine(line).map((p, j) => <span key={j} style={{ color: p.color }}>{p.text}</span>)}
+          </div>
+        ))}
+      </pre>
+    </div>
+  )
+}
+
+/* ── Mermaid Export ────────────────────────────────────────────── */
+
+function generateMermaid(chain: ChainCall[]): string {
+  if (chain.length === 0) return ''
+  const participants = [...new Set([chain[0].caller, ...chain.map(c => c.callee)])]
+  const lines = ['sequenceDiagram']
+  for (const p of participants) lines.push(`  participant ${p}`)
+  for (const c of chain) {
+    const rel = c.relation || 'call'
+    const arrow = rel === 'depend' ? '-->>' : rel === 'inherit' ? '-->' : '->>'
+    lines.push(`  ${c.caller}${arrow}${c.callee}: ${c.method}(${c.params})`)
+    if (c.ret && c.ret !== 'void') lines.push(`  ${c.callee}-->>${c.caller}: ${c.ret}`)
+  }
+  return lines.join('\n')
+}
+
 /* ── Code Parser ──────────────────────────────────────────────── */
 
 function analyzePastedCode(code: string): ChainCall[] {
   const calls: ChainCall[] = []
   const classes: string[] = []
-  const cr = /(?:class|struct|interface|type\s+\w+\s+struct)\s+(\w+)/g; let m: RegExpExecArray | null
+  // Extract class/struct/interface/type names
+  const cr = /(?:class|struct|interface|type\s+\w+\s+struct|trait|protocol)\s+(\w+)/g
+  let m: RegExpExecArray | null
   while ((m = cr.exec(code)) !== null) classes.push(m[1])
+
   const seen = new Set<string>()
-  const patterns = [
-    /(\w+)\.(\w+)\s*\(([^)]*)\)\s*;/g, /this\.(\w+)\s*\(([^)]*)\)/g, /self\.(\w+)\s*\(([^)]*)\)/g,
-    /(\w+)::(\w+)\s*\(([^)]*)\)/g, /(\w+)\s*=\s*(\w+)\.(\w+)\s*\(([^)]*)\)/g,
-  ]
-  for (const re of patterns) {
-    while ((m = re.exec(code)) !== null) {
-      const obj = m[1], method = m[2], args = m[3]?.trim() || ''
-      let callee = method[0].toUpperCase() + method.slice(1)
-      for (const c of classes) { if (c.toLowerCase() === callee.toLowerCase()) { callee = c; break } }
-      const key = `${obj}.${method}`
-      if (seen.has(key)) continue; seen.add(key)
-      if (method === 'main') continue
-      const caller = classes.find(c => code.indexOf(`class ${c}`) < (m!.index)) || obj
-      calls.push({ caller, callee, method, params: args || 'x', ret: 'void', relation: 'call' })
-      if (calls.length >= 5) break
-    }
-    if (calls.length >= 5) break
+  type RawCall = { caller: string; callee: string; method: string; args: string; rel: ChainCall['relation'] }
+  const raw: RawCall[] = []
+
+  // Pattern 1: obj.method(args) or obj.method(args); — standard method call
+  const p1 = /\b(\w+)\.(\w+)\s*\(([^)]{0,80})\)/g
+  while ((m = p1.exec(code)) !== null) {
+    const [, obj, method, args] = m
+    if (['main','this','self','super','console','fmt','log','print','println','len','cap','make','new','append'].includes(obj)) continue
+    if (['toString','valueOf','hashCode','equals','length','size'].includes(method)) continue
+    const key = `${obj}.${method}`
+    if (seen.has(key)) continue; seen.add(key)
+    // Determine callee: prefer class name match over method name
+    let callee = classes.find(c => obj.toLowerCase() === c.toLowerCase()) || obj
+    // Detect relation from context
+    const lineStart = code.lastIndexOf('\n', m.index)
+    const lineText = code.slice(lineStart, m.index + m[0].length)
+    let rel: ChainCall['relation'] = 'call'
+    if (/new\s+\w+/.test(lineText) || /compose|contain|has/.test(method.toLowerCase())) rel = 'compose'
+    if (/subscribe|listen|attach|addObserver|addEventListener/.test(method)) rel = 'aggregate'
+    raw.push({ caller: obj, callee, method, args: args.trim().slice(0, 30), rel })
+  }
+
+  // Pattern 2: ClassName::method(args) — C++ static / scope resolution
+  const p2 = /\b(\w+)::(\w+)\s*\(([^)]{0,80})\)/g
+  while ((m = p2.exec(code)) !== null) {
+    const [, obj, method, args] = m
+    const key = `${obj}::${method}`
+    if (seen.has(key)) continue; seen.add(key)
+    raw.push({ caller: obj, callee: obj, method, args: args.trim().slice(0, 30), rel: 'call' })
+  }
+
+  // Pattern 3: extends / implements — inheritance
+  const p3 = /class\s+(\w+)\s+(?:extends|implements)\s+(\w+)/g
+  while ((m = p3.exec(code)) !== null) {
+    const [, child, parent] = m
+    const key = `${child}:${parent}`
+    if (seen.has(key)) continue; seen.add(key)
+    raw.push({ caller: child, callee: parent, method: 'extends', args: '', rel: 'inherit' })
+  }
+
+  // Pattern 4: new ClassName(args) — construction / composition
+  const p4 = /new\s+(\w+)\s*\(([^)]{0,60})\)/g
+  while ((m = p4.exec(code)) !== null) {
+    const [, cls, args] = m
+    if (seen.has(`new:${cls}`)) continue; seen.add(`new:${cls}`)
+    const caller = classes[0] || 'App'
+    raw.push({ caller, callee: cls, method: cls, args: args.trim().slice(0, 30), rel: 'compose' })
+  }
+
+  // Build chain: use first caller as anchor, link subsequent calls
+  let prevCallee = raw[0]?.caller || 'App'
+  for (const r of raw.slice(0, 6)) {
+    calls.push({ caller: prevCallee, callee: r.callee, method: r.method, params: r.args || 'x', ret: 'void', relation: r.rel })
+    prevCallee = r.callee
   }
   return calls
 }
@@ -520,7 +853,7 @@ function downloadBlob(blob: Blob, name: string) {
 
 /* ── Main Component ──────────────────────────────────────────── */
 
-export default function ObjectBusView() {
+export default function CodeChipView() {
   const { lang } = useLang()
   const isZh = lang === 'zh'
   const [exIdx, setExIdx] = useState(-2)
@@ -532,9 +865,14 @@ export default function ObjectBusView() {
   const [showMem, setShowMem] = useState(false)
   const [cuCaller, setCuCaller] = useState('App')
   const [cuCallee, setCuCallee] = useState('Svc')
+  const [cuMethod, setCuMethod] = useState('exec')
   const [cuParams, setCuParams] = useState('x=42')
   const [cuReturn, setCuReturn] = useState('void')
-  const [cuChain, setCuChain] = useState<ChainCall[]>([{caller:'App',callee:'Svc',method:'exec',params:'x=42',ret:'void',relation:'call'}])
+  const [cuRelation, setCuRelation] = useState<ChainCall['relation']>('call')
+  const [cuChain, setCuChain] = useState<ChainCall[]>(() => {
+    try { const s = localStorage.getItem('codechip-chain'); if (s) return JSON.parse(s) } catch {}
+    return [{caller:'App',callee:'Svc',method:'exec',params:'x=42',ret:'void',relation:'call'}]
+  })
   const [pasteCode, setPasteCode] = useState('')
   const [cuMode, setCuMode] = useState<'form'|'paste'>('form')
   const svgRef = useRef<SVGSVGElement>(null)
@@ -549,6 +887,11 @@ export default function ObjectBusView() {
       if (h) { const d = JSON.parse(decodeURIComponent(h)); if (d.chain) { setCuChain(d.chain); setExIdx(-1) }; if (d.code) { setPasteCode(d.code); setCuMode('paste') } }
     } catch {}
   }, [])
+
+  /* Persist custom chain */
+  useEffect(() => {
+    try { localStorage.setItem('codechip-chain', JSON.stringify(cuChain)) } catch {}
+  }, [cuChain])
 
   /* Real-time analysis debounce */
   useEffect(() => {
@@ -627,31 +970,42 @@ export default function ObjectBusView() {
 
   const exportSvg = () => {
     const b = svgToBlob(svgRef.current)
-    if (b) downloadBlob(b, `bus-analysis-${exIdx}.svg`)
+    if (b) downloadBlob(b, `bus-analysis-${Date.now()}.svg`)
+  }
+
+  const exportMermaid = () => {
+    const text = generateMermaid(chain)
+    navigator.clipboard.writeText(text).then(() => {
+      const btn = document.getElementById('mermaid-btn')
+      if (btn) { btn.textContent = '✓ Copied'; setTimeout(() => { btn.textContent = '⬇ Mermaid' }, 1500) }
+    }).catch(() => {
+      downloadBlob(new Blob([text], { type: 'text/plain' }), `codechip-${Date.now()}.mmd`)
+    })
   }
 
   /* Auto Layout: max 5 chips per row */
-  const chipsPerRow = 5
+  const chipsPerRow = 4
   const numChips = chain.length + 1
   const numRows = Math.ceil(numChips / chipsPerRow)
-  const chipW = 100
-  const gapX = 30
-  const rowH = 200
-  const svgW = Math.max(600, chipsPerRow * (chipW + gapX) + 80)
-  const svgH = numRows * rowH + 60
+  const chipW = 110
+  const gapX = 36
+  const chipH = 80
+  const rowH = chipH + 140  // chip + bus space + margin
+  const svgW = Math.max(560, chipsPerRow * (chipW + gapX) + 60)
+  const svgH = numRows * rowH + 50
 
   const chipPos = (idx: number) => {
     const row = Math.floor(idx / chipsPerRow)
     const col = idx % chipsPerRow
-    return { x: 20 + col * (chipW + gapX), y: 15 + row * rowH }
+    return { x: 18 + col * (chipW + gapX), y: 16 + row * rowH }
   }
-  const busLineY = (row: number, bus: BusType) => row * rowH + 110 + (bus === 'addr' ? -28 : bus === 'data' ? 28 : 0)
+  const busLineY = (row: number, bus: BusType) => row * rowH + chipH + 30 + (bus === 'addr' ? -24 : bus === 'data' ? 24 : 0)
 
   return (
     <div style={{ height:'100%', display:'flex', flexDirection:'column', padding:'8px 12px', gap:6, overflow:'auto' }}>
       {/* Toolbar */}
       <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', flexShrink:0 }}>
-        <span style={{ fontWeight:700, fontSize:12, color:'var(--text)' }}>{isZh ? '🔌 对象总线分析器' : '🔌 Object Bus Analyzer'}</span>
+        <span style={{ fontWeight:700, fontSize:12, color:'var(--text)' }}>{isZh ? '🔌 CodeChip · 代码电路模拟器' : '🔌 CodeChip · Code Circuit Simulator'}</span>
         <select value={exIdx} onChange={e => { setExIdx(+e.target.value); reset() }} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:11 }}>
           <option value={-1}>{isZh ? '🔧 自定义' : '🔧 Custom'}</option>
           <option value={-2}>{isZh ? '📋 粘贴代码' : '📋 Paste'}</option>
@@ -670,6 +1024,7 @@ export default function ObjectBusView() {
         </div>
         <button onClick={shareUrl} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>🔗</button>
         <button onClick={exportSvg} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>⬇ SVG</button>
+        <button id="mermaid-btn" onClick={exportMermaid} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>⬇ Mermaid</button>
         <button onClick={reset} style={{ padding:'4px 10px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:11 }}>⏹</button>
         <button onClick={nextStep} style={{ padding:'4px 10px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:11 }}>⏭</button>
         <button onClick={togglePlay} style={{ padding:'4px 14px', borderRadius:4, border:'none', background:playing?'#ff7b72':'#56d364', color:'#000', cursor:'pointer', fontSize:11, fontWeight:700 }}>
@@ -684,22 +1039,43 @@ export default function ObjectBusView() {
           {exIdx === -1 ? (
             <div style={{ padding:10, display:'flex', flexDirection:'column', gap:6 }}>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-secondary)', marginBottom:2 }}>{isZh ? '自定义调用链' : 'Custom Chain'}</div>
-              {chain.map((c, i) => (
-                <div key={i} style={{ display:'flex', gap:3, alignItems:'center', fontSize:9, fontFamily:'monospace' }}>
+              {cuChain.map((c, i) => (
+                <div key={i} style={{ display:'flex', gap:3, alignItems:'center', fontSize:9, fontFamily:'monospace', background:'var(--bg-elevated)', borderRadius:4, padding:'3px 5px' }}>
                   <span style={{ color:'#4d8fff' }}>{c.caller}</span>
                   <span style={{ color: REL_COLORS[c.relation||'call'] || '#445', fontSize:7 }}>{isZh ? REL_LABELS_ZH[c.relation||'call'] : REL_LABELS_EN[c.relation||'call']}</span>
                   <span style={{ color:'#d2a8ff' }}>{c.callee}</span>
-                  <span style={{ color:'var(--text-secondary)' }}>.{c.method}()</span>
+                  <span style={{ color:'var(--text-secondary)' }}>.{c.method}({c.params})</span>
+                  <button onClick={() => { const n = cuChain.filter((_,j) => j !== i); if (n.length > 0) { setCuChain(n); reset() } }}
+                    style={{ marginLeft:'auto', padding:'0 4px', border:'none', background:'transparent', color:'#ff7b72', cursor:'pointer', fontSize:10 }}>✕</button>
                 </div>
               ))}
-              <div style={{ display:'flex', flexDirection:'column', gap:5, marginTop:4 }}>
-                {[{label:'Caller',v:cuCaller,s:setCuCaller},{label:'Callee',v:cuCallee,s:setCuCallee},{label:'Params',v:cuParams,s:setCuParams},{label:'Return',v:cuReturn,s:setCuReturn}].map(f => (
+              <div style={{ display:'flex', flexDirection:'column', gap:4, marginTop:4, padding:'6px 8px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-elevated)' }}>
+                <div style={{ fontSize:8, color:'var(--text-muted)', fontWeight:700 }}>{isZh ? '+ 新增调用' : '+ Add Call'}</div>
+                {([{label:'Caller',v:cuCaller,s:setCuCaller},{label:'Method',v:cuMethod,s:setCuMethod},{label:'Callee',v:cuCallee,s:setCuCallee},{label:'Params',v:cuParams,s:setCuParams},{label:'Return',v:cuReturn,s:setCuReturn}] as const).map(f => (
                   <div key={f.label} style={{ display:'flex', gap:4, alignItems:'center' }}>
-                    <span style={{ fontSize:8, color:'var(--text-secondary)', width:36 }}>{f.label}</span>
-                    <input value={f.v} onChange={e => { f.s(e.target.value); reset() }} style={{ flex:1, padding:'3px 5px', borderRadius:3, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-primary)', fontSize:10, fontFamily:'monospace', outline:'none' }} />
+                    <span style={{ fontSize:8, color:'var(--text-secondary)', width:38 }}>{f.label}</span>
+                    <input value={f.v} onChange={e => f.s(e.target.value as never)} style={{ flex:1, padding:'2px 5px', borderRadius:3, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text-primary)', fontSize:10, fontFamily:'monospace', outline:'none' }} />
                   </div>
                 ))}
+                <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                  <span style={{ fontSize:8, color:'var(--text-secondary)', width:38 }}>Relation</span>
+                  <select value={cuRelation} onChange={e => setCuRelation(e.target.value as ChainCall['relation'])}
+                    style={{ flex:1, padding:'2px 4px', borderRadius:3, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text-primary)', fontSize:10 }}>
+                    {Object.keys(REL_LABELS_EN).map(r => <option key={r} value={r}>{r}</option>)}
+                  </select>
+                </div>
+                <div style={{ display:'flex', gap:4, marginTop:2 }}>
+                  <button onClick={() => { setCuChain(prev => [...prev, {caller:cuCaller,callee:cuCallee,method:cuMethod,params:cuParams,ret:cuReturn,relation:cuRelation}]); reset() }}
+                    style={{ flex:1, padding:'3px 0', borderRadius:3, border:'none', background:'#56d364', color:'#000', cursor:'pointer', fontSize:10, fontWeight:700 }}>
+                    {isZh ? '+ 添加' : '+ Add'}
+                  </button>
+                  <button onClick={() => { setCuChain([{caller:'App',callee:'Svc',method:'exec',params:'x=42',ret:'void',relation:'call'}]); reset() }}
+                    style={{ padding:'3px 8px', borderRadius:3, border:'1px solid var(--border)', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:10 }}>
+                    {isZh ? '清空' : 'Clear'}
+                  </button>
+                </div>
               </div>
+              <GeneratedCodeBlock chain={chain} hlLine={hlLine} isZh={isZh} />
             </div>
           ) : exIdx === -2 ? (
             <div style={{ padding:10, display:'flex', flexDirection:'column', gap:6 }}>
@@ -707,6 +1083,7 @@ export default function ObjectBusView() {
                 placeholder={isZh ? '粘贴代码（自动分析）' : 'Paste code (auto-analyze)'}
                 style={{ width:'100%', minHeight:160, padding:6, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-primary)', fontSize:10.5, fontFamily:'monospace', resize:'vertical', outline:'none', lineHeight:1.5 }} />
               <div style={{ fontSize:8, color:'var(--text-secondary)' }}>{isZh ? '实时分析中...' : 'Auto-analyzing...'} ({detectCalls} {isZh ? '个调用' : 'calls'})</div>
+              {chain.length > 0 && <GeneratedCodeBlock chain={chain} hlLine={hlLine} isZh={isZh} />}
             </div>
           ) : (
             <>
@@ -745,13 +1122,40 @@ export default function ObjectBusView() {
               </defs>
               <rect width={svgW} height={svgH} fill="var(--bg-primary)" /><rect width={svgW} height={svgH} fill="url(#g)" />
 
-              {/* Relationship arrows between adjacent chips */}
+              {/* Relationship arrows between adjacent chips (same row) */}
               {Array.from({ length: Math.max(0, numChips - 1) }, (_, i) => {
                 const p1 = chipPos(i)
                 const p2 = chipPos(i + 1)
                 if (Math.floor(i / chipsPerRow) !== Math.floor((i + 1) / chipsPerRow)) return null
                 const rel = chain[i]?.relation || 'call'
                 return <RelationPath key={`rel-${i}`} from={{...p1, w: chipW}} to={{...p2, w: chipW}} relation={rel} isZh={isZh} />
+              })}
+
+              {/* Cross-row connection arrows (L-shaped path) */}
+              {Array.from({ length: Math.max(0, numChips - 1) }, (_, i) => {
+                const p1 = chipPos(i)
+                const p2 = chipPos(i + 1)
+                if (Math.floor(i / chipsPerRow) === Math.floor((i + 1) / chipsPerRow)) return null
+                const rel = chain[i]?.relation || 'call'
+                const color = REL_COLORS[rel] || '#79c0ff'
+                const isDashed = REL_STROKE[rel] === 'dashed'
+                const label = isZh ? (REL_LABELS_ZH[rel] || rel) : (REL_LABELS_EN[rel] || rel)
+                const fx = p1.x + chipW, fy = p1.y + 30
+                const tx = p2.x, ty = p2.y + 30
+                const rx = svgW - 16
+                const midLX = (fx + rx) / 2
+                return (
+                  <g key={`cross-${i}`}>
+                    <path d={`M ${fx} ${fy} L ${rx} ${fy} L ${rx} ${ty} L ${tx} ${ty}`}
+                      stroke={color} strokeWidth={1.5} fill="none"
+                      strokeDasharray={isDashed ? '4 3' : 'none'}
+                      markerEnd={`url(#arrow-${rel})`} />
+                    <rect x={midLX - 35} y={fy - 15} width={70} height={12} rx={3}
+                      fill="var(--bg-primary)" stroke={color + '60'} strokeWidth={0.5} />
+                    <text x={midLX} y={fy - 5} textAnchor="middle" fill={color}
+                      fontSize={7} fontWeight="bold" fontFamily="monospace">{label}</text>
+                  </g>
+                )
               })}
 
               {/* Chips */}
@@ -787,6 +1191,26 @@ export default function ObjectBusView() {
                 </g>
               ))))}
 
+              {/* Cross-row bus bridges — vertical connectors on right edge */}
+              {numRows > 1 && Array.from({ length: numRows - 1 }, (_, row) => (
+                (['addr','ctrl','data'] as BusType[]).map(bus => {
+                  const y1 = busLineY(row, bus)
+                  const y2 = busLineY(row + 1, bus)
+                  const bx = svgW - 6
+                  const color = BUS_COLORS[bus]
+                  const active = s[bus] !== '—'
+                  return (
+                    <g key={`bridge-${row}-${bus}`}>
+                      <line x1={bx} y1={y1} x2={bx} y2={y2}
+                        stroke={active ? color : color + '28'} strokeWidth={2}
+                        strokeDasharray={active ? 'none' : '4 3'} />
+                      <circle cx={bx} cy={y1} r={3} fill={active ? color : color + '50'} />
+                      <circle cx={bx} cy={y2} r={3} fill={active ? color : color + '50'} />
+                    </g>
+                  )
+                })
+              ))}
+
               {/* Value labels */}
               {(['addr','ctrl','data'] as BusType[]).map(b => (
                 <g key={b} transform={`translate(${chipW + 40}, ${busLineY(0, b)})`}>
@@ -806,7 +1230,7 @@ export default function ObjectBusView() {
                 const toChipIdx = md.to === 0 ? 0 : (md.to === 99 ? numChips - 1 : md.to)
                 const rowFrom = Math.floor(fromChipIdx / chipsPerRow)
                 const rowTo = Math.floor(toChipIdx / chipsPerRow)
-                const y = md.from < 99 && md.to < 99 && rowFrom === rowTo ? busLineY(rowFrom, md.bus) : busLineY(0, md.bus)
+                const y = busLineY(rowFrom, md.bus)
                 const fx = cx1 < cx2 ? cx1 : cx2; const tx = cx1 < cx2 ? cx2 : cx1
                 return <MovingDot key={i} progress={animProgress} fromX={fx} toX={tx} y={y} color={BUS_COLORS[md.bus]} label={md.label} />
               })}
@@ -826,27 +1250,35 @@ export default function ObjectBusView() {
             </div>
           </div>
 
-          {/* Conflict + Description + Mini chain map */}
+          {/* Conflict + Description + Pattern badge + Mini chain map */}
           <div style={{ borderRadius:6, border:'1px solid var(--border)', padding:'4px 8px', fontSize:11, lineHeight:1.5, color:'var(--text-primary)', background:conflict?'#ff7b7215': 'var(--bg-elevated)', flexShrink:0, display:'flex', alignItems:'center', gap:8 }}>
             {conflict && <span style={{ color:'#ff7b72', fontWeight:700 }}>{conflict}</span>}
             <span>{isZh ? s.desc_zh : s.desc_en}</span>
-            <span style={{ fontSize:9, color:'#4d8fff', fontFamily:'monospace' }}>
+            {(() => {
+              const p = detectPattern(chain)
+              return p ? (
+                <span title={isZh ? p.desc_zh : p.desc_en} style={{ marginLeft:4, padding:'1px 7px', borderRadius:10, fontSize:9, fontWeight:700, background:'rgba(100,180,255,0.12)', border:'1px solid rgba(100,180,255,0.25)', color:'#79c0ff', cursor:'help', whiteSpace:'nowrap' }}>
+                  {p.icon} {isZh ? p.name_zh : p.name_en}
+                </span>
+              ) : null
+            })()}
+            <span style={{ fontSize:9, color:'#4d8fff', fontFamily:'monospace', marginLeft:'auto' }}>
+              {chain[0]?.caller}
               {chain.map((c, i) => (
                 <span key={i}>
-                  {i > 0 && <span style={{ color: REL_COLORS[c.relation||'call'], fontSize:7, margin:'0 2px' }}>{isZh ? REL_LABELS_ZH[c.relation||'call'] : REL_LABELS_EN[c.relation||'call']}</span>}
+                  <span style={{ color: REL_COLORS[c.relation||'call'], fontSize:7, margin:'0 2px' }}>{isZh ? REL_LABELS_ZH[c.relation||'call'] : REL_LABELS_EN[c.relation||'call']}</span>
                   {c.callee}
                 </span>
-              )).reduce((acc, el) => {
-                if (acc.length === 0) return [el]
-                return [...acc, <>{acc[acc.length-1]}</>]
-              }, [] as React.ReactNode[])}
+              ))}
             </span>
           </div>
 
           {/* Waveform */}
           <div style={{ flexShrink:0 }}>
             <div style={{ fontSize:8, color:'var(--text-secondary)', marginBottom:1, fontFamily:'monospace', paddingLeft:2 }}>{isZh ? '波形' : 'Wave'}</div>
-            <Waveform steps={allSteps} curStep={step} />
+            <div style={{ overflowX:'auto' }}>
+              <Waveform steps={allSteps} curStep={step} />
+            </div>
           </div>
         </div>
       </div>
@@ -854,26 +1286,98 @@ export default function ObjectBusView() {
   )
 }
 
-/* ── Waveform sub-component ──────────────────────────────────── */
+/* ── Oscilloscope Waveform ───────────────────────────────────── */
 
 function Waveform({ steps, curStep }: { steps: BusStep[]; curStep: number }) {
-  const w = Math.max(50, 300 / steps.length)
+  const n = steps.length
+  if (n === 0) return null
+  const labelW = 40
+  const stepW = 32  // fixed width per step — enables scroll for long sequences
+  const W = Math.max(520, labelW + n * stepW + 4)
+  const chH = 26
+  const sigA = 9
+  const topPad = 8
+  const numRows = 4  // CLK + ADDR + CTRL + DATA
+  const H = topPad + numRows * chH + 16
+
+  type Ch = { name: string; color: string; vals: (0|1)[]; texts?: string[] }
+  const channels: Ch[] = [
+    { name: 'CLK',  color: '#00ff41', vals: steps.map((_, i) => (i % 2) as 0|1) },
+    { name: 'ADDR', color: '#ff7b72', vals: steps.map(s => (s.addr !== '—' ? 1 : 0) as 0|1), texts: steps.map(s => s.addr) },
+    { name: 'CTRL', color: '#79c0ff', vals: steps.map(s => (s.ctrl !== '—' ? 1 : 0) as 0|1), texts: steps.map(s => s.ctrl) },
+    { name: 'DATA', color: '#56d364', vals: steps.map(s => (s.data !== '—' ? 1 : 0) as 0|1), texts: steps.map(s => s.data) },
+  ]
+
+  const midY = (ci: number) => topPad + ci * chH + chH / 2
+
+  const buildPath = (vals: (0|1)[], ci: number) => {
+    const cy = midY(ci), hi = cy - sigA, lo = cy + sigA
+    let d = ''
+    for (let i = 0; i < vals.length; i++) {
+      const x0 = labelW + i * stepW, x1 = labelW + (i + 1) * stepW
+      const y = vals[i] ? hi : lo
+      if (i === 0) { d += `M ${x0} ${y}` }
+      else {
+        const py = vals[i-1] ? hi : lo
+        if (y !== py) d += ` L ${x0} ${py} L ${x0} ${y}`
+      }
+      d += ` L ${x1} ${y}`
+    }
+    return d
+  }
+
   return (
-    <div style={{ display:'flex', gap:0, alignItems:'stretch', height:44, borderRadius:4, overflow:'hidden', border:'1px solid var(--border)', background:'var(--bg-primary)' }}>
-      {steps.map((st, i) => {
-        const isCur = i === curStep
-        return (
-          <div key={i} style={{ flex:'0 0 '+w+'px', display:'flex', flexDirection:'column', gap:1, borderRight:'1px solid '+(isCur?'#fff':'var(--bg-elevated)'), background:isCur?'#1a2332':'transparent', padding:'1px 1px' }}>
-            {(['addr','ctrl','data'] as BusType[]).map(b => {
-              const on = st[b] !== '—'
-              return <div key={b} style={{ flex:1, borderRadius:1, background:on ? BUS_COLORS[b] : 'transparent', minHeight:on?undefined:0, display:'flex', alignItems:'center', justifyContent:'center', padding:'0 1px', transition:'all 0.3s' }}>
-                {on && <span style={{ fontSize:6, color:'#000', fontWeight:'bold', fontFamily:'monospace', overflow:'hidden', textOverflow:'ellipsis', whiteSpace:'nowrap' }}>{st[b]}</span>}
-              </div>
-            })}
-            <div style={{ textAlign:'center', fontSize:6, color:isCur?'#fff':'#445', fontFamily:'monospace' }}>{i+1}</div>
-          </div>
-        )
-      })}
+    <div style={{ borderRadius:4, overflow:'hidden', border:'1px solid #00ff4128', background:'#020c08' }}>
+      <svg width={W} height={H} viewBox={`0 0 ${W} ${H}`} style={{ display:'block', minWidth: W }}>
+        {/* Graticule grid */}
+        {Array.from({ length: n + 1 }, (_, i) => (
+          <line key={`vg${i}`} x1={labelW + i * stepW} y1={topPad} x2={labelW + i * stepW} y2={H - 14}
+            stroke="rgba(0,255,65,0.07)" strokeWidth={0.5} />
+        ))}
+        {channels.map((_, ci) => (
+          <line key={`hg${ci}`} x1={labelW} y1={midY(ci)} x2={W} y2={midY(ci)}
+            stroke="rgba(0,255,65,0.05)" strokeWidth={0.5} />
+        ))}
+        {/* Active step cursor */}
+        <rect x={labelW + curStep * stepW} y={topPad} width={stepW} height={H - 14 - topPad}
+          fill="rgba(255,255,255,0.025)" />
+        <line x1={labelW + curStep * stepW + stepW / 2} y1={topPad}
+          x2={labelW + curStep * stepW + stepW / 2} y2={H - 14}
+          stroke="rgba(200,255,220,0.3)" strokeWidth={0.8} strokeDasharray="2 2" />
+        {/* Channels */}
+        {channels.map((ch, ci) => {
+          const val = ch.texts?.[curStep]
+          const showLabel = val && val !== '—'
+          const cx = labelW + curStep * stepW + stepW / 2
+          const cy = midY(ci)
+          return (
+            <g key={ch.name}>
+              <rect x={0} y={midY(ci) - chH / 2} width={labelW - 2} height={chH} fill="#020c08" />
+              <text x={labelW - 5} y={midY(ci) + 3} textAnchor="end"
+                fill={ch.color} fontSize={7} fontWeight="bold" fontFamily="monospace">{ch.name}</text>
+              {/* Phosphor glow */}
+              <path d={buildPath(ch.vals, ci)} stroke={ch.color} strokeWidth={3.5} fill="none" opacity={0.1} />
+              {/* Signal line */}
+              <path d={buildPath(ch.vals, ci)} stroke={ch.color} strokeWidth={1.2} fill="none" opacity={0.92} />
+              {/* Value annotation at cursor */}
+              {showLabel && (
+                <g>
+                  <rect x={cx - 20} y={cy - sigA - 14} width={40} height={11} rx={2}
+                    fill={ch.color + '22'} stroke={ch.color + '80'} strokeWidth={0.5} />
+                  <text x={cx} y={cy - sigA - 5} textAnchor="middle"
+                    fill={ch.color} fontSize={6} fontFamily="monospace" fontWeight="bold">{val}</text>
+                </g>
+              )}
+            </g>
+          )
+        })}
+        {/* Bottom step numbers */}
+        <line x1={labelW} y1={H - 14} x2={W} y2={H - 14} stroke="rgba(0,255,65,0.1)" strokeWidth={0.5} />
+        {steps.map((_, i) => (
+          <text key={i} x={labelW + i * stepW + stepW / 2} y={H - 3}
+            textAnchor="middle" fill={i === curStep ? '#88ffaa' : '#1a3322'} fontSize={6} fontFamily="monospace">{i + 1}</text>
+        ))}
+      </svg>
     </div>
   )
 }

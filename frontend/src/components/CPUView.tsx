@@ -281,7 +281,7 @@ export default function CPUView() {
                         <div style={{ fontSize: 10, fontFamily: 'monospace', color: 'var(--text-primary)', lineHeight: 1.4 }}>{slot.instr.asm}</div>
                         {slot.hazard !== 'none' && (
                           <div style={{ marginTop: 5, fontSize: 9, color: slot.hazard === 'data' ? '#ff6b6b' : '#ffa657', background: slot.hazard === 'data' ? 'rgba(255,107,107,0.1)' : 'rgba(255,166,87,0.1)', padding: '2px 5px', borderRadius: 3 }}>
-                            ⚠ {slot.hazard === 'data' ? 'Data Hazard' : 'Control Hazard'}
+                            ⚠ {slot.hazard === 'data' ? (isZh ? '数据冒险' : 'Data Hazard') : (isZh ? '控制冒险' : 'Control Hazard')}
                           </div>
                         )}
                       </>

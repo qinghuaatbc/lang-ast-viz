@@ -1,7 +1,8 @@
 import { useState, useEffect } from 'react'
 import { useMobile } from '../hooks/useMobile'
+import { useLang } from '../i18n/lang'
 
-interface CodeEx { name: string; desc?: string; code: string }
+interface CodeEx { name: string; name_en?: string; desc?: string; desc_en?: string; code: string }
 interface SyscallEx {
   name: string; icon: string; chapter: string; vol: 1|2; desc: string
   syscalls?: { name: string; sig: string }[]
@@ -158,7 +159,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: 'Custom errExit', desc: '封装 errExit/errMsg 供整个程序使用，模仿 TLPI 书中的 tlpi_hdr.h 风格',
+      { name: 'Custom errExit', desc: '封装 errExit/errMsg 供整个程序使用，模仿 TLPI 书中的 tlpi_hdr.h 风格', desc_en: 'Wrap errExit/errMsg helpers used project-wide, mimicking TLPI\'s tlpi_hdr.h style',
         code: `#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -195,7 +196,7 @@ int main() {
     /* errno = ENOMEM; errExit("malloc"); */
     return 0;
 }` },
-      { name: 'errno 全表', desc: '打印所有标准 errno 错误码及描述',
+      { name: 'errno 全表', name_en: 'errno Table', desc: '打印所有标准 errno 错误码及描述', desc_en: 'Print all standard errno codes and their descriptions',
         code: `#include <stdio.h>
 #include <string.h>
 #include <errno.h>
@@ -282,7 +283,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: 'Scatter-Gather I/O', desc: 'readv/writev 一次 syscall 读写多个缓冲区 (Scatter-Gather I/O)',
+      { name: 'Scatter-Gather I/O', desc: 'readv/writev 一次 syscall 读写多个缓冲区 (Scatter-Gather I/O)', desc_en: 'readv/writev: read/write multiple buffers in one syscall (Scatter-Gather I/O)',
         code: `#include <sys/uio.h>
 #include <fcntl.h>
 #include <unistd.h>
@@ -320,7 +321,7 @@ int main() {
     unlink(path);
     return 0;
 }` },
-      { name: 'O_APPEND 原子写', desc: '多进程并发追加写文件时 O_APPEND 保证原子性，避免数据交错',
+      { name: 'O_APPEND 原子写', name_en: 'O_APPEND Atomic Write', desc: '多进程并发追加写文件时 O_APPEND 保证原子性，避免数据交错', desc_en: 'O_APPEND guarantees atomic appends under concurrent processes — no interleaving',
         code: `#include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -357,7 +358,7 @@ int main() {
     printf("total lines = %d (expected 15)\\n", lines);
     return 0;
 }` },
-      { name: '/proc/self/fd 查看 fd', desc: '通过 /proc/self/fd 列出进程当前所有打开的文件描述符',
+      { name: '/proc/self/fd 查看 fd', name_en: '/proc/self/fd List', desc: '通过 /proc/self/fd 列出进程当前所有打开的文件描述符', desc_en: 'List all open file descriptors of the current process via /proc/self/fd',
         code: `#include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -518,7 +519,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: '内存泄漏检测', desc: '故意泄漏，用 valgrind 思路自己追踪 malloc/free', code: `#include <stdio.h>
+      { name: '内存泄漏检测', name_en: 'Memory Leak Detection', desc: '故意泄漏，用 valgrind 思路自己追踪 malloc/free', desc_en: 'Intentional leak — track malloc/free manually using valgrind-style logic', code: `#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
@@ -552,7 +553,7 @@ int main() {
     /* run under valgrind --leak-check=full to verify */
     return 0;
 }` },
-      { name: 'realloc 动态数组', desc: '用 realloc 实现类似 vector 的动态增长', code: `#include <stdio.h>
+      { name: 'realloc 动态数组', name_en: 'realloc Dynamic Array', desc: '用 realloc 实现类似 vector 的动态增长', desc_en: 'Dynamic array growth using realloc, similar to std::vector', code: `#include <stdio.h>
 #include <stdlib.h>
 
 typedef struct {
@@ -579,7 +580,7 @@ int main() {
     free(v.data);
     return 0;
 }` },
-      { name: 'brk/sbrk 堆边界', desc: '直接操控堆顶，观察 program break 变化', code: `#include <stdio.h>
+      { name: 'brk/sbrk 堆边界', name_en: 'brk/sbrk Heap Boundary', desc: '直接操控堆顶，观察 program break 变化', desc_en: 'Directly manipulate the heap top with brk/sbrk, observe program break changes', code: `#include <stdio.h>
 #include <unistd.h>
 
 int main() {
@@ -1067,7 +1068,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: 'signalfd + epoll', desc: '用 signalfd 将信号转为 fd 事件，配合 epoll 做事件循环',
+      { name: 'signalfd + epoll', desc: '用 signalfd 将信号转为 fd 事件，配合 epoll 做事件循环', desc_en: 'Convert signals to fd events with signalfd, use with epoll for an event loop',
         code: `#include <sys/signalfd.h>
 #include <sys/epoll.h>
 #include <signal.h>
@@ -1113,7 +1114,7 @@ int main() {
     close(sfd); close(efd);
     return 0;
 }` },
-      { name: '实时信号排队', desc: '普通信号不排队，SIGRTMIN+n 可靠排队——用 sigqueue 发送',
+      { name: '实时信号排队', name_en: 'Real-Time Signal Queue', desc: '普通信号不排队，SIGRTMIN+n 可靠排队——用 sigqueue 发送', desc_en: 'Regular signals do not queue; SIGRTMIN+n real-time signals reliably queue — send with sigqueue',
         code: `#include <signal.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -1269,7 +1270,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: 'pipe + fork', desc: '父子进程通过 pipe 通信：子进程写，父进程读',
+      { name: 'pipe + fork', desc: '父子进程通过 pipe 通信：子进程写，父进程读', desc_en: 'Parent-child IPC via pipe: child writes, parent reads',
         code: `#include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -1301,7 +1302,7 @@ int main() {
     wait(NULL);
     return 0;
 }` },
-      { name: '僵尸进程演示', desc: '子进程退出后父进程延迟 wait()，期间子进程处于 zombie 状态',
+      { name: '僵尸进程演示', name_en: 'Zombie Process Demo', desc: '子进程退出后父进程延迟 wait()，期间子进程处于 zombie 状态', desc_en: 'Child exits, parent delays wait() — child stays zombie until reaped',
         code: `#include <unistd.h>
 #include <stdio.h>
 #include <sys/wait.h>
@@ -1323,7 +1324,7 @@ int main() {
     printf("zombie gone!\\n");
     return 0;
 }` },
-      { name: 'SIGCHLD 异步 reap', desc: '安装 SIGCHLD 处理函数，在信号处理中 waitpid 避免僵尸',
+      { name: 'SIGCHLD 异步 reap', name_en: 'SIGCHLD Async Reap', desc: '安装 SIGCHLD 处理函数，在信号处理中 waitpid 避免僵尸', desc_en: 'Install SIGCHLD handler to waitpid inside the handler — prevents zombies',
         code: `#include <unistd.h>
 #include <stdio.h>
 #include <signal.h>
@@ -1667,7 +1668,7 @@ int main() {
 }`,
     notes: 'The pipe has a kernel buffer (typically 64KB). write() to a full pipe blocks. Closing the write end causes read() to return 0 (EOF). Always close both ends you don\'t use in child — otherwise EOF is never sent.',
     examples: [
-      { name: 'FIFO 命名管道', desc: '无亲缘关系的进程通过文件路径通信', code: `#include <sys/stat.h>
+      { name: 'FIFO 命名管道', name_en: 'FIFO Named Pipe', desc: '无亲缘关系的进程通过文件路径通信', desc_en: 'Unrelated processes communicate via FIFO (named pipe) filesystem path', code: `#include <sys/stat.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -1697,7 +1698,7 @@ int main() {
     unlink(FIFO);
     return 0;
 }` },
-      { name: '双向管道', desc: '两个 pipe 实现父子全双工通信', code: `#include <unistd.h>
+      { name: '双向管道', name_en: 'Bidirectional Pipes', desc: '两个 pipe 实现父子全双工通信', desc_en: 'Full-duplex parent-child communication using two pipes', code: `#include <unistd.h>
 #include <sys/wait.h>
 #include <stdio.h>
 #include <string.h>
@@ -1731,7 +1732,7 @@ int main() {
     wait(NULL);
     return 0;
 }` },
-      { name: 'popen 捕获命令输出', desc: '用 popen 读取 shell 命令的标准输出', code: `#include <stdio.h>
+      { name: 'popen 捕获命令输出', name_en: 'popen Capture Output', desc: '用 popen 读取 shell 命令的标准输出', desc_en: 'Capture shell command stdout with popen', code: `#include <stdio.h>
 #include <stdlib.h>
 
 int main() {
@@ -1814,7 +1815,7 @@ int main(int argc, char *argv[]) {
 }`,
     notes: 'MAP_PRIVATE creates copy-on-write — writes create private anonymous pages visible only to this process. MAP_SHARED writes go to the page cache and are visible to all mappers. madvise(MADV_SEQUENTIAL) enables aggressive readahead.',
     examples: [
-      { name: '匿名共享内存', desc: 'MAP_ANONYMOUS|MAP_SHARED: 父子进程零拷贝共享', code: `#include <sys/mman.h>
+      { name: '匿名共享内存', name_en: 'Anonymous Shared Memory', desc: 'MAP_ANONYMOUS|MAP_SHARED: 父子进程零拷贝共享', desc_en: 'MAP_ANONYMOUS|MAP_SHARED: zero-copy shared memory between parent and child', code: `#include <sys/mman.h>
 #include <stdio.h>
 #include <unistd.h>
 #include <sys/wait.h>
@@ -1840,7 +1841,7 @@ int main() {
     munmap(counter, sizeof(int));
     return 0;
 }` },
-      { name: 'mprotect 只读保护', desc: '将内存区域改为只读，写入触发 SIGSEGV', code: `#include <sys/mman.h>
+      { name: 'mprotect 只读保护', name_en: 'mprotect Read-Only', desc: '将内存区域改为只读，写入触发 SIGSEGV', desc_en: 'Make a memory region read-only with mprotect; write triggers SIGSEGV', code: `#include <sys/mman.h>
 #include <stdio.h>
 #include <string.h>
 #include <signal.h>
@@ -1868,7 +1869,7 @@ int main() {
     munmap(p, 4096);
     return 0;
 }` },
-      { name: 'msync 持久化', desc: '将 MAP_SHARED 修改同步写回文件', code: `#include <sys/mman.h>
+      { name: 'msync 持久化', name_en: 'msync Persist', desc: '将 MAP_SHARED 修改同步写回文件', desc_en: 'Flush MAP_SHARED changes back to file with msync', code: `#include <sys/mman.h>
 #include <sys/stat.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -1961,7 +1962,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: '跨进程消息传递', desc: '父进程发送，子进程接收，验证优先级排序', code: `#include <mqueue.h>
+      { name: '跨进程消息传递', name_en: 'Cross-Process Messaging', desc: '父进程发送，子进程接收，验证优先级排序', desc_en: 'Parent sends, child receives; verify priority ordering', code: `#include <mqueue.h>
 #include <stdio.h>
 #include <string.h>
 #include <fcntl.h>
@@ -2064,7 +2065,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: '生产者-消费者', desc: '用无名信号量实现线程间生产者-消费者同步', code: `#include <semaphore.h>
+      { name: '生产者-消费者', name_en: 'Producer-Consumer', desc: '用无名信号量实现线程间生产者-消费者同步', desc_en: 'Producer-consumer thread sync using unnamed POSIX semaphores', code: `#include <semaphore.h>
 #include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -2269,7 +2270,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: 'flock 全文件锁', desc: '用 flock() 实现简单进程间互斥锁', code: `#include <sys/file.h>
+      { name: 'flock 全文件锁', name_en: 'flock Whole-File Lock', desc: '用 flock() 实现简单进程间互斥锁', desc_en: 'Simple inter-process mutex with flock()', code: `#include <sys/file.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -2302,7 +2303,7 @@ int main() {
     unlink("/tmp/tlpi_flock.lock");
     return 0;
 }` },
-      { name: 'fcntl 字节范围锁', desc: '对文件的特定字节范围加锁（数据库常用）', code: `#include <fcntl.h>
+      { name: 'fcntl 字节范围锁', name_en: 'fcntl Byte-Range Lock', desc: '对文件的特定字节范围加锁（数据库常用）', desc_en: 'Lock a specific byte range in a file with fcntl (common in databases)', code: `#include <fcntl.h>
 #include <stdio.h>
 #include <unistd.h>
 
@@ -2455,7 +2456,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: 'TCP echo server', desc: '最简 TCP echo 服务端 + 客户端 (fork 在同一进程演示)',
+      { name: 'TCP echo server', desc: '最简 TCP echo 服务端 + 客户端 (fork 在同一进程演示)', desc_en: 'Minimal TCP echo server + client (forked in same process for demo)',
         code: `#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -2517,7 +2518,7 @@ int main() {
     wait(NULL);
     return 0;
 }` },
-      { name: 'UDP 广播', desc: 'UDP 一发多收：SO_BROADCAST + INADDR_BROADCAST',
+      { name: 'UDP 广播', name_en: 'UDP Broadcast', desc: 'UDP 一发多收：SO_BROADCAST + INADDR_BROADCAST', desc_en: 'UDP broadcast: one sender, multiple receivers — SO_BROADCAST + INADDR_BROADCAST',
         code: `#include <sys/socket.h>
 #include <netinet/in.h>
 #include <arpa/inet.h>
@@ -2602,7 +2603,7 @@ int main() {
 }`,
     notes: 'select() rebuilds fd_set on every call — O(n) scan of all bits up to nfds. poll() uses an array of structs (no bit-scanning limit). epoll is O(1): it stores ready events in a linked list and only returns what\'s ready. Use EPOLLET (edge-triggered) with non-blocking fds for maximum performance.',
     examples: [
-      { name: 'poll() 多 fd', desc: 'poll 同时监听两个管道，无 fd 数量上限', code: `#include <poll.h>
+      { name: 'poll() 多 fd', name_en: 'poll() Multiple fds', desc: 'poll 同时监听两个管道，无 fd 数量上限', desc_en: 'poll monitors two pipes simultaneously — no fd count limit', code: `#include <poll.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <string.h>
@@ -2634,7 +2635,7 @@ int main() {
     close(p2[0]); close(p2[1]);
     return 0;
 }` },
-      { name: 'epoll ET 边缘触发', desc: 'EPOLLET 模式：仅在状态变化时通知一次，需读尽', code: `#include <sys/epoll.h>
+      { name: 'epoll ET 边缘触发', name_en: 'epoll ET Edge-Triggered', desc: 'EPOLLET 模式：仅在状态变化时通知一次，需读尽', desc_en: 'EPOLLET edge-triggered mode: notified only once per state change — must drain the fd', code: `#include <sys/epoll.h>
 #include <fcntl.h>
 #include <unistd.h>
 #include <stdio.h>
@@ -2673,7 +2674,7 @@ int main() {
     close(ep); close(pfd[0]); close(pfd[1]);
     return 0;
 }` },
-      { name: 'epoll 超时', desc: 'epoll_wait 超时：-1 永久阻塞，0 立即返回，>0 毫秒', code: `#include <sys/epoll.h>
+      { name: 'epoll 超时', name_en: 'epoll Timeout', desc: 'epoll_wait 超时：-1 永久阻塞，0 立即返回，>0 毫秒', desc_en: 'epoll_wait timeout: -1 blocks forever, 0 returns immediately, >0 waits N ms', code: `#include <sys/epoll.h>
 #include <unistd.h>
 #include <stdio.h>
 #include <time.h>
@@ -3079,7 +3080,7 @@ int main() {
 }`,
     notes: 'After execve(), open file descriptors without FD_CLOEXEC survive. Signal dispositions are reset to SIG_DFL. The exec family differs only in how argv/envp are passed: l=varargs list, v=array, p=PATH search, e=explicit envp. Use execve() when you need precise control; execlp()/execvp() for convenience.',
     examples: [
-      { name: 'exec 家族对比', desc: 'execlp/execvp/execve 三种变体对比', code: `#include <unistd.h>
+      { name: 'exec 家族对比', name_en: 'exec Family Comparison', desc: 'execlp/execvp/execve 三种变体对比', desc_en: 'Compare execlp / execvp / execve variants', code: `#include <unistd.h>
 #include <sys/wait.h>
 #include <stdio.h>
 
@@ -3111,7 +3112,7 @@ int main() {
     run("execve");
     return 0;
 }` },
-      { name: 'FD_CLOEXEC 继承', desc: 'exec 后 fd 默认继承，FD_CLOEXEC 可阻止泄漏', code: `#include <unistd.h>
+      { name: 'FD_CLOEXEC 继承', name_en: 'FD_CLOEXEC Inheritance', desc: 'exec 后 fd 默认继承，FD_CLOEXEC 可阻止泄漏', desc_en: 'File descriptors survive exec by default; FD_CLOEXEC prevents the leak', code: `#include <unistd.h>
 #include <fcntl.h>
 #include <sys/wait.h>
 #include <stdio.h>
@@ -3138,7 +3139,7 @@ int main() {
     unlink("/tmp/test_safe.txt");
     return 0;
 }` },
-      { name: '简单 Shell 实现', desc: '用 fork+exec+waitpid 实现一个极简 shell', code: `#include <unistd.h>
+      { name: '简单 Shell 实现', name_en: 'Mini Shell', desc: '用 fork+exec+waitpid 实现一个极简 shell', desc_en: 'Implement a minimal shell with fork+exec+waitpid', code: `#include <unistd.h>
 #include <sys/wait.h>
 #include <stdio.h>
 #include <string.h>
@@ -3287,7 +3288,7 @@ int main() {
     return 0;
 }`,
     examples: [
-      { name: '竞态条件', desc: '不加锁的计数器 vs 加锁计数器：演示 race condition 造成结果错误',
+      { name: '竞态条件', name_en: 'Race Condition', desc: '不加锁的计数器 vs 加锁计数器：演示 race condition 造成结果错误', desc_en: 'Unlocked counter vs mutex-protected counter: demonstrating race condition data loss',
         code: `#include <pthread.h>
 #include <stdio.h>
 
@@ -3328,7 +3329,7 @@ int main() {
            safe_counter, N_THREADS * N_ITERS);
     return 0;
 }` },
-      { name: '线程局部存储 TLS', desc: 'pthread_key_create + 每线程独立数据，__thread 关键字',
+      { name: '线程局部存储 TLS', name_en: 'Thread-Local Storage (TLS)', desc: 'pthread_key_create + 每线程独立数据，__thread 关键字', desc_en: 'pthread_key_create + per-thread independent data, __thread keyword',
         code: `#include <pthread.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -3369,7 +3370,7 @@ int main() {
     pthread_key_delete(key);
     return 0;
 }` },
-      { name: '读写锁 rwlock', desc: '多读单写锁：允许并发读，写时独占',
+      { name: '读写锁 rwlock', name_en: 'Read-Write Lock', desc: '多读单写锁：允许并发读，写时独占', desc_en: 'Multiple concurrent readers, exclusive writer — pthread_rwlock',
         code: `#include <pthread.h>
 #include <stdio.h>
 #include <unistd.h>
@@ -7344,7 +7345,7 @@ function ClickableCode({code,onHeaderClick}:{code:string;onHeaderClick:(n:string
 
 type RunState={status:'idle'}|{status:'running'}|{status:'ok';output:string[];stderr?:string}|{status:'err';msg:string;stderr?:string}
 
-function ExRunPanel({ex,color}:{ex:CodeEx;color:string}) {
+function ExRunPanel({ex,color,isZh}:{ex:CodeEx;color:string;isZh:boolean}) {
   const [code,setCode]=useState(ex.code)
   const [run,setRun]=useState<RunState>({status:'idle'})
   useEffect(()=>{setCode(ex.code);setRun({status:'idle'})},[ex.code])
@@ -7356,9 +7357,10 @@ function ExRunPanel({ex,color}:{ex:CodeEx;color:string}) {
       else setRun({status:'ok',output:res.output??[],stderr:res.stderr})
     } catch(e:any){setRun({status:'err',msg:e.message||'network error'})}
   }
+  const descText = !isZh && ex.desc_en ? ex.desc_en : ex.desc
   return (
     <div>
-      {ex.desc&&<div style={{padding:'6px 14px 0',fontSize:12,color:'var(--text-secondary)',lineHeight:1.5}}>{ex.desc}</div>}
+      {descText&&<div style={{padding:'6px 14px 0',fontSize:12,color:'var(--text-secondary)',lineHeight:1.5}}>{descText}</div>}
       <div style={{position:'relative'}}>
         <textarea value={code} onChange={e=>{setCode(e.target.value);setRun({status:'idle'})}}
           spellCheck={false}
@@ -7401,6 +7403,8 @@ function ExRunPanel({ex,color}:{ex:CodeEx;color:string}) {
 }
 
 function RunPanel({bookCode,demoCode,color,examples}:{bookCode:string;demoCode:string;color:string;examples?:CodeEx[]}) {
+  const { lang } = useLang()
+  const isZh = lang === 'zh'
   const allExamples: CodeEx[] = [
     ...(demoCode ? [{name:'Demo',code:demoCode}] : []),
     ...(examples ?? []),
@@ -7422,7 +7426,7 @@ function RunPanel({bookCode,demoCode,color,examples}:{bookCode:string;demoCode:s
               background:tab===i?`${color}28`:'transparent',
               color:tab===i?color:'var(--text-muted)',fontWeight:tab===i?700:400,
               borderBottom:tab===i?`2px solid ${color}`:'2px solid transparent'}}>
-            ▶ {ex.name}
+            ▶ {(!isZh && ex.name_en) ? ex.name_en : ex.name}
           </button>
         ))}
       </div>
@@ -7430,7 +7434,7 @@ function RunPanel({bookCode,demoCode,color,examples}:{bookCode:string;demoCode:s
       {tab==='book'?(
         <ClickableCode code={bookCode} onHeaderClick={setHeaderModal}/>
       ):(
-        <ExRunPanel key={tab} ex={allExamples[tab as number]} color={color}/>
+        <ExRunPanel key={tab} ex={allExamples[tab as number]} color={color} isZh={isZh}/>
       )}
       {headerModal && <HeaderModal name={headerModal} onClose={()=>setHeaderModal(null)}/>}
     </div>
@@ -7450,11 +7454,11 @@ export default function TLPIView() {
   const vol1=CHAPTERS.filter(c=>c.vol===1)
   const vol2=CHAPTERS.filter(c=>c.vol===2)
 
-  // Guard: chapter or example not found
-  if (!ch || !ex) return (
+  // Only guard for completely unknown chapter id (programming error)
+  if (!ch) return (
     <div style={{display:'flex',alignItems:'center',justifyContent:'center',
       height:'100%',color:'var(--text-muted)',fontSize:13}}>
-      章节内容待补充 (id: {sel})
+      Unknown chapter: {sel}
     </div>
   )
 
@@ -7524,6 +7528,15 @@ export default function TLPIView() {
 
       {/* ── Detail ── */}
       <div style={{flex:1,overflow:'auto',padding:22}}>
+        {!ex && (
+          <div style={{display:'flex',flexDirection:'column',alignItems:'center',justifyContent:'center',
+            height:'60%',gap:16,color:'var(--text-muted)'}}>
+            <span style={{fontSize:48}}>{ch.icon}</span>
+            <div style={{fontSize:14,fontWeight:700,color:ch.color}}>{ch.label}</div>
+            <div style={{fontSize:12}}>Content coming soon…</div>
+          </div>
+        )}
+        {ex && <>
         {/* Header */}
         <div style={{display:'flex',alignItems:'center',gap:14,marginBottom:14,
           padding:'10px 16px',borderRadius:10,
@@ -7581,6 +7594,7 @@ export default function TLPIView() {
           color:'var(--text-secondary)'}}>
           <span style={{fontWeight:700,color:'#e3b341',marginRight:6}}>💡</span>{ex.notes}
         </div>
+        </>}
       </div>
       {manModal && <ManModal name={manModal} onClose={()=>setManModal(null)}/>}
     </div>
