@@ -1036,6 +1036,7 @@ export default function CodeChipView() {
   const { lang } = useLang()
   const isZh = lang === 'zh'
   const [exIdx, setExIdx] = useState(-2)
+  const [exSearch, setExSearch] = useState('')
   const [step, setStep] = useState(0)
   const [playing, setPlaying] = useState(false)
   const [speed, setSpeed] = useState(2)
@@ -1266,11 +1267,19 @@ export default function CodeChipView() {
       {/* Toolbar */}
       <div style={{ display:'flex', gap:6, alignItems:'center', flexWrap:'wrap', flexShrink:0 }}>
         <span style={{ fontWeight:700, fontSize:12, color:'var(--text)' }}>{isZh ? '🔌 CodeChip · 代码电路模拟器' : '🔌 CodeChip · Code Circuit Simulator'}</span>
-        <select value={exIdx} onChange={e => { setExIdx(+e.target.value); reset() }} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:11 }}>
+        <input value={exSearch} onChange={e => setExSearch(e.target.value)} placeholder={isZh ? '🔍 搜索示例...' : '🔍 Search examples...'}
+          style={{ padding:'3px 7px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-primary)', fontSize:10, width:130, outline:'none' }} />
+        <select value={exIdx} onChange={e => { setExIdx(+e.target.value); setExSearch(''); reset() }} style={{ padding:'3px 6px', borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-primary)', color:'var(--text)', fontSize:11, maxWidth:220 }}>
           <option value={-1}>{isZh ? '🔧 自定义' : '🔧 Custom'}</option>
           <option value={-2}>{isZh ? '📋 粘贴代码' : '📋 Paste'}</option>
-          {STATIC_EXAMPLES.map((e, i) => (<option key={i} value={i}>[{isZh ? e.cat_zh : e.cat_en}] {isZh ? e.label_zh : e.label_en}</option>))}
+          {STATIC_EXAMPLES.map((e, i) => {
+            const q = exSearch.toLowerCase()
+            if (q && !e.label_en.toLowerCase().includes(q) && !e.cat_en.toLowerCase().includes(q) && !e.label_zh.includes(q) && !e.cat_zh.includes(q)) return null
+            return <option key={i} value={i}>[{isZh ? e.cat_zh : e.cat_en}] {isZh ? e.label_zh : e.label_en}</option>
+          })}
         </select>
+        <button title={isZh ? '随机示例' : 'Random example'} onClick={() => { const i = Math.floor(Math.random() * STATIC_EXAMPLES.length); setExIdx(i); setExSearch(''); reset() }}
+          style={{ padding:'3px 7px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:12 }}>🎲</button>
         <div style={{ flex:1 }} />
         <label style={{ fontSize:9, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:2, cursor:'pointer' }}>
           <input type="checkbox" checked={showHex} onChange={e => setShowHex(e.target.checked)} /> HEX
