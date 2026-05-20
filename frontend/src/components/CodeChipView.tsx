@@ -855,8 +855,8 @@ function RelationPath({ from, to, relation, method, isZh, active, animPct }: {
       {/* Method label on path */}
       <rect x={labelX - labelW / 2} y={labelY} width={labelW} height={11} rx={3}
         fill="var(--bg-primary)" stroke={active ? color + '90' : color + '28'} strokeWidth={0.6} />
-      <text x={labelX} y={labelY + 8} textAnchor="middle" fill={active ? color : color + '80'}
-        fontSize={6.5} fontWeight="bold" fontFamily="monospace">{labelText}</text>
+      <text x={labelX} y={labelY + 8} textAnchor="middle" fill={active ? color : color + '90'}
+        fontSize={7.5} fontWeight="bold" fontFamily="monospace">{labelText}</text>
     </g>
   )
 }
@@ -1153,6 +1153,32 @@ export default function CodeChipView() {
   }, [pasteCode, exIdx])
 
   const nextStep = useCallback(() => { setStep(s => (s + 1) % allSteps.length); setAnimProgress(0) }, [allSteps.length])
+  const prevStep = useCallback(() => { setStep(s => Math.max(0, s - 1)); setAnimProgress(0) }, [])
+
+  // Auto-reset view when example/chain changes
+  useEffect(() => { setZoom(1); setPan({ x: 0, y: 0 }); reset() }, [exIdx]) // eslint-disable-line
+
+  // Keyboard shortcuts: arrows step, space play/pause, r reset
+  useEffect(() => {
+    const h = (e: KeyboardEvent) => {
+      const tag = (e.target as HTMLElement).tagName
+      if (tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT') return
+      if (e.key === 'ArrowRight') { e.preventDefault(); nextStep() }
+      else if (e.key === 'ArrowLeft') { e.preventDefault(); prevStep() }
+      else if (e.key === ' ') {
+        e.preventDefault()
+        setPlaying(p => {
+          if (!p && step >= allSteps.length - 1) { setStep(0); setAnimProgress(0) }
+          if (!p) startRef.current = 0
+          else if (animRef.current) cancelAnimationFrame(animRef.current)
+          return !p
+        })
+      } else if (e.key === 'r' || e.key === 'R') { e.preventDefault(); reset(); setZoom(1); setPan({ x: 0, y: 0 }) }
+    }
+    window.addEventListener('keydown', h)
+    return () => window.removeEventListener('keydown', h)
+  }, [nextStep, prevStep, step, allSteps.length]) // eslint-disable-line
+
   useEffect(() => {
     if (playing && step < allSteps.length) {
       const anim = (ts: number) => {
@@ -1612,26 +1638,48 @@ export default function CodeChipView() {
               const typeColor = CHIP_TYPE_COLOR[chipType]
               const incoming = chain.filter(c => c.callee === selectedChip)
               const outgoing = chain.filter(c => c.caller === selectedChip)
+              const relCounts: Record<string, number> = {}
+              for (const c of [...incoming, ...outgoing]) relCounts[c.relation || 'call'] = (relCounts[c.relation || 'call'] || 0) + 1
               return (
-                <div style={{ width:130, flexShrink:0, borderLeft:'1px solid var(--border)', padding:6, background:'var(--bg-primary)', display:'flex', flexDirection:'column', gap:4, overflowY:'auto' }}>
+                <div style={{ width:140, flexShrink:0, borderLeft:'1px solid var(--border)', padding:6, background:'var(--bg-primary)', display:'flex', flexDirection:'column', gap:4, overflowY:'auto' }}>
                   <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
                     <span style={{ fontSize:9, fontWeight:700, color:typeColor, fontFamily:'monospace' }}>{selectedChip}</span>
                     <button onClick={() => setSelectedChip(null)} style={{ border:'none', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:10, padding:0 }}>✕</button>
                   </div>
-                  <div style={{ fontSize:8, color:typeColor, background:typeColor+'18', borderRadius:3, padding:'1px 5px', alignSelf:'flex-start' }}>{CHIP_TYPE_LABEL[chipType]}</div>
+                  <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                    <div style={{ fontSize:7, color:typeColor, background:typeColor+'18', borderRadius:3, padding:'1px 5px' }}>{CHIP_TYPE_LABEL[chipType]}</div>
+                    <div style={{ fontSize:7, color:'var(--text-muted)', marginLeft:'auto' }}>
+                      <span style={{ color:'#79c0ff' }}>↓{incoming.length}</span>{' '}
+                      <span style={{ color:'#56d364' }}>↑{outgoing.length}</span>
+                    </div>
+                  </div>
+                  {/* Relation type summary */}
+                  {Object.keys(relCounts).length > 0 && (
+                    <div style={{ display:'flex', flexWrap:'wrap', gap:2 }}>
+                      {Object.entries(relCounts).map(([rel, cnt]) => (
+                        <span key={rel} style={{ fontSize:6.5, padding:'1px 4px', borderRadius:3, background:REL_COLORS[rel]+'20', color:REL_COLORS[rel], border:`1px solid ${REL_COLORS[rel]}40` }}>
+                          {rel} ×{cnt}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                   {incoming.length > 0 && <>
-                    <div style={{ fontSize:8, color:'var(--text-muted)', fontWeight:700 }}>{isZh ? '接收' : 'Receives'}</div>
+                    <div style={{ fontSize:7.5, color:'var(--text-muted)', fontWeight:700, borderBottom:'1px solid var(--border)', paddingBottom:2 }}>{isZh ? '入 Receives' : 'Receives'}</div>
                     {incoming.map((c, i) => (
-                      <div key={i} style={{ fontSize:8, fontFamily:'monospace', color:'var(--text-secondary)', background:'var(--bg-elevated)', borderRadius:3, padding:'2px 4px' }}>
-                        <span style={{ color:REL_COLORS[c.relation||'call'] }}>←</span> {c.caller}.{c.method}
+                      <div key={i} style={{ fontSize:7.5, fontFamily:'monospace', color:'var(--text-secondary)', background:'var(--bg-elevated)', borderRadius:3, padding:'2px 4px', borderLeft:`2px solid ${REL_COLORS[c.relation||'call']}` }}>
+                        <span style={{ color:REL_COLORS[c.relation||'call'], fontSize:7 }}>{c.caller}</span>
+                        <span style={{ color:'var(--text-muted)' }}>.{c.method}()</span>
+                        {c.ret && c.ret !== 'void' && <span style={{ color:'#56d36480', fontSize:6 }}> →{c.ret}</span>}
                       </div>
                     ))}
                   </>}
                   {outgoing.length > 0 && <>
-                    <div style={{ fontSize:8, color:'var(--text-muted)', fontWeight:700 }}>{isZh ? '发出' : 'Calls'}</div>
+                    <div style={{ fontSize:7.5, color:'var(--text-muted)', fontWeight:700, borderBottom:'1px solid var(--border)', paddingBottom:2, marginTop:2 }}>{isZh ? '出 Calls' : 'Calls'}</div>
                     {outgoing.map((c, i) => (
-                      <div key={i} style={{ fontSize:8, fontFamily:'monospace', color:'var(--text-secondary)', background:'var(--bg-elevated)', borderRadius:3, padding:'2px 4px' }}>
-                        <span style={{ color:REL_COLORS[c.relation||'call'] }}>→</span> {c.callee}.{c.method}
+                      <div key={i} style={{ fontSize:7.5, fontFamily:'monospace', color:'var(--text-secondary)', background:'var(--bg-elevated)', borderRadius:3, padding:'2px 4px', borderLeft:`2px solid ${REL_COLORS[c.relation||'call']}` }}>
+                        <span style={{ color:'#56d364', fontSize:7 }}>{c.callee}</span>
+                        <span style={{ color:'var(--text-muted)' }}>.{c.method}()</span>
+                        {c.params && <div style={{ color:'#4d8fff80', fontSize:6, paddingLeft:2, fontStyle:'italic' }}>{c.params.slice(0, 20)}</div>}
                       </div>
                     ))}
                   </>}
@@ -1665,7 +1713,10 @@ export default function CodeChipView() {
                 </span>
               ) : null
             })()}
-            <span style={{ fontSize:9, color:'#4d8fff', fontFamily:'monospace', marginLeft:'auto' }}>
+            <span style={{ fontSize:8, color:'#484f58', fontFamily:'monospace', marginLeft:'auto', whiteSpace:'nowrap' }}>
+              {isZh ? '← → 步进 · 空格播放 · R 重置' : '← → step · Space play · R reset'}
+            </span>
+            <span style={{ fontSize:9, color:'#4d8fff', fontFamily:'monospace' }}>
               {chain[0]?.caller}
               {chain.map((c, i) => (
                 <span key={i}>
