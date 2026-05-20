@@ -118,6 +118,7 @@ func (h *Handler) Register(mux *http.ServeMux) {
 	mux.HandleFunc("/api/v1/languages", h.handleLanguages)
 	mux.HandleFunc("/api/v1/run", h.handleRun)
 	mux.HandleFunc("/api/v1/header", h.handleHeader)
+	mux.HandleFunc("/api/codechip/parse", h.handleCodeChipParse)
 }
 
 type compileRequest struct {

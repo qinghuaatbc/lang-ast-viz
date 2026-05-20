@@ -754,7 +754,36 @@ function generateMermaid(chain: ChainCall[]): string {
   return lines.join('\n')
 }
 
-/* ── Code Parser ──────────────────────────────────────────────── */
+/* ── AST Result → ChainCall[] ─────────────────────────────────── */
+
+function astResultToChain(
+  chips: { name: string; methods: string[]; fields: string[] }[],
+  calls: { from: string; to: string; method: string; params: string; ret: string; relation: string }[]
+): ChainCall[] {
+  if (calls.length === 0) return []
+
+  // Filter out self-loops and noisy calls, map relation strings
+  const relMap: Record<string, ChainCall['relation']> = {
+    call: 'call', compose: 'compose', aggregate: 'aggregate',
+    inherit: 'inherit', depend: 'depend',
+  }
+  const chipNames = new Set(chips.map(c => c.name))
+
+  return calls
+    .filter(c => c.from !== c.to && c.from && c.to)
+    .filter(c => c.method !== 'has' || chipNames.has(c.to))
+    .map(c => ({
+      caller: c.from,
+      callee: c.to,
+      method: c.method || 'call',
+      params: c.params || '',
+      ret: c.ret || 'void',
+      relation: relMap[c.relation] ?? 'call',
+    }))
+    .slice(0, 20) // cap for display
+}
+
+/* ── Code Parser (fallback / local) ───────────────────────────── */
 
 function analyzePastedCode(code: string): ChainCall[] {
   const calls: ChainCall[] = []
@@ -874,6 +903,9 @@ export default function CodeChipView() {
     return [{caller:'App',callee:'Svc',method:'exec',params:'x=42',ret:'void',relation:'call'}]
   })
   const [pasteCode, setPasteCode] = useState('')
+  const [pasteLang, setPasteLang] = useState('auto')
+  const [parseLoading, setParseLoading] = useState(false)
+  const [parseError, setParseError] = useState('')
   const [cuMode, setCuMode] = useState<'form'|'paste'>('form')
   const svgRef = useRef<SVGSVGElement>(null)
   const animRef = useRef<ReturnType<typeof requestAnimationFrame>|null>(null)
@@ -893,16 +925,32 @@ export default function CodeChipView() {
     try { localStorage.setItem('codechip-chain', JSON.stringify(cuChain)) } catch {}
   }, [cuChain])
 
-  /* Real-time analysis debounce */
+  /* AST parse via Go backend */
   useEffect(() => {
     if (exIdx !== -2 || !pasteCode.trim()) return
     clearTimeout(debRef.current)
-    debRef.current = setTimeout(() => {
-      const r = analyzePastedCode(pasteCode)
-      if (r.length > 0) setCuChain(r)
-    }, 400)
+    debRef.current = setTimeout(async () => {
+      setParseLoading(true)
+      setParseError('')
+      try {
+        const res = await fetch('/api/codechip/parse', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ code: pasteCode, lang: pasteLang }),
+        })
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data: { chips: {name:string,methods:string[],fields:string[]}[], calls: {from:string,to:string,method:string,params:string,ret:string,relation:string}[], lang: string } = await res.json()
+        const chain = astResultToChain(data.chips, data.calls)
+        if (chain.length > 0) setCuChain(chain)
+        else setParseError(isZh ? '未识别到结构' : 'No structure found')
+      } catch (e) {
+        setParseError(isZh ? '解析失败' : 'Parse failed')
+      } finally {
+        setParseLoading(false)
+      }
+    }, 600)
     return () => clearTimeout(debRef.current)
-  }, [pasteCode, exIdx])
+  }, [pasteCode, pasteLang, exIdx, isZh])
 
   const isStatic = exIdx >= 0 && exIdx < STATIC_EXAMPLES.length
   const staticEx = isStatic ? STATIC_EXAMPLES[exIdx] : null
@@ -1079,10 +1127,26 @@ export default function CodeChipView() {
             </div>
           ) : exIdx === -2 ? (
             <div style={{ padding:10, display:'flex', flexDirection:'column', gap:6 }}>
+              <div style={{ display:'flex', gap:4, alignItems:'center' }}>
+                <span style={{ fontSize:9, color:'var(--text-secondary)', flexShrink:0 }}>{isZh ? '语言' : 'Lang'}</span>
+                <select value={pasteLang} onChange={e => setPasteLang(e.target.value)}
+                  style={{ flex:1, padding:'2px 4px', borderRadius:3, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-primary)', fontSize:10, outline:'none' }}>
+                  <option value="auto">{isZh ? '自动检测' : 'Auto'}</option>
+                  <option value="go">Go</option>
+                  <option value="python">Python</option>
+                  <option value="java">Java</option>
+                  <option value="cpp">C++</option>
+                  <option value="typescript">TypeScript</option>
+                </select>
+              </div>
               <textarea value={pasteCode} onChange={e => setPasteCode(e.target.value)}
-                placeholder={isZh ? '粘贴代码（自动分析）' : 'Paste code (auto-analyze)'}
-                style={{ width:'100%', minHeight:160, padding:6, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-primary)', fontSize:10.5, fontFamily:'monospace', resize:'vertical', outline:'none', lineHeight:1.5 }} />
-              <div style={{ fontSize:8, color:'var(--text-secondary)' }}>{isZh ? '实时分析中...' : 'Auto-analyzing...'} ({detectCalls} {isZh ? '个调用' : 'calls'})</div>
+                placeholder={isZh ? '粘贴代码 → 自动生成芯片电路' : 'Paste code → generates chip circuit'}
+                style={{ width:'100%', minHeight:180, padding:6, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-primary)', fontSize:10.5, fontFamily:'monospace', resize:'vertical', outline:'none', lineHeight:1.5 }} />
+              <div style={{ fontSize:8, color: parseError ? '#ff7b72' : 'var(--text-secondary)', minHeight:12 }}>
+                {parseLoading
+                  ? (isZh ? '⟳ AST 解析中...' : '⟳ Parsing AST...')
+                  : parseError || (chain.length > 0 ? `✓ ${chain.length} ${isZh ? '条连接' : 'edges'}` : '')}
+              </div>
               {chain.length > 0 && <GeneratedCodeBlock chain={chain} hlLine={hlLine} isZh={isZh} />}
             </div>
           ) : (
