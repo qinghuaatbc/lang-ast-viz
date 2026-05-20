@@ -1038,6 +1038,11 @@ export default function CodeChipView() {
   const [animProgress, setAnimProgress] = useState(0)
   const [showHex, setShowHex] = useState(false)
   const [showMem, setShowMem] = useState(false)
+  const [selectedChip, setSelectedChip] = useState<string | null>(null)
+  const [zoom, setZoom] = useState(1)
+  const [pan, setPan] = useState({ x: 0, y: 0 })
+  const isPanning = useRef(false)
+  const panStart = useRef({ x: 0, y: 0, px: 0, py: 0 })
   const [cuCaller, setCuCaller] = useState('App')
   const [cuCallee, setCuCallee] = useState('Svc')
   const [cuMethod, setCuMethod] = useState('exec')
@@ -1386,8 +1391,28 @@ export default function CodeChipView() {
         {/* Right: Circuit + Description + Waveform + Stack */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6, minWidth:0 }}>
           {/* SVG */}
-          <div style={{ flex:1, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)', overflow:'hidden', display:'flex' }}>
-            <svg ref={svgRef} viewBox={`0 0 ${svgW} ${svgH}`} style={{ width:'100%', height:'100%', display:'block', flex:1 }}>
+          <div style={{ flex:1, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)', overflow:'hidden', display:'flex', position:'relative' }}>
+            {/* Zoom controls */}
+            <div style={{ position:'absolute', top:6, right:6, display:'flex', flexDirection:'column', gap:2, zIndex:10 }}>
+              {[['＋',0.2],['－',-0.2],['↺',0]].map(([label, delta]) => (
+                <button key={String(label)} onClick={() => {
+                  if (delta === 0) { setZoom(1); setPan({ x:0, y:0 }) }
+                  else setZoom(z => Math.max(0.3, Math.min(3, z + Number(delta))))
+                }} style={{ width:22, height:22, borderRadius:4, border:'1px solid var(--border)', background:'var(--bg-elevated)', color:'var(--text-secondary)', cursor:'pointer', fontSize:12, lineHeight:'1', display:'flex', alignItems:'center', justifyContent:'center' }}>
+                  {label}
+                </button>
+              ))}
+              <div style={{ fontSize:8, color:'var(--text-muted)', textAlign:'center' }}>{Math.round(zoom*100)}%</div>
+            </div>
+            <svg ref={svgRef}
+              viewBox={`${-pan.x/zoom} ${-pan.y/zoom} ${svgW/zoom} ${svgH/zoom}`}
+              style={{ width:'100%', height:'100%', display:'block', flex:1, cursor: isPanning.current ? 'grabbing' : 'grab' }}
+              onWheel={e => { e.preventDefault(); setZoom(z => Math.max(0.3, Math.min(3, z * (e.deltaY < 0 ? 1.12 : 0.9)))) }}
+              onMouseDown={e => { isPanning.current = true; panStart.current = { x: e.clientX, y: e.clientY, px: pan.x, py: pan.y } }}
+              onMouseMove={e => { if (!isPanning.current) return; setPan({ x: panStart.current.px + (e.clientX - panStart.current.x), y: panStart.current.py + (e.clientY - panStart.current.y) }) }}
+              onMouseUp={() => { isPanning.current = false }}
+              onMouseLeave={() => { isPanning.current = false }}
+            >
               <defs>
                 <pattern id="g" width="20" height="20" patternUnits="userSpaceOnUse"><path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--bg-elevated)" strokeWidth="0.5" /></pattern>
                 {Object.entries(REL_COLORS).map(([rel, c]) => (
@@ -1404,11 +1429,10 @@ export default function CodeChipView() {
                 const p2 = chipPosMap[c.callee]
                 if (!p1 || !p2 || c.caller === c.callee) return null
                 const isActive = i === activeToIdx
-                const animPct = isActive ? ((Date.now() % 1200) / 1200) : undefined
                 return <RelationPath key={`rel-${i}`}
                   from={{...p1, w: chipW}} to={{...p2, w: chipW}}
                   relation={c.relation || 'call'} isZh={isZh}
-                  active={isActive} animPct={isActive ? step / Math.max(1, allSteps.length) : undefined}
+                  active={isActive} animPct={isActive ? animProgress : undefined}
                 />
               })}
 
@@ -1418,13 +1442,20 @@ export default function CodeChipView() {
                 const chipType = detectChipType(name)
                 const typeColor = CHIP_TYPE_COLOR[chipType]
                 const isActiveChip = chain.some((c, ci) => (c.caller === name || c.callee === name) && ci === activeToIdx)
-                return <ChipModule key={name} name={name}
-                  sub={CHIP_TYPE_LABEL[chipType]}
-                  x={p.x} y={p.y} w={chipW}
-                  active={isActiveChip}
-                  color={typeColor}
-                  state={s.state}
-                  memLayout={showMem && i === numChips - 1 ? memLayout : undefined} />
+                const isSelected = selectedChip === name
+                return (
+                  <g key={name} onClick={() => setSelectedChip(selectedChip === name ? null : name)} style={{ cursor:'pointer' }}>
+                    {isSelected && <rect x={p.x-6} y={p.y-6} width={chipW+12} height={chipH+12} rx={8}
+                      fill="none" stroke={typeColor} strokeWidth={2} strokeDasharray="4 2" opacity={0.7} />}
+                    <ChipModule name={name}
+                      sub={CHIP_TYPE_LABEL[chipType]}
+                      x={p.x} y={p.y} w={chipW}
+                      active={isActiveChip}
+                      color={typeColor}
+                      state={s.state}
+                      memLayout={showMem && i === numChips - 1 ? memLayout : undefined} />
+                  </g>
+                )
               })}
 
               {/* Buses per row */}
@@ -1494,6 +1525,39 @@ export default function CodeChipView() {
                 return <MovingDot key={i} progress={animProgress} fromX={fx} toX={tx} y={y} color={BUS_COLORS[md.bus]} label={md.label} />
               })}
             </svg>
+
+            {/* Chip Inspector Panel */}
+            {selectedChip && (() => {
+              const chipType = detectChipType(selectedChip)
+              const typeColor = CHIP_TYPE_COLOR[chipType]
+              const incoming = chain.filter(c => c.callee === selectedChip)
+              const outgoing = chain.filter(c => c.caller === selectedChip)
+              return (
+                <div style={{ width:130, flexShrink:0, borderLeft:'1px solid var(--border)', padding:6, background:'var(--bg-primary)', display:'flex', flexDirection:'column', gap:4, overflowY:'auto' }}>
+                  <div style={{ display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                    <span style={{ fontSize:9, fontWeight:700, color:typeColor, fontFamily:'monospace' }}>{selectedChip}</span>
+                    <button onClick={() => setSelectedChip(null)} style={{ border:'none', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:10, padding:0 }}>✕</button>
+                  </div>
+                  <div style={{ fontSize:8, color:typeColor, background:typeColor+'18', borderRadius:3, padding:'1px 5px', alignSelf:'flex-start' }}>{CHIP_TYPE_LABEL[chipType]}</div>
+                  {incoming.length > 0 && <>
+                    <div style={{ fontSize:8, color:'var(--text-muted)', fontWeight:700 }}>{isZh ? '接收' : 'Receives'}</div>
+                    {incoming.map((c, i) => (
+                      <div key={i} style={{ fontSize:8, fontFamily:'monospace', color:'var(--text-secondary)', background:'var(--bg-elevated)', borderRadius:3, padding:'2px 4px' }}>
+                        <span style={{ color:REL_COLORS[c.relation||'call'] }}>←</span> {c.caller}.{c.method}
+                      </div>
+                    ))}
+                  </>}
+                  {outgoing.length > 0 && <>
+                    <div style={{ fontSize:8, color:'var(--text-muted)', fontWeight:700 }}>{isZh ? '发出' : 'Calls'}</div>
+                    {outgoing.map((c, i) => (
+                      <div key={i} style={{ fontSize:8, fontFamily:'monospace', color:'var(--text-secondary)', background:'var(--bg-elevated)', borderRadius:3, padding:'2px 4px' }}>
+                        <span style={{ color:REL_COLORS[c.relation||'call'] }}>→</span> {c.callee}.{c.method}
+                      </div>
+                    ))}
+                  </>}
+                </div>
+              )
+            })()}
 
             {/* Stack Panel */}
             <div style={{ width:100, flexShrink:0, borderLeft:'1px solid var(--border)', padding:4, background:'var(--bg-primary)', display:'flex', flexDirection:'column', gap:3 }}>
