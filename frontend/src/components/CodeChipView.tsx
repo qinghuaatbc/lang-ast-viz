@@ -1274,7 +1274,10 @@ export default function CodeChipView() {
 
   const svgW = Math.max(600, numCols * (chipW + gapX) + 80)
   const chipAreaH = Math.max(220, maxPerCol * (chipH + gapY) + 60)
-  const svgH = chipAreaH + 90  // chip area + system bus zone
+  const cpuBoxH = 44
+  const cpuBoxY = chipAreaH + 8
+  const busBaseY = cpuBoxY + cpuBoxH + 8   // chipAreaH + 60
+  const svgH = busBaseY + 82               // chip area + CPU + bus zone
 
   const chipPosMap = useMemo(() => {
     const aH = Math.max(220, maxPerCol * (chipH + gapY) + 60)
@@ -1550,15 +1553,25 @@ export default function CodeChipView() {
                 )
               })}
 
-              {/* System Bus — three horizontal rails below all chips */}
+              {/* CPU + System Bus — chip → CPU(FETCH/EXEC) → ADDR/CTRL/DATA rails */}
               {(() => {
-                const busBaseY = chipAreaH + 12
                 const busOffs: Record<BusType, number> = { addr: 0, ctrl: 26, data: 52 }
                 const activeCaller = activeToIdx >= 0 && activeToIdx < chain.length ? chain[activeToIdx].caller : ''
                 const activeCallee = activeToIdx >= 0 && activeToIdx < chain.length ? chain[activeToIdx].callee : ''
+                const activeMethod  = activeToIdx >= 0 && activeToIdx < chain.length ? chain[activeToIdx].method  : ''
+                const activeParams  = activeToIdx >= 0 && activeToIdx < chain.length ? chain[activeToIdx].params  : ''
+
+                // 3-phase animation
+                const P1 = 0.38   // 0→P1:  signal drops from caller chip → CPU top
+                const P2 = 0.62   // P1→P2: CPU decodes + executes (glow)
+                                  // P2→1:  signal travels along bus rails
+
+                const isCpuActive = animProgress > P1 && animProgress < P2 && activeToIdx >= 0
+                const phase = animProgress <= P1 ? 1 : animProgress <= P2 ? 2 : 3
+
                 return (
                   <g>
-                    {/* Per-chip wires to bus */}
+                    {/* Per-chip wires: chip bottom → CPU top, CPU bottom → bus rail */}
                     {chipNames.map(name => {
                       const p = chipPosMap[name]
                       if (!p) return null
@@ -1573,7 +1586,11 @@ export default function CodeChipView() {
                             const active = isActive && s[bus] !== '—'
                             return (
                               <g key={bus}>
-                                <line x1={bx} y1={chipBottomY + 3} x2={bx} y2={busY}
+                                <line x1={bx} y1={chipBottomY + 3} x2={bx} y2={cpuBoxY}
+                                  stroke={active ? BUS_COLORS[bus] : '#1c2940'}
+                                  strokeWidth={active ? 1.5 : 0.8}
+                                  strokeDasharray={active ? 'none' : '3 3'} />
+                                <line x1={bx} y1={cpuBoxY + cpuBoxH} x2={bx} y2={busY}
                                   stroke={active ? BUS_COLORS[bus] : '#1c2940'}
                                   strokeWidth={active ? 1.5 : 0.8}
                                   strokeDasharray={active ? 'none' : '3 3'} />
@@ -1584,6 +1601,35 @@ export default function CodeChipView() {
                         </g>
                       )
                     })}
+
+                    {/* CPU Box */}
+                    <rect x={4} y={cpuBoxY} width={svgW - 8} height={cpuBoxH} rx={4}
+                      fill={isCpuActive ? '#0d1f0d' : '#0a0f0a'}
+                      stroke={isCpuActive ? '#56d364' : '#1a2a1a'}
+                      strokeWidth={isCpuActive ? 2 : 1} />
+                    {isCpuActive && <rect x={4} y={cpuBoxY} width={svgW - 8} height={cpuBoxH} rx={4} fill="#56d364" opacity={0.03} />}
+                    <text x={14} y={cpuBoxY + 15} fill={isCpuActive ? '#56d364' : '#243524'}
+                      fontSize={9} fontWeight="bold" fontFamily="monospace">⚙ CPU</text>
+                    <line x1={52} y1={cpuBoxY + 6} x2={52} y2={cpuBoxY + cpuBoxH - 6}
+                      stroke={isCpuActive ? '#56d36430' : '#151f15'} strokeWidth={1} />
+                    {isCpuActive ? (
+                      <g>
+                        <text x={60} y={cpuBoxY + 13} fill="#ff7b72" fontSize={7.5} fontFamily="monospace" fontWeight="bold">
+                          FETCH   MOV RDI, [{activeCaller}*]
+                        </text>
+                        <text x={60} y={cpuBoxY + 25} fill="#ffa657" fontSize={7.5} fontFamily="monospace" fontWeight="bold">
+                          DECODE  CALL {activeCallee}.{activeMethod}({activeParams.slice(0, 24)})
+                        </text>
+                        <text x={60} y={cpuBoxY + 37} fill="#79c0ff" fontSize={7.5} fontFamily="monospace" fontWeight="bold">
+                          EXEC    ADDR={s.addr}  CTRL={s.ctrl}  DATA={s.data}
+                        </text>
+                      </g>
+                    ) : (
+                      <text x={60} y={cpuBoxY + 27} fill="#1a2d1a" fontSize={7.5} fontFamily="monospace">
+                        {isZh ? 'idle — 等待调用指令...' : 'idle — waiting for CALL instruction...'}
+                      </text>
+                    )}
+
                     {/* Bus rails */}
                     {(['addr', 'ctrl', 'data'] as BusType[]).map(bus => {
                       const busY = busBaseY + busOffs[bus]
@@ -1608,25 +1654,46 @@ export default function CodeChipView() {
                         </g>
                       )
                     })}
-                    {/* Signal pulses on bus rails */}
-                    {activeToIdx >= 0 && activeToIdx < chain.length && animProgress > 0 && (
-                      (['addr', 'ctrl', 'data'] as BusType[]).map(bus => {
+
+                    {/* Signal pulses — 3 phases */}
+                    {activeToIdx >= 0 && activeToIdx < chain.length && animProgress > 0 && (() => {
+                      const pFrom = chipPosMap[activeCaller]
+                      const pTo   = chipPosMap[activeCallee]
+                      if (!pFrom || !pTo) return null
+                      const fx = pFrom.x + chipW / 2
+                      const tx = pTo.x   + chipW / 2
+
+                      return (['addr', 'ctrl', 'data'] as BusType[]).map((bus, bi) => {
                         if (s[bus] === '—') return null
-                        const pFrom = chipPosMap[activeCaller]
-                        const pTo = chipPosMap[activeCallee]
-                        if (!pFrom || !pTo) return null
+                        const color = BUS_COLORS[bus]
+                        const bx = fx + (bi - 1) * 5
                         const busY = busBaseY + busOffs[bus]
-                        const fx = pFrom.x + chipW / 2
-                        const tx = pTo.x + chipW / 2
-                        const cx = fx + (tx - fx) * animProgress
-                        return (
-                          <g key={`bp-${bus}`}>
-                            <circle cx={cx} cy={busY} r={5} fill={BUS_COLORS[bus]} opacity={0.9} />
-                            <circle cx={cx} cy={busY} r={10} fill={BUS_COLORS[bus]} opacity={0.15} />
-                          </g>
-                        )
+
+                        if (phase === 1) {
+                          // Drop from caller chip bottom → CPU top
+                          const t = animProgress / P1
+                          const cy = (pFrom.y + chipH) + (cpuBoxY - (pFrom.y + chipH)) * t
+                          return (
+                            <g key={`p1-${bus}`}>
+                              <circle cx={bx} cy={cy} r={4} fill={color} opacity={0.85} />
+                              <circle cx={bx} cy={cy} r={8} fill={color} opacity={0.18} />
+                            </g>
+                          )
+                        }
+                        if (phase === 3) {
+                          // Travel along bus rail from caller x → callee x
+                          const t = (animProgress - P2) / (1 - P2)
+                          const cx = fx + (tx - fx) * t
+                          return (
+                            <g key={`p3-${bus}`}>
+                              <circle cx={cx} cy={busY} r={5} fill={color} opacity={0.92} />
+                              <circle cx={cx} cy={busY} r={11} fill={color} opacity={0.15} />
+                            </g>
+                          )
+                        }
+                        return null  // phase 2: CPU glowing, no moving dot
                       })
-                    )}
+                    })()}
                   </g>
                 )
               })()}
