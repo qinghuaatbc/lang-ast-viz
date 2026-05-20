@@ -1274,10 +1274,11 @@ export default function CodeChipView() {
 
   const svgW = Math.max(600, numCols * (chipW + gapX) + 80)
   const chipAreaH = Math.max(220, maxPerCol * (chipH + gapY) + 60)
-  const cpuBoxH = 44
+  const cpuBoxH = 52
   const cpuBoxY = chipAreaH + 8
-  const busBaseY = cpuBoxY + cpuBoxH + 8   // chipAreaH + 60
-  const svgH = busBaseY + 82               // chip area + CPU + bus zone
+  const busBaseY = cpuBoxY + cpuBoxH + 8   // chipAreaH + 68
+  const textSegY = busBaseY + 72           // .text strip below bus rails
+  const svgH = textSegY + 30              // total height
 
   const chipPosMap = useMemo(() => {
     const aH = Math.max(220, maxPerCol * (chipH + gapY) + 60)
@@ -1602,33 +1603,55 @@ export default function CodeChipView() {
                       )
                     })}
 
-                    {/* CPU Box */}
+                    {/* CPU Box — pipeline visualization */}
                     <rect x={4} y={cpuBoxY} width={svgW - 8} height={cpuBoxH} rx={4}
                       fill={isCpuActive ? '#0d1f0d' : '#0a0f0a'}
                       stroke={isCpuActive ? '#56d364' : '#1a2a1a'}
                       strokeWidth={isCpuActive ? 2 : 1} />
-                    {isCpuActive && <rect x={4} y={cpuBoxY} width={svgW - 8} height={cpuBoxH} rx={4} fill="#56d364" opacity={0.03} />}
-                    <text x={14} y={cpuBoxY + 15} fill={isCpuActive ? '#56d364' : '#243524'}
-                      fontSize={9} fontWeight="bold" fontFamily="monospace">⚙ CPU</text>
-                    <line x1={52} y1={cpuBoxY + 6} x2={52} y2={cpuBoxY + cpuBoxH - 6}
-                      stroke={isCpuActive ? '#56d36430' : '#151f15'} strokeWidth={1} />
-                    {isCpuActive ? (
-                      <g>
-                        <text x={60} y={cpuBoxY + 13} fill="#ff7b72" fontSize={7.5} fontFamily="monospace" fontWeight="bold">
-                          FETCH   MOV RDI, [{activeCaller}*]
-                        </text>
-                        <text x={60} y={cpuBoxY + 25} fill="#ffa657" fontSize={7.5} fontFamily="monospace" fontWeight="bold">
-                          DECODE  CALL {activeCallee}.{activeMethod}({activeParams.slice(0, 24)})
-                        </text>
-                        <text x={60} y={cpuBoxY + 37} fill="#79c0ff" fontSize={7.5} fontFamily="monospace" fontWeight="bold">
-                          EXEC    ADDR={s.addr}  CTRL={s.ctrl}  DATA={s.data}
-                        </text>
-                      </g>
-                    ) : (
-                      <text x={60} y={cpuBoxY + 27} fill="#1a2d1a" fontSize={7.5} fontFamily="monospace">
-                        {isZh ? 'idle — 等待调用指令...' : 'idle — waiting for CALL instruction...'}
-                      </text>
-                    )}
+                    {/* Pipeline stages */}
+                    {(() => {
+                      const stages = [
+                        { name: 'FETCH',   color: '#ff7b72', desc: `MOV RDI,[${activeCaller}*]`,       active: phase === 1 },
+                        { name: 'DECODE',  color: '#ffa657', desc: `CALL ${activeCallee}.${activeMethod}`, active: isCpuActive && animProgress < (P1+P2)/2 },
+                        { name: 'EXECUTE', color: '#56d364', desc: `vtable[${activeCallee}] → .text`,  active: isCpuActive && animProgress >= (P1+P2)/2 },
+                        { name: 'BUS',     color: '#79c0ff', desc: `ADDR=${s.addr}`,                   active: phase === 3 },
+                      ]
+                      const labelW = 52
+                      const stageAreaW = svgW - 8 - labelW
+                      const sw = stageAreaW / 4
+                      return (
+                        <g>
+                          <text x={14} y={cpuBoxY + 22} fill={isCpuActive || phase===1 || phase===3 ? '#56d364' : '#243524'}
+                            fontSize={8} fontWeight="bold" fontFamily="monospace">⚙ CPU</text>
+                          {stages.map((st, si) => {
+                            const sx = 4 + labelW + si * sw
+                            return (
+                              <g key={st.name}>
+                                <rect x={sx + 2} y={cpuBoxY + 4} width={sw - 4} height={cpuBoxH - 8} rx={3}
+                                  fill={st.active ? st.color + '22' : '#111a11'}
+                                  stroke={st.active ? st.color : '#1e2e1e'}
+                                  strokeWidth={st.active ? 1.5 : 0.7} />
+                                <text x={sx + sw/2} y={cpuBoxY + 18} textAnchor="middle"
+                                  fill={st.active ? st.color : '#2a3a2a'} fontSize={7} fontWeight="bold" fontFamily="monospace">
+                                  {st.name}
+                                </text>
+                                {st.active && (
+                                  <text x={sx + sw/2} y={cpuBoxY + 31} textAnchor="middle"
+                                    fill={st.color} fontSize={5.8} fontFamily="monospace"
+                                    style={{ dominantBaseline: 'middle' }}>
+                                    {st.desc.slice(0, Math.floor((sw - 8) / 5.5))}
+                                  </text>
+                                )}
+                                {si < 3 && (
+                                  <text x={sx + sw - 1} y={cpuBoxY + cpuBoxH/2 + 4} textAnchor="middle"
+                                    fill={st.active ? st.color + '80' : '#1e2e1e'} fontSize={10}>›</text>
+                                )}
+                              </g>
+                            )
+                          })}
+                        </g>
+                      )
+                    })()}
 
                     {/* Bus rails */}
                     {(['addr', 'ctrl', 'data'] as BusType[]).map(bus => {
@@ -1693,6 +1716,54 @@ export default function CodeChipView() {
                         }
                         return null  // phase 2: CPU glowing, no moving dot
                       })
+                    })()}
+
+                    {/* .text segment — where method code actually lives */}
+                    {(() => {
+                      const methods = chain.map((c, i) => ({
+                        label: `${c.callee}.${c.method}`,
+                        addr: `0x${(0x401100 + i * 0x28).toString(16).padStart(6,'0')}`,
+                        idx: i,
+                      }))
+                      const mW = Math.min(160, Math.max(80, (svgW - 56) / Math.max(1, methods.length)))
+                      const isJumping = phase === 3 && activeToIdx >= 0
+
+                      return (
+                        <g>
+                          {/* .text label */}
+                          <text x={6} y={textSegY + 17} fill="#2a3a2a" fontSize={7} fontFamily="monospace" fontWeight="bold">.text</text>
+                          <line x1={36} y1={textSegY + 10} x2={svgW - 4} y2={textSegY + 10}
+                            stroke="#1a2a1a" strokeWidth={0.5} />
+                          {methods.map((m) => {
+                            const mx = 40 + m.idx * mW
+                            const isActive = m.idx === activeToIdx
+                            const jumpProgress = isActive && isJumping ? (animProgress - P2) / (1 - P2) : 0
+                            return (
+                              <g key={m.idx}>
+                                {/* Jump arrow from bus DATA rail → .text box */}
+                                {isActive && jumpProgress > 0.4 && (
+                                  <line
+                                    x1={mx + mW / 2} y1={busBaseY + busOffs.data}
+                                    x2={mx + mW / 2} y2={textSegY + 2}
+                                    stroke="#56d364" strokeWidth={1.2}
+                                    strokeDasharray="3 2"
+                                    opacity={Math.min(1, (jumpProgress - 0.4) * 2.5)} />
+                                )}
+                                <rect x={mx} y={textSegY} width={mW - 6} height={22} rx={3}
+                                  fill={isActive ? '#56d36420' : '#0d170d'}
+                                  stroke={isActive ? '#56d364' : '#1a2a1a'}
+                                  strokeWidth={isActive ? 1.5 : 0.7} />
+                                <text x={mx + 4} y={textSegY + 9} fill={isActive ? '#56d36499' : '#233323'}
+                                  fontSize={5.5} fontFamily="monospace">{m.addr}</text>
+                                <text x={mx + 4} y={textSegY + 18} fill={isActive ? '#a5d6ff' : '#1e3a1e'}
+                                  fontSize={6.5} fontFamily="monospace" fontWeight={isActive ? 'bold' : 'normal'}>
+                                  {m.label.slice(0, Math.floor((mW - 8) / 5))}
+                                </text>
+                              </g>
+                            )
+                          })}
+                        </g>
+                      )
                     })()}
                   </g>
                 )
