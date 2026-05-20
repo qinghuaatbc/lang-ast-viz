@@ -225,7 +225,7 @@ func parseGo(code string) ChipParseResult {
 	}
 	tree := goFileToGenAST(fset, f)
 	deduped := deduplicateCalls(calls)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "go"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped, chips), Lang: "go"}
 }
 
 /* ── Go AST → GenASTNode tree ───────────────────────────────── */
@@ -523,7 +523,7 @@ func parsePython(code string) ChipParseResult {
 
 	deduped := deduplicateCalls(calls)
 	tree := chipsToAST("python", chips, deduped)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "python"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped, chips), Lang: "python"}
 }
 
 /* ── Java ───────────────────────────────────────────────────── */
@@ -593,7 +593,7 @@ func parseJava(code string) ChipParseResult {
 
 	deduped := deduplicateCalls(calls)
 	tree := chipsToAST("java", chips, deduped)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "java"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped, chips), Lang: "java"}
 }
 
 /* ── C++ ────────────────────────────────────────────────────── */
@@ -658,7 +658,7 @@ func parseCpp(code string) ChipParseResult {
 
 	deduped := deduplicateCalls(calls)
 	tree := chipsToAST("cpp", chips, deduped)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "cpp"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped, chips), Lang: "cpp"}
 }
 
 /* ── TypeScript ─────────────────────────────────────────────── */
@@ -734,7 +734,7 @@ func parseTypeScript(code string) ChipParseResult {
 
 	deduped := deduplicateCalls(calls)
 	tree := chipsToAST("typescript", chips, deduped)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "typescript"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped, chips), Lang: "typescript"}
 }
 
 /* ── Auto-detect language ───────────────────────────────────── */
@@ -802,14 +802,61 @@ func chipsToAST(lang string, chips []ChipInfo, calls []CallEdge) GenASTNode {
 // Simulates the AMD64 System V calling convention for the call chain.
 // Produces educational (not exact) assembly with full register+stack state.
 
-func generateAsm(calls []CallEdge) []AsmInstr {
+func generateAsm(calls []CallEdge, chips []ChipInfo) []AsmInstr {
 	if len(calls) == 0 {
 		return nil
 	}
 	const (
-		stackBase = uint64(0x7fff_0000_0060) // initial RSP
-		codeBase  = uint64(0x0040_1000)      // .text segment start
+		stackBase = uint64(0x7fff_0000_0060) // initial RSP (stack grows down)
+		codeBase  = uint64(0x0040_1000)      // .text segment
+		heapBase  = uint64(0x0060_8000)      // heap: one contiguous block per object
 	)
+
+	// Build chip field lookup
+	chipMap := map[string]ChipInfo{}
+	for _, c := range chips {
+		chipMap[c.Name] = c
+	}
+
+	// Collect unique object names in call order
+	seenN := map[string]bool{}
+	var names []string
+	for _, c := range calls {
+		for _, nm := range []string{c.From, c.To} {
+			if !seenN[nm] {
+				seenN[nm] = true
+				names = append(names, nm)
+			}
+		}
+	}
+
+	// ── Heap layout: contiguous block per object ──────────────────
+	// Each block: [vtable ptr][field0][field1]... aligned to 64-byte cache line
+	type heapBlock struct {
+		base   uint64
+		nSlot  uint64   // actual slots to display (vtable + fields)
+		fields []string // field names (already stripped of type suffix)
+	}
+	objBlocks := map[string]heapBlock{}
+	heapOff := uint64(0)
+	for _, nm := range names {
+		ci := chipMap[nm]
+		fieldNames := make([]string, 0, len(ci.Fields))
+		for _, f := range ci.Fields {
+			name := f
+			if idx := strings.Index(f, ":"); idx >= 0 {
+				name = f[:idx]
+			}
+			fieldNames = append(fieldNames, name)
+		}
+		if len(fieldNames) == 0 {
+			fieldNames = []string{"data"} // at least one data slot
+		}
+		nSlot := uint64(1 + len(fieldNames)) // vtable + fields
+		sz := (nSlot*8 + 63) &^ 63           // round up to 64B cache line
+		objBlocks[nm] = heapBlock{base: heapBase + heapOff, nSlot: nSlot, fields: fieldNames}
+		heapOff += sz
+	}
 
 	rsp, rbp := stackBase, stackBase
 	codeOff := uint64(0)
@@ -825,28 +872,62 @@ func generateAsm(calls []CallEdge) []AsmInstr {
 	type slot struct{ v, l string }
 	stack := map[uint64]slot{stackBase: {"<caller_ret>", "return addr"}}
 
+	// Heap memory: addr → slot (pre-populated with zero values + field labels)
+	heap := map[uint64]slot{}
+	for _, nm := range names {
+		blk := objBlocks[nm]
+		heap[blk.base] = slot{"0x0000000000000000", nm + ".vtable"}
+		for i, fname := range blk.fields {
+			heap[blk.base+uint64(i+1)*8] = slot{"0x0000000000000000", nm + "." + fname}
+		}
+	}
+
+	nameOff := map[string]uint64{} // positive offset below RBP (stack ptr slots)
+	for i, nm := range names {
+		nameOff[nm] = uint64(i+1) * 8
+	}
+
 	var instrs []AsmInstr
 
 	snapR := func() map[string]string {
 		r := make(map[string]string, len(regs))
-		for k, v := range regs { r[k] = v }
+		for k, v := range regs {
+			r[k] = v
+		}
 		return r
 	}
+
+	// snapM: stack frame (RSP..stackBase) then heap object blocks
 	snapM := func() []AsmMemSlot {
-		out := make([]AsmMemSlot, 0, 10)
-		for i := uint64(0); i < 10; i++ {
-			addr := rsp + i*8
+		out := make([]AsmMemSlot, 0, 32)
+		for addr := rsp; addr <= stackBase; addr += 8 {
 			s := stack[addr]
 			v := s.v
-			if v == "" { v = "—" }
+			if v == "" {
+				v = "—"
+			}
 			out = append(out, AsmMemSlot{Addr: fmt.Sprintf("0x%016x", addr), Value: v, Label: s.l})
+		}
+		for _, nm := range names {
+			blk := objBlocks[nm]
+			for i := uint64(0); i < blk.nSlot; i++ {
+				addr := blk.base + i*8
+				s := heap[addr]
+				v := s.v
+				if v == "" {
+					v = "—"
+				}
+				out = append(out, AsmMemSlot{Addr: fmt.Sprintf("0x%016x", addr), Value: v, Label: s.l})
+			}
 		}
 		return out
 	}
+
 	emit := func(bytesHex, mnem, ops, comment string, isCall, isRet bool) {
 		nb := uint64(len(strings.Fields(bytesHex)))
 		instr := AsmInstr{
-			Addr: fmt.Sprintf("0x%08x", codeBase+codeOff), Bytes: bytesHex,
+			Addr:     fmt.Sprintf("0x%08x", codeBase+codeOff),
+			Bytes:    bytesHex,
 			Mnemonic: mnem, Operands: ops, Comment: comment,
 			IsCall: isCall, IsRet: isRet,
 		}
@@ -858,107 +939,123 @@ func generateAsm(calls []CallEdge) []AsmInstr {
 	}
 
 	// ── Prologue ─────────────────────────────────────────────────
-	rsp -= 8; stack[rsp] = slot{regs["RBP"], "saved RBP"}
+	rsp -= 8
+	stack[rsp] = slot{regs["RBP"], "saved RBP"}
 	regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
 	emit("55", "PUSH", "RBP", "; save caller frame pointer", false, false)
 
-	rbp = rsp; regs["RBP"] = fmt.Sprintf("0x%016x", rbp)
+	rbp = rsp
+	regs["RBP"] = fmt.Sprintf("0x%016x", rbp)
 	emit("48 89 E5", "MOV", "RBP, RSP", "; establish stack frame", false, false)
 
-	// Collect unique names for local variable slots
-	seenN := map[string]bool{}
-	var names []string
-	for _, c := range calls {
-		for _, nm := range []string{c.From, c.To} {
-			if !seenN[nm] { seenN[nm] = true; names = append(names, nm) }
-		}
-	}
-	nameOff := map[string]uint64{} // positive offset below RBP
-	for i, nm := range names { nameOff[nm] = uint64(i+1) * 8 }
-
 	frameBytes := ((uint64(len(names))*8 + 15) &^ 15)
-	rsp -= frameBytes; regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+	rsp -= frameBytes
+	regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
 	for _, nm := range names {
-		stack[rbp-nameOff[nm]] = slot{"nil", nm}
+		stack[rbp-nameOff[nm]] = slot{"nil", nm + "*"}
 	}
 	emit(fmt.Sprintf("48 83 EC %02X", frameBytes), "SUB",
 		fmt.Sprintf("RSP, 0x%X", frameBytes),
-		fmt.Sprintf("; alloc %d bytes for locals", frameBytes), false, false)
+		fmt.Sprintf("; reserve %d bytes for %d object pointers", frameBytes, len(names)), false, false)
 
-	// ── Initialize locals ─────────────────────────────────────────
-	for _, nm := range names {
+	// ── Initialize locals: point stack slots at heap blocks ───────
+	for i, nm := range names {
 		off := nameOff[nm]
-		ptrVal := fmt.Sprintf("*%s{}", nm)
-		regs["RAX"] = ptrVal
-		stack[rbp-off] = slot{ptrVal, nm}
+		blk := objBlocks[nm]
+		addrStr := fmt.Sprintf("0x%016x", blk.base)
+		regs["RAX"] = addrStr
+		// vtable pointer = fake symbol in .rodata
+		heap[blk.base] = slot{fmt.Sprintf("0x%08x", codeBase+0x2000+uint64(i)*0x10), nm + ".vtable"}
+		stack[rbp-off] = slot{addrStr, nm + "*"}
 		emit("48 8D 05 00 00 00 00", "LEA",
 			fmt.Sprintf("RAX, [rip+%s]", nm),
-			fmt.Sprintf("; &%s{}", nm), false, false)
+			fmt.Sprintf("; RAX = &%s (heap 0x%x)", nm, blk.base), false, false)
 		disp := byte(0x100 - off)
 		emit(fmt.Sprintf("48 89 45 %02X", disp), "MOV",
 			fmt.Sprintf("[RBP-0x%X], RAX", off),
-			fmt.Sprintf("; %s%s := new(%s)", strings.ToLower(nm[:1]), nm[1:], nm), false, false)
+			fmt.Sprintf("; %s* → 0x%016x (contiguous %d-byte block)", nm, blk.base, blk.nSlot*8), false, false)
 	}
 
 	// ── Call sequence ─────────────────────────────────────────────
 	argRegs := [6]string{"RDI", "RSI", "RDX", "RCX", "R8", "R9"}
 	for _, call := range calls {
 		off, ok := nameOff[call.To]
-		if !ok { continue }
+		if !ok {
+			continue
+		}
+		blk := objBlocks[call.To]
 
-		// Load receiver into RDI
-		regs["RDI"] = fmt.Sprintf("*%s{}", call.To)
+		// Load receiver pointer (heap base addr) into RDI
+		regs["RDI"] = fmt.Sprintf("0x%016x", blk.base)
 		disp := byte(0x100 - off)
 		emit(fmt.Sprintf("48 8B 7D %02X", disp), "MOV",
 			fmt.Sprintf("RDI, [RBP-0x%X]", off),
-			fmt.Sprintf("; receiver = %s%s", strings.ToLower(call.To[:1]), call.To[1:]), false, false)
+			fmt.Sprintf("; RDI = %s* (0x%x)", call.To, blk.base), false, false)
 
 		// Load params into arg registers
 		params := strings.Split(call.Params, ",")
 		for j, param := range params {
 			param = strings.TrimSpace(param)
-			if param == "" || j+1 >= len(argRegs) { break }
+			if param == "" || j+1 >= len(argRegs) {
+				break
+			}
 			kv := strings.SplitN(param, "=", 2)
-			name, val := strings.TrimSpace(kv[0]), ""
-			if len(kv) > 1 { val = strings.TrimSpace(kv[1]) }
+			pname, val := strings.TrimSpace(kv[0]), ""
+			if len(kv) > 1 {
+				val = strings.TrimSpace(kv[1])
+			}
 			reg := argRegs[j+1]
 			regs[reg] = fmt.Sprintf("%q", val)
-			// LEA for string/pointer args
-			leaBytes := [7]string{"48 8D 35", "48 8D 15", "48 8D 0D", "48 8D 05", "4C 8D 05"}
-			lb := leaBytes[j]
-			emit(fmt.Sprintf("%s 00 00 00 00", lb), "LEA",
+			leaOps := [5]string{"48 8D 35", "48 8D 15", "48 8D 0D", "48 8D 05", "4C 8D 05"}
+			emit(fmt.Sprintf("%s 00 00 00 00", leaOps[j%5]), "LEA",
 				fmt.Sprintf("%s, [rip+.str]", reg),
-				fmt.Sprintf("; %s = %q", name, val), false, false)
+				fmt.Sprintf("; %s = %q", pname, val), false, false)
 		}
 
-		// CALL — push return addr
+		// CALL — push return address, simulate callee mutating first field
 		retLabel := fmt.Sprintf("0x%08x", codeBase+codeOff+5)
-		rsp -= 8; stack[rsp] = slot{retLabel, "ret addr"}
+		rsp -= 8
+		stack[rsp] = slot{retLabel, "ret addr"}
 		regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
 		if call.Ret != "" && call.Ret != "void" {
 			regs["RAX"] = fmt.Sprintf("<ret: %s>", call.Ret)
 		} else {
 			regs["RAX"] = "0x0000000000000000"
 		}
+		// Simulate method write: mark first data field as modified
+		if len(blk.fields) > 0 {
+			fieldAddr := blk.base + 8
+			heap[fieldAddr] = slot{
+				fmt.Sprintf("<after .%s()>", call.Method),
+				objBlocks[call.To].fields[0] + " (modified)",
+			}
+		}
 		emit("E8 00 00 00 00", "CALL",
 			fmt.Sprintf("%s.%s", call.To, call.Method),
-			fmt.Sprintf("; %s → %s.%s(%s)", call.From, call.To, call.Method, call.Ret),
+			fmt.Sprintf("; %s → %s.%s(%s) : heap[0x%x]", call.From, call.To, call.Method, call.Ret, blk.base),
 			true, false)
-		// Simulate return (callee cleans up its own frame)
-		delete(stack, rsp); rsp += 8
+		delete(stack, rsp)
+		rsp += 8
 		regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
-		for _, r := range argRegs[1:4] { regs[r] = "0x0000000000000000" }
+		for _, r := range argRegs[1:4] {
+			regs[r] = "0x0000000000000000"
+		}
 	}
 
 	// ── Epilogue ──────────────────────────────────────────────────
-	for _, nm := range names { delete(stack, rbp-nameOff[nm]) }
-	rsp += frameBytes; regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+	for _, nm := range names {
+		delete(stack, rbp-nameOff[nm])
+	}
+	rsp += frameBytes
+	regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
 	emit(fmt.Sprintf("48 83 C4 %02X", frameBytes), "ADD",
-		fmt.Sprintf("RSP, 0x%X", frameBytes), "; free local variables", false, false)
+		fmt.Sprintf("RSP, 0x%X", frameBytes), "; release object pointer slots", false, false)
 
 	savedRBP := stack[rsp]
-	delete(stack, rsp); rsp += 8
-	regs["RBP"] = savedRBP.v; regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+	delete(stack, rsp)
+	rsp += 8
+	regs["RBP"] = savedRBP.v
+	regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
 	emit("5D", "POP", "RBP", "; restore caller frame pointer", false, false)
 
 	regs["RIP"] = "<caller>"

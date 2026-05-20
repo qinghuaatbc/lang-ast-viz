@@ -198,30 +198,45 @@ export default function AsmViewer({ asm, lang }: Props) {
             })}
           </div>
 
-          {/* Stack memory */}
+          {/* Memory: stack frame + heap object blocks */}
           <div style={{ flex: 1, overflow: 'auto', padding: '6px 8px' }}>
             <div style={{ fontSize: 9, fontWeight: 700, color: 'var(--text-secondary)', marginBottom: 5, letterSpacing: '0.5px' }}>
-              {isZh ? '📦 栈内存' : '📦 STACK'}
+              {isZh ? '📦 内存布局' : '📦 MEMORY'}
             </div>
-            {(cur.mem || []).map((slot, i) => {
+            {(cur.mem || []).map((slot, i, arr) => {
               const isRSP = slot.addr === cur.regs?.RSP
               const isRBP = slot.addr === cur.regs?.RBP
+              // heap slots start at 0x0060..., stack at 0x7fff...
+              const isHeap = slot.addr.startsWith('0x0060')
+              const prevIsStack = i > 0 && !arr[i-1].addr.startsWith('0x0060')
+              const showDivider = isHeap && prevIsStack
               return (
-                <div key={i} style={{
-                  padding: '2px 5px', borderRadius: 3, marginBottom: 2,
-                  background: isRSP ? '#79c0ff14' : isRBP ? '#f0883e14' : 'transparent',
-                  border: isRSP ? '1px solid #79c0ff40' : isRBP ? '1px solid #f0883e40' : '1px solid transparent',
-                }}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <code style={{ fontSize: 8, color: isRSP ? '#79c0ff' : isRBP ? '#f0883e' : '#484f58' }}>
-                      {isRSP ? '▶ ' : isRBP ? '● ' : '  '}{slot.addr.slice(-10)}
+                <div key={i}>
+                  {showDivider && (
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 4, margin: '5px 0 4px' }}>
+                      <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                      <span style={{ fontSize: 7, color: '#56d364', fontWeight: 700, letterSpacing: '0.5px' }}>
+                        {isZh ? 'HEAP (对象连续块)' : 'HEAP (contiguous objects)'}
+                      </span>
+                      <div style={{ flex: 1, height: 1, background: 'var(--border)' }} />
+                    </div>
+                  )}
+                  <div style={{
+                    padding: '2px 5px', borderRadius: 3, marginBottom: 2,
+                    background: isRSP ? '#79c0ff14' : isRBP ? '#f0883e14' : isHeap ? '#56d36408' : 'transparent',
+                    border: isRSP ? '1px solid #79c0ff40' : isRBP ? '1px solid #f0883e40' : isHeap ? '1px solid #56d36420' : '1px solid transparent',
+                  }}>
+                    <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                      <code style={{ fontSize: 8, color: isRSP ? '#79c0ff' : isRBP ? '#f0883e' : isHeap ? '#56d364' : '#484f58' }}>
+                        {isRSP ? '▶ ' : isRBP ? '● ' : '  '}{slot.addr.slice(-10)}
+                      </code>
+                      {slot.label && <span style={{ fontSize: 7, color: isHeap ? '#56d36499' : 'var(--text-muted)', fontStyle: 'italic' }}>{slot.label}</span>}
+                    </div>
+                    <code style={{ fontSize: 8, color: 'var(--text-secondary)', paddingLeft: 12, display: 'block',
+                      overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 196 }}>
+                      {slot.value}
                     </code>
-                    {slot.label && <span style={{ fontSize: 7, color: 'var(--text-muted)', fontStyle: 'italic' }}>{slot.label}</span>}
                   </div>
-                  <code style={{ fontSize: 8, color: 'var(--text-secondary)', paddingLeft: 12, display: 'block',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 196 }}>
-                    {slot.value}
-                  </code>
                 </div>
               )
             })}
