@@ -6,10 +6,23 @@ export interface GenASTNode {
   children?: GenASTNode[]
 }
 
+export interface AsmInstruction {
+  addr: string
+  bytes: string
+  mnemonic: string
+  operands: string
+  comment?: string
+  regs?: Record<string, string>
+  mem?: { addr: string; value: string; label?: string }[]
+  isCall?: boolean
+  isRet?: boolean
+}
+
 export interface ParseResult {
   chips: { name: string; methods: string[]; fields: string[] }[]
   calls: { from: string; to: string; method: string; params: string; ret: string; relation: string }[]
   ast?: GenASTNode
+  asm?: AsmInstruction[]
   lang: string
 }
 

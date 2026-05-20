@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"fmt"
 	"go/ast"
 	"go/parser"
 	"go/token"
@@ -38,10 +39,29 @@ type GenASTNode struct {
 	Children []GenASTNode `json:"children,omitempty"`
 }
 
+type AsmInstr struct {
+	Addr     string            `json:"addr"`
+	Bytes    string            `json:"bytes"`
+	Mnemonic string            `json:"mnemonic"`
+	Operands string            `json:"operands"`
+	Comment  string            `json:"comment,omitempty"`
+	Regs     map[string]string `json:"regs,omitempty"`
+	Mem      []AsmMemSlot      `json:"mem,omitempty"`
+	IsCall   bool              `json:"isCall,omitempty"`
+	IsRet    bool              `json:"isRet,omitempty"`
+}
+
+type AsmMemSlot struct {
+	Addr  string `json:"addr"`
+	Value string `json:"value"`
+	Label string `json:"label,omitempty"`
+}
+
 type ChipParseResult struct {
 	Chips []ChipInfo  `json:"chips"`
 	Calls []CallEdge  `json:"calls"`
 	AST   *GenASTNode `json:"ast,omitempty"`
+	Asm   []AsmInstr  `json:"asm,omitempty"`
 	Lang  string      `json:"lang"`
 }
 
@@ -204,7 +224,8 @@ func parseGo(code string) ChipParseResult {
 		chips = append(chips, *c)
 	}
 	tree := goFileToGenAST(fset, f)
-	return ChipParseResult{Chips: chips, Calls: deduplicateCalls(calls), AST: &tree, Lang: "go"}
+	deduped := deduplicateCalls(calls)
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "go"}
 }
 
 /* ── Go AST → GenASTNode tree ───────────────────────────────── */
@@ -502,7 +523,7 @@ func parsePython(code string) ChipParseResult {
 
 	deduped := deduplicateCalls(calls)
 	tree := chipsToAST("python", chips, deduped)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Lang: "python"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "python"}
 }
 
 /* ── Java ───────────────────────────────────────────────────── */
@@ -572,7 +593,7 @@ func parseJava(code string) ChipParseResult {
 
 	deduped := deduplicateCalls(calls)
 	tree := chipsToAST("java", chips, deduped)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Lang: "java"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "java"}
 }
 
 /* ── C++ ────────────────────────────────────────────────────── */
@@ -637,7 +658,7 @@ func parseCpp(code string) ChipParseResult {
 
 	deduped := deduplicateCalls(calls)
 	tree := chipsToAST("cpp", chips, deduped)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Lang: "cpp"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "cpp"}
 }
 
 /* ── TypeScript ─────────────────────────────────────────────── */
@@ -713,7 +734,7 @@ func parseTypeScript(code string) ChipParseResult {
 
 	deduped := deduplicateCalls(calls)
 	tree := chipsToAST("typescript", chips, deduped)
-	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Lang: "typescript"}
+	return ChipParseResult{Chips: chips, Calls: deduped, AST: &tree, Asm: generateAsm(deduped), Lang: "typescript"}
 }
 
 /* ── Auto-detect language ───────────────────────────────────── */
@@ -776,6 +797,174 @@ func chipsToAST(lang string, chips []ChipInfo, calls []CallEdge) GenASTNode {
 }
 
 /* ── Helpers ────────────────────────────────────────────────── */
+
+/* ── x86-64 Assembly Generator ──────────────────────────────── */
+// Simulates the AMD64 System V calling convention for the call chain.
+// Produces educational (not exact) assembly with full register+stack state.
+
+func generateAsm(calls []CallEdge) []AsmInstr {
+	if len(calls) == 0 {
+		return nil
+	}
+	const (
+		stackBase = uint64(0x7fff_0000_0060) // initial RSP
+		codeBase  = uint64(0x0040_1000)      // .text segment start
+	)
+
+	rsp, rbp := stackBase, stackBase
+	codeOff := uint64(0)
+
+	regs := map[string]string{
+		"RAX": "0x0000000000000000", "RBX": "0x0000000000000000",
+		"RCX": "0x0000000000000000", "RDX": "0x0000000000000000",
+		"RSI": "0x0000000000000000", "RDI": "0x0000000000000000",
+		"RSP": fmt.Sprintf("0x%016x", rsp), "RBP": fmt.Sprintf("0x%016x", rbp),
+		"RIP": fmt.Sprintf("0x%08x", codeBase), "FLAGS": "ZF=0 SF=0 CF=0",
+	}
+
+	type slot struct{ v, l string }
+	stack := map[uint64]slot{stackBase: {"<caller_ret>", "return addr"}}
+
+	var instrs []AsmInstr
+
+	snapR := func() map[string]string {
+		r := make(map[string]string, len(regs))
+		for k, v := range regs { r[k] = v }
+		return r
+	}
+	snapM := func() []AsmMemSlot {
+		out := make([]AsmMemSlot, 0, 10)
+		for i := uint64(0); i < 10; i++ {
+			addr := rsp + i*8
+			s := stack[addr]
+			v := s.v
+			if v == "" { v = "—" }
+			out = append(out, AsmMemSlot{Addr: fmt.Sprintf("0x%016x", addr), Value: v, Label: s.l})
+		}
+		return out
+	}
+	emit := func(bytesHex, mnem, ops, comment string, isCall, isRet bool) {
+		nb := uint64(len(strings.Fields(bytesHex)))
+		instr := AsmInstr{
+			Addr: fmt.Sprintf("0x%08x", codeBase+codeOff), Bytes: bytesHex,
+			Mnemonic: mnem, Operands: ops, Comment: comment,
+			IsCall: isCall, IsRet: isRet,
+		}
+		codeOff += nb
+		regs["RIP"] = fmt.Sprintf("0x%08x", codeBase+codeOff)
+		instr.Regs = snapR()
+		instr.Mem = snapM()
+		instrs = append(instrs, instr)
+	}
+
+	// ── Prologue ─────────────────────────────────────────────────
+	rsp -= 8; stack[rsp] = slot{regs["RBP"], "saved RBP"}
+	regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+	emit("55", "PUSH", "RBP", "; save caller frame pointer", false, false)
+
+	rbp = rsp; regs["RBP"] = fmt.Sprintf("0x%016x", rbp)
+	emit("48 89 E5", "MOV", "RBP, RSP", "; establish stack frame", false, false)
+
+	// Collect unique names for local variable slots
+	seenN := map[string]bool{}
+	var names []string
+	for _, c := range calls {
+		for _, nm := range []string{c.From, c.To} {
+			if !seenN[nm] { seenN[nm] = true; names = append(names, nm) }
+		}
+	}
+	nameOff := map[string]uint64{} // positive offset below RBP
+	for i, nm := range names { nameOff[nm] = uint64(i+1) * 8 }
+
+	frameBytes := ((uint64(len(names))*8 + 15) &^ 15)
+	rsp -= frameBytes; regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+	for _, nm := range names {
+		stack[rbp-nameOff[nm]] = slot{"nil", nm}
+	}
+	emit(fmt.Sprintf("48 83 EC %02X", frameBytes), "SUB",
+		fmt.Sprintf("RSP, 0x%X", frameBytes),
+		fmt.Sprintf("; alloc %d bytes for locals", frameBytes), false, false)
+
+	// ── Initialize locals ─────────────────────────────────────────
+	for _, nm := range names {
+		off := nameOff[nm]
+		ptrVal := fmt.Sprintf("*%s{}", nm)
+		regs["RAX"] = ptrVal
+		stack[rbp-off] = slot{ptrVal, nm}
+		emit("48 8D 05 00 00 00 00", "LEA",
+			fmt.Sprintf("RAX, [rip+%s]", nm),
+			fmt.Sprintf("; &%s{}", nm), false, false)
+		disp := byte(0x100 - off)
+		emit(fmt.Sprintf("48 89 45 %02X", disp), "MOV",
+			fmt.Sprintf("[RBP-0x%X], RAX", off),
+			fmt.Sprintf("; %s%s := new(%s)", strings.ToLower(nm[:1]), nm[1:], nm), false, false)
+	}
+
+	// ── Call sequence ─────────────────────────────────────────────
+	argRegs := [6]string{"RDI", "RSI", "RDX", "RCX", "R8", "R9"}
+	for _, call := range calls {
+		off, ok := nameOff[call.To]
+		if !ok { continue }
+
+		// Load receiver into RDI
+		regs["RDI"] = fmt.Sprintf("*%s{}", call.To)
+		disp := byte(0x100 - off)
+		emit(fmt.Sprintf("48 8B 7D %02X", disp), "MOV",
+			fmt.Sprintf("RDI, [RBP-0x%X]", off),
+			fmt.Sprintf("; receiver = %s%s", strings.ToLower(call.To[:1]), call.To[1:]), false, false)
+
+		// Load params into arg registers
+		params := strings.Split(call.Params, ",")
+		for j, param := range params {
+			param = strings.TrimSpace(param)
+			if param == "" || j+1 >= len(argRegs) { break }
+			kv := strings.SplitN(param, "=", 2)
+			name, val := strings.TrimSpace(kv[0]), ""
+			if len(kv) > 1 { val = strings.TrimSpace(kv[1]) }
+			reg := argRegs[j+1]
+			regs[reg] = fmt.Sprintf("%q", val)
+			// LEA for string/pointer args
+			leaBytes := [7]string{"48 8D 35", "48 8D 15", "48 8D 0D", "48 8D 05", "4C 8D 05"}
+			lb := leaBytes[j]
+			emit(fmt.Sprintf("%s 00 00 00 00", lb), "LEA",
+				fmt.Sprintf("%s, [rip+.str]", reg),
+				fmt.Sprintf("; %s = %q", name, val), false, false)
+		}
+
+		// CALL — push return addr
+		retLabel := fmt.Sprintf("0x%08x", codeBase+codeOff+5)
+		rsp -= 8; stack[rsp] = slot{retLabel, "ret addr"}
+		regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+		if call.Ret != "" && call.Ret != "void" {
+			regs["RAX"] = fmt.Sprintf("<ret: %s>", call.Ret)
+		} else {
+			regs["RAX"] = "0x0000000000000000"
+		}
+		emit("E8 00 00 00 00", "CALL",
+			fmt.Sprintf("%s.%s", call.To, call.Method),
+			fmt.Sprintf("; %s → %s.%s(%s)", call.From, call.To, call.Method, call.Ret),
+			true, false)
+		// Simulate return (callee cleans up its own frame)
+		delete(stack, rsp); rsp += 8
+		regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+		for _, r := range argRegs[1:4] { regs[r] = "0x0000000000000000" }
+	}
+
+	// ── Epilogue ──────────────────────────────────────────────────
+	for _, nm := range names { delete(stack, rbp-nameOff[nm]) }
+	rsp += frameBytes; regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+	emit(fmt.Sprintf("48 83 C4 %02X", frameBytes), "ADD",
+		fmt.Sprintf("RSP, 0x%X", frameBytes), "; free local variables", false, false)
+
+	savedRBP := stack[rsp]
+	delete(stack, rsp); rsp += 8
+	regs["RBP"] = savedRBP.v; regs["RSP"] = fmt.Sprintf("0x%016x", rsp)
+	emit("5D", "POP", "RBP", "; restore caller frame pointer", false, false)
+
+	regs["RIP"] = "<caller>"
+	emit("C3", "RET", "", "; return to caller", false, true)
+	return instrs
+}
 
 func deduplicateCalls(calls []CallEdge) []CallEdge {
 	seen := map[string]bool{}

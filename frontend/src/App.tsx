@@ -7,6 +7,7 @@ import CodeEditor from './components/CodeEditor'
 import ErrorBoundary from './components/ErrorBoundary'
 import ASTViewer from './components/ASTViewer'
 import IRViewer from './components/IRViewer'
+import AsmViewer from './components/ASMViewer'
 import { searchEntries, TAB_LABELS, type TopMode as SearchTopMode } from './searchIndex'
 
 const DataStructuresView = lazy(() => import('./components/DataStructuresView'))
@@ -158,7 +159,7 @@ function AppInner() {
     return ex && ex.length > 0 ? ex[0].code : examplesByLang.go[0].code
   })
   const [state, dispatch] = useReducer(parseReducer, { result: null, loading: false, error: '' })
-  const [activeTab, setActiveTab] = useState<'ast' | 'ir'>('ast')
+  const [activeTab, setActiveTab] = useState<'ast' | 'ir' | 'asm'>('ast')
   const [language, setLanguage] = useState(() => localStorage.getItem('lav-lang') || 'go')
   const [showHelp, setShowHelp] = useState(false)
   const [autoRun, setAutoRun] = useState(false)
@@ -378,6 +379,7 @@ function AppInner() {
             <div className="tab-bar">
               <button className={`tab ${activeTab === 'ast' ? 'active' : ''}`} onClick={() => setActiveTab('ast')}>{t('ast.tree')}</button>
               <button className={`tab ${activeTab === 'ir' ? 'active' : ''}`} onClick={() => setActiveTab('ir')}>{isZh ? '调用图' : 'Call Graph'}</button>
+              <button className={`tab ${activeTab === 'asm' ? 'active' : ''}`} onClick={() => setActiveTab('asm')}>{isZh ? '汇编' : 'Assembly'}</button>
             </div>
 
             {state.loading && (
@@ -391,6 +393,7 @@ function AppInner() {
             <div className="tab-content">
               <ErrorBoundary>{activeTab === 'ast' && <ASTViewer ast={state.result?.ast} lang={state.result?.lang} />}</ErrorBoundary>
               <ErrorBoundary>{activeTab === 'ir' && <IRViewer calls={state.result?.calls} chips={state.result?.chips} lang={state.result?.lang} />}</ErrorBoundary>
+              <ErrorBoundary>{activeTab === 'asm' && <AsmViewer asm={state.result?.asm} lang={state.result?.lang} />}</ErrorBoundary>
             </div>
           </div>
         </div>
