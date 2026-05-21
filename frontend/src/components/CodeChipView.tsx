@@ -1896,6 +1896,46 @@ export default function CodeChipView() {
                 </div>
               ))}
             </div>
+
+            {/* GPU spectrum */}
+            <div style={{ marginTop:10, paddingTop:8, borderTop:'1px solid var(--border)' }}>
+              <div style={{ fontSize:9, fontWeight:700, color:'#79c0ff', marginBottom:6 }}>
+                {isZh ? '🎮 GPU 是这个理论最极端的体现' : '🎮 GPU is the most extreme manifestation of this theory'}
+              </div>
+              <div style={{ fontSize:9, color:'var(--text-secondary)', lineHeight:1.7, marginBottom:8 }}>
+                {isZh
+                  ? 'GPU 是大规模并行数字电路，几千个运算单元同时工作。CUDA 程序本质上是描述几千个数字电路同时做什么，与 FPGA 的硬件描述语言思想相同——只是 GPU 可编程，FPGA 可重构，ASIC 固定。'
+                  : 'A GPU is a massively parallel digital circuit with thousands of compute units working simultaneously. A CUDA program describes what thousands of digital circuits do in parallel — the same idea as FPGA HDL, just with different reconfigurability.'}
+              </div>
+              <table style={{ borderCollapse:'collapse', fontSize:10, fontFamily:'monospace', width:'100%' }}>
+                <thead>
+                  <tr>{[isZh?'介质':'Medium', isZh?'代表':'Example', isZh?'灵活性':'Flexibility', isZh?'速度':'Speed', isZh?'对应':'Analogy'].map(h => (
+                    <th key={h} style={{ textAlign:'left', padding:'3px 8px', borderBottom:'1px solid var(--border)', color:'var(--text-secondary)', fontWeight:600, fontSize:9 }}>{h}</th>
+                  ))}</tr>
+                </thead>
+                <tbody>
+                  {[
+                    [isZh?'软件':'Software', 'CPU',  isZh?'最高':'Highest', isZh?'最慢':'Slowest', isZh?'GDScript / Python':'GDScript / Python'],
+                    [isZh?'并行软件':'Parallel SW', 'GPU / CUDA', isZh?'高':'High', isZh?'快':'Fast', isZh?'几千个 chip 并行':'Thousands of chips in parallel'],
+                    ['FPGA', 'Xilinx / Intel', isZh?'中':'Medium', isZh?'很快':'Very fast', isZh?'可重构的数字电路':'Reconfigurable digital circuit'],
+                    ['ASIC', isZh?'矿机芯片 / TPU':'Mining chip / TPU', isZh?'最低（固定）':'Lowest (fixed)', isZh?'最快':'Fastest', isZh?'固化的软件逻辑':'Hardened software logic'],
+                  ].map(([medium, ex, flex, spd, analogy], i) => (
+                    <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                      <td style={{ padding:'3px 8px', color:'#ffa657', fontWeight:700 }}>{medium}</td>
+                      <td style={{ padding:'3px 8px', color:'#79c0ff' }}>{ex}</td>
+                      <td style={{ padding:'3px 8px', color:'#56d364' }}>{flex}</td>
+                      <td style={{ padding:'3px 8px', color:'#d2a8ff' }}>{spd}</td>
+                      <td style={{ padding:'3px 8px', color:'var(--text-secondary)' }}>{analogy}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+              <div style={{ marginTop:6, fontSize:9, color:'var(--text-muted)', fontStyle:'italic' }}>
+                {isZh
+                  ? '四者本质上是同一个计算在不同硬件介质上的实现——从最灵活到最高效的连续谱。'
+                  : 'All four are the same computation implemented on different hardware media — a continuum from most flexible to most efficient.'}
+              </div>
+            </div>
           </div>
 
           {/* Virtual vs Real Circuit */}
