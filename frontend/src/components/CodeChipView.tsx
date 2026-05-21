@@ -1819,6 +1819,63 @@ export default function CodeChipView() {
               ))}
             </tbody>
           </table>
+
+          {/* Virtual vs Real Circuit */}
+          <div style={{ marginTop:12, display:'flex', gap:12, flexWrap:'wrap' }}>
+            {/* Advantages / Limitations */}
+            <table style={{ borderCollapse:'collapse', fontSize:10, fontFamily:'monospace', flex:1, minWidth:300 }}>
+              <thead>
+                <tr><th colSpan={2} style={{ textAlign:'left', padding:'4px 10px', borderBottom:'1px solid var(--border)', color:'#56d364', fontSize:9 }}>
+                  {isZh ? '虚拟电路 vs 实际电路' : 'Virtual vs Real Circuit'}
+                </th></tr>
+                <tr>{[isZh?'虚拟（软件模拟）':'Virtual (software)', isZh?'实际电路':'Real Circuit'].map(h => (
+                  <th key={h} style={{ textAlign:'left', padding:'3px 10px', borderBottom:'1px solid var(--border)', color:'var(--text-secondary)', fontWeight:600, fontSize:9 }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {[
+                  [isZh?'✓ 可暂停/单步/回溯':'✓ Pause / step / rewind',      isZh?'✓ 真实物理行为':'✓ Real physical behavior'],
+                  [isZh?'✓ 无限复制，零成本':'✓ Copy infinitely, zero cost',  isZh?'✓ 纳秒级真并行':'✓ Nanosecond true parallel'],
+                  [isZh?'✓ 可观测内部状态':'✓ Observable internal state',    isZh?'✓ 真实电磁/热效应':'✓ Real EM / thermal effects'],
+                  [isZh?'✓ 改参数瞬间生效':'✓ Params change instantly',       isZh?'✓ 无抽象层开销':'✓ No abstraction overhead'],
+                  [isZh?'✗ 顺序执行，伪并行':'✗ Sequential, fake parallel',   isZh?'✗ 无法暂停观测':'✗ Cannot pause to observe'],
+                  [isZh?'✗ 无真实电压/电流':'✗ No real voltage / current',   isZh?'✗ 制造成本高':'✗ High manufacturing cost'],
+                  [isZh?'✗ 时序精度粗糙':'✗ Coarse timing accuracy',          isZh?'✗ 改动困难':'✗ Hard to modify'],
+                ].map(([v, r], i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                    <td style={{ padding:'3px 10px', color: v.startsWith('✓') ? '#56d364' : '#ff7b72' }}>{v}</td>
+                    <td style={{ padding:'3px 10px', color: r.startsWith('✓') ? '#56d364' : '#ff7b72' }}>{r}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+
+            {/* What can / cannot be virtualized */}
+            <table style={{ borderCollapse:'collapse', fontSize:10, fontFamily:'monospace', flex:1, minWidth:300 }}>
+              <thead>
+                <tr><th colSpan={2} style={{ textAlign:'left', padding:'4px 10px', borderBottom:'1px solid var(--border)', color:'#ffa657', fontSize:9 }}>
+                  {isZh ? '哪些可以虚拟 / 哪些不能' : 'What can / cannot be virtualized'}
+                </th></tr>
+                <tr>{[isZh?'✓ 可虚拟':'✓ Can virtualize', isZh?'✗ 难以虚拟':'✗ Hard to virtualize'].map(h => (
+                  <th key={h} style={{ textAlign:'left', padding:'3px 10px', borderBottom:'1px solid var(--border)', color:'var(--text-secondary)', fontWeight:600, fontSize:9 }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {[
+                  [isZh?'逻辑电路（AND/OR/NOT）':'Logic gates (AND/OR/NOT)',     isZh?'模拟信号（连续电压曲线）':'Analog signals (continuous)'],
+                  [isZh?'有限状态机':'Finite state machines',                      isZh?'电磁干扰 / 噪声':'EMI / noise'],
+                  [isZh?'总线协议（I2C/SPI）':'Bus protocols (I2C/SPI)',           isZh?'皮秒级时序精度':'Picosecond timing accuracy'],
+                  [isZh?'CPU 指令执行':'CPU instruction execution',                isZh?'功耗 / 热分布':'Power / thermal distribution'],
+                  [isZh?'存储器读写':'Memory read / write',                        isZh?'量子效应':'Quantum effects'],
+                ].map(([can, cant], i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                    <td style={{ padding:'3px 10px', color:'#56d364' }}>{can}</td>
+                    <td style={{ padding:'3px 10px', color:'#ff7b72' }}>{cant}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
         </div>
       )}
 
