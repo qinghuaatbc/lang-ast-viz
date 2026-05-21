@@ -1462,6 +1462,7 @@ export default function CodeChipView() {
     window.addEventListener('resize', h)
     return () => window.removeEventListener('resize', h)
   }, [])
+  const [showRef, setShowRef] = useState(false)
 
   /* URL restore */
   useEffect(() => {
@@ -1760,6 +1761,8 @@ export default function CodeChipView() {
         {!isMobile && <button onClick={shareUrl} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>🔗</button>}
         {!isMobile && <button onClick={exportSvg} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>⬇ SVG</button>}
         {!isMobile && <button id="mermaid-btn" onClick={exportMermaid} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>⬇ Mermaid</button>}
+        <button onClick={() => setShowRef(r => !r)} title={isZh ? '电路↔代码对照表' : 'Circuit ↔ Code reference'}
+          style={{ padding:'3px 8px', borderRadius:4, border:`1px solid ${showRef ? '#d2a8ff' : 'var(--border)'}`, background: showRef ? 'rgba(210,168,255,0.12)' : 'transparent', color: showRef ? '#d2a8ff' : 'var(--text-secondary)', cursor:'pointer', fontSize:12 }}>📖</button>
         <button onClick={reset} style={{ padding:'4px 10px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:11 }}>⏹</button>
         <button onClick={nextStep} style={{ padding:'4px 10px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:11 }}>⏭</button>
         <button onClick={togglePlay} style={{ padding:'4px 14px', borderRadius:4, border:'none', background:playing?'#ff7b72':'#56d364', color:'#000', cursor:'pointer', fontSize:11, fontWeight:700 }}>
@@ -1767,6 +1770,57 @@ export default function CodeChipView() {
         </button>
         <div style={{ fontSize:10, color:'var(--text-muted)' }}>{step+1}/{allSteps.length}</div>
       </div>
+
+      {/* Circuit ↔ Code Reference Table */}
+      {showRef && (
+        <div style={{ flexShrink:0, borderRadius:6, border:'1px solid #d2a8ff44', background:'var(--bg-primary)', padding:'10px 14px', overflowX:'auto' }}>
+          <div style={{ display:'flex', alignItems:'center', gap:8, marginBottom:8 }}>
+            <span style={{ fontWeight:700, fontSize:11, color:'#d2a8ff' }}>{isZh ? '📖 电路 ↔ 代码对照表' : '📖 Circuit ↔ Code Reference'}</span>
+            <button onClick={() => setShowRef(false)} style={{ marginLeft:'auto', border:'none', background:'transparent', color:'var(--text-muted)', cursor:'pointer', fontSize:14 }}>✕</button>
+          </div>
+          <table style={{ borderCollapse:'collapse', fontSize:10, fontFamily:'monospace', width:'100%', minWidth:520 }}>
+            <thead>
+              <tr>{[isZh ? '电路概念' : 'Circuit', isZh ? '代码概念' : 'Code', isZh ? '说明' : 'Notes'].map(h => (
+                <th key={h} style={{ textAlign:'left', padding:'3px 10px', borderBottom:'1px solid var(--border)', color:'var(--text-secondary)', fontWeight:600, fontSize:9 }}>{h}</th>
+              ))}</tr>
+            </thead>
+            <tbody>
+              {[
+                ['Chip 芯片',          isZh?'类 / 对象':'Class / Object',           isZh?'封装单元':'Encapsulation unit'],
+                ['引脚 Pin',           isZh?'方法 / 函数签名':'Method / Signature',   isZh?'对外接口':'External interface'],
+                ['输入引脚',           isZh?'参数':'Parameters',                      isZh?'信号输入':'Signal input'],
+                ['输出引脚',           isZh?'返回值':'Return value',                  isZh?'信号输出':'Signal output'],
+                ['寄存器 Register',    isZh?'属性 / 字段':'Property / Field',         isZh?'内部状态存储':'Internal state'],
+                ['只读寄存器',         'const / readonly',                             isZh?'值不可变':'Immutable value'],
+                ['易失性寄存器',       isZh?'共享变量（需加锁）':'Shared var (mutex)', isZh?'多线程可见':'Thread-visible'],
+                ['芯片内部电路',       isZh?'函数体（实现逻辑）':'Function body',     isZh?'黑盒内部':'Black box internals'],
+                ['导线 Wire',          isZh?'函数调用 / 引用传递':'Call / Reference',  isZh?'连接两个 chip':'Connects chips'],
+                ['总线 Bus',           isZh?'参数传递通道':'Param channel',           isZh?'多信号共享通路':'Shared signal path'],
+                ['地址总线',           isZh?'方法地址 / 函数指针':'Function pointer',  isZh?'定位引脚':'Locate pin'],
+                ['数据总线',           isZh?'参数值 / 返回值':'Args / Return',         isZh?'传输的数据':'Data in transit'],
+                ['控制总线',           'CALL / RET / NEW',                             isZh?'操作类型信号':'Operation type'],
+                ['电路板 PCB',         isZh?'模块 / 包':'Module / Package',           isZh?'chip 的容器':'Chip container'],
+                ['芯片组合',           isZh?'组合 compose':'Composition',              isZh?'chip 包含 chip':'Chip contains chip'],
+                ['芯片级联',           isZh?'继承 inherit':'Inheritance',              isZh?'子 chip 扩展父':'Child extends parent'],
+                ['插槽 / 接口规范',    isZh?'接口 Interface':'Interface',              isZh?'规定引脚布局':'Pin layout contract'],
+                ['电源 VCC',           isZh?'运行时 / 堆内存':'Runtime / Heap',        isZh?'chip 存活基础':'Chip alive condition'],
+                ['接地 GND',           isZh?'析构 / GC 回收':'Destructor / GC',       isZh?'生命周期结束':'End of lifetime'],
+                ['时钟信号 CLK',       isZh?'事件循环 / 调度器':'Event loop',          isZh?'驱动执行节拍':'Drives execution'],
+                ['中断 IRQ',           isZh?'异步事件 / Signal':'Async event',         isZh?'打断正常执行流':'Interrupts flow'],
+                ['DMA',                isZh?'零拷贝 / 内存映射':'Zero-copy / mmap',    isZh?'绕过 CPU 直传':'Bypass CPU'],
+                ['短路',               isZh?'死锁 / 无限递归':'Deadlock / Recursion',  isZh?'电流/调用无法流通':'Flow blocked'],
+                ['信号噪声',           isZh?'并发竞态条件':'Race condition',            isZh?'数据被意外干扰':'Data corrupted'],
+              ].map(([circuit, code, note], i) => (
+                <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                  <td style={{ padding:'3px 10px', color:'#ffa657', whiteSpace:'nowrap' }}>{circuit}</td>
+                  <td style={{ padding:'3px 10px', color:'#79c0ff', whiteSpace:'nowrap' }}>{code}</td>
+                  <td style={{ padding:'3px 10px', color:'var(--text-secondary)' }}>{note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
 
       <div style={{ flex:1, display:'flex', flexDirection: isMobile ? 'column' : 'row', gap:8, minHeight:0 }}>
         {/* Left: Code / Config Panel */}
