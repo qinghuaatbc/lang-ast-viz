@@ -1853,6 +1853,51 @@ export default function CodeChipView() {
             </table>
           </div>
 
+          {/* Software = Virtual Digital Circuit Theory */}
+          <div style={{ marginTop:12, padding:'8px 12px', borderRadius:6, border:'1px solid #56d36433', background:'rgba(86,211,100,0.04)' }}>
+            <div style={{ fontSize:9, fontWeight:700, color:'#56d364', marginBottom:6 }}>
+              {isZh ? '💡 核心理论：软件 = 运行在通用数字电路上的虚拟专用数字电路' : '💡 Core Theory: Software = Virtual Dedicated Digital Circuit running on a General-Purpose Digital Circuit'}
+            </div>
+            <div style={{ fontSize:9, color:'var(--text-secondary)', lineHeight:1.7, marginBottom:8 }}>
+              {isZh
+                ? '服务器、应用程序本质上就是数字逻辑电路——所有数据是 0/1，所有操作离散，状态转换确定，时钟驱动。软件与硬件数字电路的唯一区别是实现介质，计算能力完全等价。'
+                : 'Servers and applications are fundamentally digital logic circuits — all data is 0/1, all operations are discrete, state transitions are deterministic, clock-driven. The only difference between software and hardware digital circuits is the implementation medium; their computational power is fully equivalent.'}
+            </div>
+            <table style={{ borderCollapse:'collapse', fontSize:10, fontFamily:'monospace', width:'100%' }}>
+              <thead>
+                <tr>{[isZh?'硬件数字电路':'Hardware Digital Circuit', isZh?'服务器软件':'Server Software'].map(h => (
+                  <th key={h} style={{ textAlign:'left', padding:'3px 10px', borderBottom:'1px solid var(--border)', color:'var(--text-secondary)', fontWeight:600, fontSize:9 }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {[
+                  [isZh?'逻辑门（晶体管）':'Logic gates (transistors)',     isZh?'CPU 指令':'CPU instructions'],
+                  [isZh?'触发器 / 寄存器':'Flip-flops / Registers',         isZh?'内存 / 变量':'Memory / Variables'],
+                  [isZh?'物理晶振时钟':'Physical crystal clock',            isZh?'CPU 时钟周期':'CPU clock cycle'],
+                  [isZh?'铜线 / 总线':'Copper wire / Bus',                  isZh?'函数调用 / 指针':'Function call / Pointer'],
+                  [isZh?'固定（ASIC）/ FPGA':'Fixed (ASIC) / FPGA',         isZh?'完全可编程':'Fully programmable'],
+                ].map(([hw, sw], i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                    <td style={{ padding:'3px 10px', color:'#ffa657' }}>{hw}</td>
+                    <td style={{ padding:'3px 10px', color:'#79c0ff' }}>{sw}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+            <div style={{ marginTop:8, display:'flex', flexDirection:'column', gap:3 }}>
+              {[
+                ['Church-Turing', isZh?'软件与数字硬件计算能力完全等价，没有一方能算对方算不了的东西':'Software and digital hardware are computationally equivalent — neither can compute what the other cannot'],
+                ['FPGA',          isZh?'可以把软件"烧"成硬件电路，功能完全一致':'Software can be "burned" into hardware circuits with identical behavior'],
+                ['TPU / NPU',     isZh?'把神经网络算法从软件固化成专用数字电路，本质是同一计算过程':'Neural network algorithms hardened from software into dedicated digital circuits — same computation, different medium'],
+              ].map(([label, desc]) => (
+                <div key={label} style={{ display:'flex', gap:6, fontSize:9 }}>
+                  <span style={{ color:'#d2a8ff', minWidth:80, fontWeight:700 }}>{label}</span>
+                  <span style={{ color:'var(--text-secondary)' }}>{desc}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+
           {/* Virtual vs Real Circuit */}
           <div style={{ marginTop:12, display:'flex', gap:12, flexWrap:'wrap' }}>
             {/* Advantages / Limitations */}
