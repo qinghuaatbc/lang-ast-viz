@@ -1456,6 +1456,12 @@ export default function CodeChipView() {
   const animRef = useRef<ReturnType<typeof requestAnimationFrame>|null>(null)
   const startRef = useRef(0)
   const debRef = useRef<ReturnType<typeof setTimeout>>(undefined)
+  const [isMobile, setIsMobile] = useState(() => window.innerWidth < 768)
+  useEffect(() => {
+    const h = () => setIsMobile(window.innerWidth < 768)
+    window.addEventListener('resize', h)
+    return () => window.removeEventListener('resize', h)
+  }, [])
 
   /* URL restore */
   useEffect(() => {
@@ -1736,24 +1742,24 @@ export default function CodeChipView() {
         <button title={isZh ? '随机示例' : 'Random example'} onClick={() => { const i = Math.floor(Math.random() * STATIC_EXAMPLES.length); setExIdx(i); setExSearch(''); reset() }}
           style={{ padding:'3px 7px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:12 }}>🎲</button>
         <div style={{ flex:1 }} />
-        <label style={{ fontSize:9, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:2, cursor:'pointer' }}>
+        {!isMobile && <label style={{ fontSize:9, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:2, cursor:'pointer' }}>
           <input type="checkbox" checked={showHex} onChange={e => setShowHex(e.target.checked)} /> HEX
-        </label>
-        <label style={{ fontSize:9, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:2, cursor:'pointer' }}>
+        </label>}
+        {!isMobile && <label style={{ fontSize:9, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:2, cursor:'pointer' }}>
           <input type="checkbox" checked={showMem} onChange={e => setShowMem(e.target.checked)} /> MEM
-        </label>
+        </label>}
         <button onClick={() => { setSeqTransition(true); setTimeout(() => { setSeqMode(m => !m); setSeqTransition(false) }, 220) }}
           title={isZh ? '切换空间/时序视图 (空间=同时存在的电路, 时序=时间展开的指令)' : 'Toggle Space (circuit) / Timeline (time-unrolled) view'}
           style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${seqMode ? '#79c0ff' : 'var(--border)'}`, background: seqMode ? 'rgba(121,192,255,0.12)' : 'transparent', color: seqMode ? '#79c0ff' : 'var(--text-muted)', cursor:'pointer', fontSize:9, fontWeight: seqMode ? 700 : 400 }}>
           {seqMode ? (isZh ? '⬛ 空间' : '⬛ Space') : (isZh ? '⏱ 时序' : '⏱ Seq')}
         </button>
-        <div style={{ display:'flex', alignItems:'center', gap:3 }}>
+        {!isMobile && <div style={{ display:'flex', alignItems:'center', gap:3 }}>
           <span style={{ fontSize:9, color:'var(--text-muted)' }}>{speed}x</span>
           <input type="range" min={1} max={5} value={speed} onChange={e => setSpeed(+e.target.value)} style={{ width:40, accentColor:'#4d8fff' }} />
-        </div>
-        <button onClick={shareUrl} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>🔗</button>
-        <button onClick={exportSvg} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>⬇ SVG</button>
-        <button id="mermaid-btn" onClick={exportMermaid} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>⬇ Mermaid</button>
+        </div>}
+        {!isMobile && <button onClick={shareUrl} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>🔗</button>}
+        {!isMobile && <button onClick={exportSvg} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>⬇ SVG</button>}
+        {!isMobile && <button id="mermaid-btn" onClick={exportMermaid} style={{ padding:'3px 8px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:10 }}>⬇ Mermaid</button>}
         <button onClick={reset} style={{ padding:'4px 10px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:11 }}>⏹</button>
         <button onClick={nextStep} style={{ padding:'4px 10px', borderRadius:4, border:'1px solid var(--border)', background:'transparent', color:'var(--text-secondary)', cursor:'pointer', fontSize:11 }}>⏭</button>
         <button onClick={togglePlay} style={{ padding:'4px 14px', borderRadius:4, border:'none', background:playing?'#ff7b72':'#56d364', color:'#000', cursor:'pointer', fontSize:11, fontWeight:700 }}>
@@ -1762,9 +1768,9 @@ export default function CodeChipView() {
         <div style={{ fontSize:10, color:'var(--text-muted)' }}>{step+1}/{allSteps.length}</div>
       </div>
 
-      <div style={{ flex:1, display:'flex', gap:8, minHeight:0 }}>
+      <div style={{ flex:1, display:'flex', flexDirection: isMobile ? 'column' : 'row', gap:8, minHeight:0 }}>
         {/* Left: Code / Config Panel */}
-        <div style={{ flex:'0 0 26%', overflow:'auto', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)' }}>
+        <div style={{ flex: isMobile ? '0 0 auto' : '0 0 26%', maxHeight: isMobile ? 220 : undefined, overflow:'auto', borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)' }}>
           {exIdx === -1 ? (
             <div style={{ padding:10, display:'flex', flexDirection:'column', gap:6 }}>
               <div style={{ fontSize:10, fontWeight:700, color:'var(--text-secondary)', marginBottom:2 }}>{isZh ? '自定义调用链' : 'Custom Chain'}</div>
