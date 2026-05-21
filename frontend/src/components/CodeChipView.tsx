@@ -437,6 +437,77 @@ const CATEGORIES: CatExample[] = [
     {caller:'UserProcess',callee:'MemoryManager',method:'mmap',params:'size',ret:'addr',relation:'call'},
     {caller:'MemoryManager',callee:'PageAllocator',method:'alloc',params:'pages',ret:'Frame',relation:'call'},
   ]},
+
+  // Distributed (10) — new relation types: http / db / rpc / event
+  { cat_zh:'分布式', cat_en:'Distributed', zh:'HTTP REST 调用', en:'HTTP REST Call', chain:[
+    {caller:'App',callee:'HttpClient',method:'get',params:'url=/users',ret:'Resp',relation:'http'},
+    {caller:'HttpClient',callee:'UserService',method:'listUsers',params:'page=1',ret:'User[]',relation:'http'},
+    {caller:'UserService',callee:'UserRepo',method:'findAll',params:'limit=20',ret:'User[]',relation:'db'},
+  ]},
+  { cat_zh:'分布式', cat_en:'Distributed', zh:'gRPC 服务调用', en:'gRPC Service', chain:[
+    {caller:'ApiGateway',callee:'UserClient',method:'getUser',params:'id=42',ret:'UserProto',relation:'rpc'},
+    {caller:'UserClient',callee:'UserService',method:'findById',params:'id=42',ret:'User',relation:'rpc'},
+    {caller:'UserService',callee:'UserRepo',method:'findById',params:'id=42',ret:'User',relation:'db'},
+  ]},
+  { cat_zh:'分布式', cat_en:'Distributed', zh:'消息队列事件', en:'Event Bus', chain:[
+    {caller:'OrderService',callee:'EventBus',method:'publish',params:'event=OrderCreated',ret:'void',relation:'event'},
+    {caller:'EventBus',callee:'PaymentService',method:'onOrderCreated',params:'orderId=123',ret:'void',relation:'event'},
+    {caller:'EventBus',callee:'InventoryService',method:'onOrderCreated',params:'sku=ABC',ret:'void',relation:'event'},
+    {caller:'PaymentService',callee:'PaymentRepo',method:'save',params:'txn',ret:'void',relation:'db'},
+  ]},
+  { cat_zh:'分布式', cat_en:'Distributed', zh:'数据库 CRUD', en:'DB CRUD', chain:[
+    {caller:'UserHandler',callee:'UserService',method:'createUser',params:'name=Alice',ret:'User',relation:'call'},
+    {caller:'UserService',callee:'UserRepo',method:'save',params:'user',ret:'User',relation:'db'},
+    {caller:'UserService',callee:'CacheStore',method:'set',params:'key=user:1',ret:'void',relation:'db'},
+    {caller:'UserService',callee:'AuditLog',method:'log',params:'action=create',ret:'void',relation:'event'},
+  ]},
+  { cat_zh:'分布式', cat_en:'Distributed', zh:'Saga 分布式事务', en:'Saga Transaction', chain:[
+    {caller:'SagaOrchestrator',callee:'OrderService',method:'createOrder',params:'items',ret:'OrderId',relation:'rpc'},
+    {caller:'SagaOrchestrator',callee:'PaymentService',method:'charge',params:'amt=99',ret:'TxnId',relation:'rpc'},
+    {caller:'SagaOrchestrator',callee:'InventoryService',method:'reserve',params:'sku=A1',ret:'bool',relation:'rpc'},
+    {caller:'SagaOrchestrator',callee:'EventStore',method:'append',params:'sagaEvent',ret:'void',relation:'db'},
+  ]},
+  { cat_zh:'分布式', cat_en:'Distributed', zh:'BFF 聚合层', en:'BFF Aggregator', chain:[
+    {caller:'MobileApp',callee:'BFF',method:'getDashboard',params:'userId=5',ret:'Dashboard',relation:'http'},
+    {caller:'BFF',callee:'UserService',method:'getProfile',params:'userId=5',ret:'Profile',relation:'rpc'},
+    {caller:'BFF',callee:'OrderService',method:'getOrders',params:'userId=5',ret:'Order[]',relation:'rpc'},
+    {caller:'BFF',callee:'NotificationSvc',method:'getAlerts',params:'userId=5',ret:'Alert[]',relation:'rpc'},
+  ]},
+  { cat_zh:'分布式', cat_en:'Distributed', zh:'CQRS + 事件溯源', en:'CQRS+EventSourcing', chain:[
+    {caller:'CommandBus',callee:'CreateOrderCmd',method:'handle',params:'order',ret:'void',relation:'event'},
+    {caller:'CreateOrderCmd',callee:'EventStore',method:'append',params:'OrderCreated',ret:'void',relation:'db'},
+    {caller:'EventStore',callee:'EventBus',method:'publish',params:'OrderCreated',ret:'void',relation:'event'},
+    {caller:'EventBus',callee:'OrderProjection',method:'on',params:'event',ret:'void',relation:'event'},
+    {caller:'OrderProjection',callee:'ReadDb',method:'upsert',params:'orderId',ret:'void',relation:'db'},
+  ]},
+  { cat_zh:'分布式', cat_en:'Distributed', zh:'微服务健康检查', en:'Health+Circuit Breaker', chain:[
+    {caller:'LoadBalancer',callee:'HealthChecker',method:'check',params:'svc=payment',ret:'Status',relation:'http'},
+    {caller:'HealthChecker',callee:'PaymentService',method:'health',params:'',ret:'ok',relation:'http'},
+    {caller:'LoadBalancer',callee:'CircuitBreaker',method:'call',params:'fn',ret:'Resp',relation:'call'},
+    {caller:'CircuitBreaker',callee:'Fallback',method:'handle',params:'err',ret:'Resp',relation:'call'},
+    {caller:'CircuitBreaker',callee:'MetricStore',method:'record',params:'latency=50ms',ret:'void',relation:'db'},
+  ]},
+
+  // Concurrency (5) — goroutine examples
+  { cat_zh:'并发', cat_en:'Concurrency', zh:'Goroutine 工作池', en:'Goroutine Worker Pool', chain:[
+    {caller:'Main',callee:'WorkerPool',method:'submit',params:'task=render',ret:'void',relation:'call'},
+    {caller:'WorkerPool',callee:'Worker',method:'run',params:'task',ret:'void',relation:'event',goroutine:'g1'},
+    {caller:'Worker',callee:'TaskQueue',method:'next',params:'',ret:'Task',relation:'db'},
+    {caller:'Worker',callee:'ResultChan',method:'send',params:'result',ret:'void',relation:'event'},
+    {caller:'Main',callee:'ResultChan',method:'recv',params:'',ret:'Result',relation:'call'},
+  ]},
+  { cat_zh:'并发', cat_en:'Concurrency', zh:'Pipeline 流水线', en:'Pipeline', chain:[
+    {caller:'Source',callee:'Stage1',method:'process',params:'data',ret:'T1',relation:'event',goroutine:'g1'},
+    {caller:'Stage1',callee:'Stage2',method:'transform',params:'t1',ret:'T2',relation:'event',goroutine:'g2'},
+    {caller:'Stage2',callee:'Stage3',method:'aggregate',params:'t2',ret:'T3',relation:'event',goroutine:'g3'},
+    {caller:'Stage3',callee:'Sink',method:'write',params:'t3',ret:'void',relation:'db'},
+  ]},
+  { cat_zh:'并发', cat_en:'Concurrency', zh:'Fan-out / Fan-in', en:'Fan-out / Fan-in', chain:[
+    {caller:'Dispatcher',callee:'Worker1',method:'process',params:'chunk=0',ret:'Result',relation:'event',goroutine:'g1'},
+    {caller:'Dispatcher',callee:'Worker2',method:'process',params:'chunk=1',ret:'Result',relation:'event',goroutine:'g2'},
+    {caller:'Dispatcher',callee:'Worker3',method:'process',params:'chunk=2',ret:'Result',relation:'event',goroutine:'g3'},
+    {caller:'Merger',callee:'ResultChan',method:'collect',params:'n=3',ret:'[]Result',relation:'call'},
+  ]},
 ]
 
 /* ── Helpers ────────────────────────────────────────────────── */
@@ -610,20 +681,62 @@ function detectPattern(chain: ChainCall[]): PatternMatch | null {
   return null
 }
 
+/* Relation-specific bus semantics — each relation type maps to distinct
+   ADDR (destination identifier), CTRL (protocol verb), DATA (payload) */
+function relBus(call: ChainCall): { addr: string; ctrl: string; data: string; execZh: string; execEn: string } {
+  const rel = call.relation ?? 'call'
+  const pv  = call.params.replace(/^.*=/, '') || 'x'
+  const name = call.callee.toLowerCase()
+  switch (rel) {
+    case 'http':
+      return { addr: `GET /${name}/${call.method}`, ctrl: 'HTTP/1.1', data: call.params ? `{${call.params}}` : '{}',
+               execZh: `HTTP → ${call.callee}.${call.method}`, execEn: `HTTP req → ${call.callee}.${call.method}` }
+    case 'db':
+      return { addr: `${name.toUpperCase()}`, ctrl: 'SQL/TX',
+               data: call.params ? `WHERE ${call.params}` : `SELECT *`,
+               execZh: `DB 查询 ${call.callee}`, execEn: `DB query ${call.callee}` }
+    case 'rpc':
+      return { addr: `${call.callee}/${call.method}`, ctrl: 'gRPC', data: call.params || 'proto{}',
+               execZh: `RPC → ${call.callee}/${call.method}`, execEn: `RPC call ${call.callee}/${call.method}` }
+    case 'event':
+      return { addr: `topic:${name}/${call.method}`, ctrl: 'PUB', data: `evt=${pv}`,
+               execZh: `发布事件 → ${call.method}`, execEn: `Publish event ${call.method}` }
+    case 'inherit':
+      return { addr: `vtable[${call.callee}]`, ctrl: 'VCALL', data: call.params || '—',
+               execZh: `虚调用 ${call.callee}`, execEn: `Virtual call ${call.callee}` }
+    case 'compose': case 'aggregate':
+      return { addr: `&${call.callee}`, ctrl: 'NEW', data: call.params || '—',
+               execZh: `创建 ${call.callee}`, execEn: `Create ${call.callee}` }
+    default:
+      return { addr: `&${call.callee}+0x${(0x18 + (call.method.length % 8) * 8).toString(16)}`, ctrl: 'CALL',
+               data: call.params || '—', execZh: `${call.callee} 执行`, execEn: `${call.callee} exec` }
+  }
+}
+
 function generateSteps(chain: ChainCall[]): BusStep[] {
   const steps: BusStep[] = []
   chain.forEach((call, ci) => {
     const pv = call.params.replace(/^.*=/, '') || 'x'
+    const bus = relBus(call)
+    const stack = chain.slice(0, ci + 1).map((c, j) => ({ pc: `0x${(0x4010 + j * 0x28).toString(16)}`, desc: `${c.caller}→${c.callee}.${c.method}` }))
     steps.push(
-      { addr:'—', ctrl:'—', data:'—', desc_zh:`${call.caller} 准备调用`, desc_en:`${call.caller} ready`, highlightLine:-1, movingData:[], state:{phase:'idle'}, stack:[{pc:'0x4000',desc:`main: call ${call.callee}::${call.method}`}] },
-      { addr:`&${call.callee}+off`, ctrl:'REQ', data:'—', desc_zh:`① 地址总线→${call.callee}::${call.method}(${call.relation||'call'})`, desc_en:`① Addr→${call.callee}::${call.method} (${call.relation||'call'})`, highlightLine:ci*2+1, movingData:[{from:ci===0?0:ci+1,to:99,label:'addr',bus:'addr'}], state:{phase:'addr'} },
-      { addr:`&${call.callee}+off`, ctrl:'WR', data:`${call.params}`, desc_zh:`② 数据总线写参数 (${call.relation||'call'})`, desc_en:`② Data bus: ${call.params} (${call.relation||'call'})`, highlightLine:ci*2+1, movingData:[{from:ci===0?0:ci+1,to:99,label:'WR',bus:'ctrl'},{from:ci===0?0:ci+1,to:99,label:pv,bus:'data'}], state:{phase:'write'} },
-      { addr:'—', ctrl:'EXEC', data:'—', desc_zh:`③ ${call.callee} 执行`, desc_en:`③ ${call.callee} exec`, highlightLine:ci*2+2, movingData:[{from:99,to:ci+1,label:'exec',bus:'addr'},{from:99,to:ci+1,label:pv,bus:'data'}], state:{phase:'exec',result:call.ret!=='void'?'↻':'✓'} },
+      { addr:'—', ctrl:'—', data:'—',
+        desc_zh:`${call.caller} 准备 [${call.relation||'call'}] ${call.callee}`, desc_en:`${call.caller} ready [${call.relation||'call'}]`,
+        highlightLine:-1, movingData:[], state:{phase:'idle'}, stack },
+      { addr:bus.addr, ctrl:bus.ctrl, data:'—',
+        desc_zh:`① 地址→${call.callee}::${call.method}`, desc_en:`① Addr→${call.callee}::${call.method}`,
+        highlightLine:ci*2+1, movingData:[{from:ci===0?0:ci+1,to:99,label:'addr',bus:'addr'}], state:{phase:'addr'}, stack },
+      { addr:bus.addr, ctrl:bus.ctrl, data:bus.data,
+        desc_zh:`② ${bus.ctrl} 数据: ${bus.data}`, desc_en:`② ${bus.ctrl} data: ${bus.data}`,
+        highlightLine:ci*2+1, movingData:[{from:ci===0?0:ci+1,to:99,label:bus.ctrl,bus:'ctrl'},{from:ci===0?0:ci+1,to:99,label:pv,bus:'data'}], state:{phase:'write'}, stack },
+      { addr:'—', ctrl:'EXEC', data:'—',
+        desc_zh:`③ ${bus.execZh}`, desc_en:`③ ${bus.execEn}`,
+        highlightLine:ci*2+2, movingData:[{from:99,to:ci+1,label:'exec',bus:'addr'},{from:99,to:ci+1,label:pv,bus:'data'}], state:{phase:'exec',result:call.ret!=='void'?'↻':'✓'}, stack },
     )
-    if (ci < chain.length - 1) steps.push({ addr:'—', ctrl:'DONE', data:'—', desc_zh:`${call.callee}→${chain[ci+1].callee}`, desc_en:`${call.callee}→${chain[ci+1].callee}`, highlightLine:-1, movingData:[{from:ci+1,to:99,label:'DONE',bus:'ctrl'}], state:{phase:'chain'} })
+    if (ci < chain.length - 1) steps.push({ addr:'—', ctrl:'DONE', data:'—', desc_zh:`${call.callee}→${chain[ci+1].callee}`, desc_en:`${call.callee}→${chain[ci+1].callee}`, highlightLine:-1, movingData:[{from:ci+1,to:99,label:'DONE',bus:'ctrl'}], state:{phase:'chain'}, stack })
   })
   const last = chain[chain.length-1]
-  steps.push({ addr:'—', ctrl:'DONE', data:last.ret!=='void'?'result':'void', desc_zh:`④ 完成${last.ret!=='void'?'，返回':'，结束'}`, desc_en:`④ Done${last.ret!=='void'?', return':''}`, highlightLine:-1, movingData:[{from:chain.length,to:99,label:'DONE',bus:'ctrl'}], state:{phase:'done'} })
+  steps.push({ addr:'—', ctrl:'DONE', data:last.ret!=='void'?'result':'void', desc_zh:`④ 完成${last.ret!=='void'?'，返回 '+last.ret:'，结束'}`, desc_en:`④ Done${last.ret!=='void'?', return '+last.ret:''}`, highlightLine:-1, movingData:[{from:chain.length,to:99,label:'DONE',bus:'ctrl'}], state:{phase:'done'}, stack:[] })
   return steps
 }
 
@@ -830,6 +943,42 @@ function RelationGlyph({ x, y, rel, color, atSource }: { x: number; y: number; r
     if (atSource) return null
     return <polygon points={`${x},${y} ${x-s},${y-s*0.6} ${x-s},${y+s*0.6}`} fill="var(--bg-primary)" stroke={color} strokeWidth={1.2} />
   }
+  if (rel === 'http') {
+    // Globe: circle + horizontal line at source
+    if (!atSource) return null
+    return (
+      <g>
+        <circle cx={x} cy={y} r={s * 0.75} fill="none" stroke={color} strokeWidth={1.2} />
+        <line x1={x - s * 0.75} y1={y} x2={x + s * 0.75} y2={y} stroke={color} strokeWidth={0.8} />
+        <ellipse cx={x} cy={y} rx={s * 0.35} ry={s * 0.75} fill="none" stroke={color} strokeWidth={0.8} />
+      </g>
+    )
+  }
+  if (rel === 'db') {
+    // Cylinder at destination
+    if (atSource) return null
+    const ry = s * 0.28, rx = s * 0.55, h = s * 0.9
+    return (
+      <g>
+        <ellipse cx={x} cy={y - h / 2} rx={rx} ry={ry} fill="var(--bg-primary)" stroke={color} strokeWidth={1} />
+        <rect x={x - rx} y={y - h / 2} width={rx * 2} height={h} fill="var(--bg-primary)" stroke="none" />
+        <line x1={x - rx} y1={y - h / 2} x2={x - rx} y2={y + h / 2} stroke={color} strokeWidth={1} />
+        <line x1={x + rx} y1={y - h / 2} x2={x + rx} y2={y + h / 2} stroke={color} strokeWidth={1} />
+        <ellipse cx={x} cy={y + h / 2} rx={rx} ry={ry} fill="var(--bg-primary)" stroke={color} strokeWidth={1} />
+      </g>
+    )
+  }
+  if (rel === 'rpc') {
+    // Lightning bolt at source
+    if (!atSource) return null
+    return <polyline points={`${x+2},${y-s} ${x-2},${y-1} ${x+3},${y-1} ${x-2},${y+s}`} fill="none" stroke={color} strokeWidth={1.4} strokeLinejoin="round" />
+  }
+  if (rel === 'event') {
+    // Wave at source
+    if (!atSource) return null
+    const w = s * 0.6
+    return <path d={`M${x-w} ${y} Q${x-w/2} ${y-s*0.7} ${x} ${y} Q${x+w/2} ${y+s*0.7} ${x+w} ${y}`} fill="none" stroke={color} strokeWidth={1.3} />
+  }
   return null
 }
 
@@ -947,16 +1096,31 @@ function GeneratedCodeBlock({ chain, hlLine, isZh }: {
 
 /* ── Mermaid Export ────────────────────────────────────────────── */
 
+function mermaidArrow(rel: string | undefined): string {
+  switch (rel) {
+    case 'depend':    return '-->>'   // dotted async
+    case 'inherit':   return '--)'    // dotted no-arrowhead (generalization)
+    case 'event':     return '-x'     // solid cross (fire-and-forget)
+    case 'http':      return '->>'    // solid arrow (sync HTTP req)
+    case 'rpc':       return '->>'    // solid arrow (sync RPC)
+    case 'db':        return '->>'    // solid arrow (sync DB call)
+    case 'compose':
+    case 'aggregate': return '->>'    // solid arrow (structural)
+    default:          return '->>'    // call: solid arrow
+  }
+}
+
 function generateMermaid(chain: ChainCall[]): string {
   if (chain.length === 0) return ''
   const participants = [...new Set([chain[0].caller, ...chain.map(c => c.callee)])]
   const lines = ['sequenceDiagram']
   for (const p of participants) lines.push(`  participant ${p}`)
   for (const c of chain) {
-    const rel = c.relation || 'call'
-    const arrow = rel === 'depend' ? '-->>' : rel === 'inherit' ? '-->' : '->>'
-    lines.push(`  ${c.caller}${arrow}${c.callee}: ${c.method}(${c.params})`)
+    const arrow = mermaidArrow(c.relation)
+    const note = c.relation && c.relation !== 'call' ? ` [${c.relation.toUpperCase()}]` : ''
+    lines.push(`  ${c.caller}${arrow}${c.callee}: ${c.method}(${c.params})${note}`)
     if (c.ret && c.ret !== 'void') lines.push(`  ${c.callee}-->>${c.caller}: ${c.ret}`)
+    if (c.goroutine) lines.push(`  Note over ${c.caller},${c.callee}: ⎇${c.goroutine}`)
   }
   return lines.join('\n')
 }
@@ -1288,6 +1452,7 @@ export default function CodeChipView() {
   const [cuMode, setCuMode] = useState<'form'|'paste'>('form')
   const [chipMeta, setChipMeta] = useState<Map<string, { methods: string[]; fields: string[] }>>(new Map())
   const svgRef = useRef<SVGSVGElement>(null)
+  const seqContainerRef = useRef<HTMLDivElement>(null)
   const animRef = useRef<ReturnType<typeof requestAnimationFrame>|null>(null)
   const startRef = useRef(0)
   const debRef = useRef<ReturnType<typeof setTimeout>>(undefined)
@@ -1540,6 +1705,15 @@ export default function CodeChipView() {
   // Active connection index for animation
   const activeToIdx = s.highlightLine ? s.highlightLine - 1 : -1
 
+  /* Auto-scroll sequence diagram to active step */
+  useEffect(() => {
+    if (!seqMode || activeToIdx < 0 || !seqContainerRef.current) return
+    let cumY = 0
+    for (let i = 0; i < activeToIdx; i++) cumY += stepHeight(chain[i]?.relation)
+    const containerH = seqContainerRef.current.clientHeight
+    seqContainerRef.current.scrollTo({ top: Math.max(0, 70 + cumY - containerH / 3), behavior: 'smooth' })
+  }, [seqMode, activeToIdx, chain])
+
   // Call stack depths inferred from chain sequence
   const callDepths = useMemo(() => inferCallDepths(chain), [chain])
 
@@ -1681,7 +1855,7 @@ export default function CodeChipView() {
         {/* Right: Circuit + Description + Waveform + Stack */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6, minWidth:0 }}>
           {/* SVG */}
-          <div style={{ flex:1, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)', overflow:'hidden', display:'flex', position:'relative', opacity: dissolved ? 0 : (seqTransition ? 0.1 : 1), transition: dissolved ? 'opacity 1.2s ease-out' : seqTransition ? 'opacity 0.22s ease' : 'opacity 0.22s ease' }}>
+          <div ref={seqContainerRef} style={{ flex:1, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)', overflow: seqMode ? 'auto' : 'hidden', display:'flex', position:'relative', opacity: dissolved ? 0 : (seqTransition ? 0.1 : 1), transition: dissolved ? 'opacity 1.2s ease-out' : seqTransition ? 'opacity 0.22s ease' : 'opacity 0.22s ease' }}>
             {seqMode ? (
               <SequenceDiagram chain={chain} chipNames={chipNames} chipMeta={chipMeta}
                 callDepths={callDepths} activeIdx={activeToIdx} animProgress={animProgress} isZh={isZh} />
