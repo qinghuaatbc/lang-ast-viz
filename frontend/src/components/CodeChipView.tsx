@@ -979,6 +979,217 @@ function downloadBlob(blob: Blob, name: string) {
   a.click(); URL.revokeObjectURL(url)
 }
 
+/* ── Sequence Diagram (时序图) ───────────────────────────────── */
+
+function SequenceDiagram({ chain, chipNames, chipMeta, activeIdx, animProgress, isZh }: {
+  chain: ChainCall[]
+  chipNames: string[]
+  chipMeta: Map<string, { methods: string[]; fields: string[] }>
+  activeIdx: number
+  animProgress: number
+  isZh: boolean
+}) {
+  const laneW = 134
+  const headerH = 68
+  const stepH = 54
+  const marginL = 38
+  const chipBoxW = 100
+  const chipBoxH = 48
+
+  const nChips = chipNames.length
+  const nCalls = chain.length
+  const W = marginL + nChips * laneW + 24
+  const H = headerH + nCalls * stepH + 36
+
+  const laneX = (name: string) => {
+    const idx = chipNames.indexOf(name)
+    return marginL + idx * laneW + laneW / 2
+  }
+
+  return (
+    <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block' }}>
+      <defs>
+        <pattern id="sq" width="20" height="20" patternUnits="userSpaceOnUse">
+          <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--bg-elevated)" strokeWidth="0.5" />
+        </pattern>
+        {Object.entries(REL_COLORS).map(([rel, c]) => (
+          <marker key={rel} id={`sq-arrow-${rel}`} viewBox="0 0 10 10" refX="9" refY="5"
+            markerWidth="6" markerHeight="6" orient="auto">
+            <path d="M 0 0 L 10 5 L 0 10 Z" fill={c} />
+          </marker>
+        ))}
+        <marker id="sq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
+          markerWidth="5" markerHeight="5" orient="auto">
+          <path d="M 0 0 L 10 5 L 0 10 Z" fill="#484f58" />
+        </marker>
+      </defs>
+
+      <rect width={W} height={H} fill="var(--bg-primary)" />
+      <rect width={W} height={H} fill="url(#sq)" />
+
+      {/* Time axis */}
+      <text x={6} y={headerH + 14} fill="#1e2e1e" fontSize={6} fontFamily="monospace" fontWeight="bold">
+        {isZh ? '时间' : 'TIME'}
+      </text>
+      <line x1={19} y1={headerH + 18} x2={19} y2={H - 20} stroke="#1a2a1a" strokeWidth={1} />
+      <path d={`M 15 ${H - 23} L 19 ${H - 15} L 23 ${H - 23}`} fill="none" stroke="#1a2a1a" strokeWidth={1} />
+
+      {/* Chip header boxes */}
+      {chipNames.map((name, i) => {
+        const cx = laneX(name)
+        const bx = cx - chipBoxW / 2
+        const by = 8
+        const chipType = detectChipType(name)
+        const color = CHIP_TYPE_COLOR[chipType]
+        const isActiveSrc = chain[activeIdx]?.caller === name
+        const isActiveDst = chain[activeIdx]?.callee === name
+        const isActive = isActiveSrc || isActiveDst
+        return (
+          <g key={name}>
+            {/* Main box */}
+            <rect x={bx} y={by} width={chipBoxW} height={chipBoxH} rx={4}
+              fill={isActive ? color + '18' : '#0d1117'}
+              stroke={isActive ? color : color + '50'}
+              strokeWidth={isActive ? 1.8 : 0.9} />
+            {/* Left pins */}
+            {[0, 1, 2].map(pi => (
+              <rect key={`lp-${pi}`} x={bx - 7} y={by + 8 + pi * 11} width={7} height={4} rx={1}
+                fill={isActiveDst ? color + '55' : '#172030'} />
+            ))}
+            {/* Right pins */}
+            {[0, 1, 2].map(pi => (
+              <rect key={`rp-${pi}`} x={bx + chipBoxW} y={by + 8 + pi * 11} width={7} height={4} rx={1}
+                fill={isActiveSrc ? color + '55' : '#172030'} />
+            ))}
+            <text x={cx} y={by + 19} textAnchor="middle"
+              fill={isActive ? color : color + 'aa'} fontSize={9} fontWeight="bold" fontFamily="monospace">
+              {name.slice(0, 14)}
+            </text>
+            <text x={cx} y={by + 31} textAnchor="middle"
+              fill={isActive ? color + 'bb' : color + '40'} fontSize={6.5} fontFamily="monospace">
+              {CHIP_TYPE_LABEL[chipType]}
+            </text>
+            <text x={cx} y={by + 43} textAnchor="middle"
+              fill={isActive ? color + '80' : '#18212e'} fontSize={5.5} fontFamily="monospace">
+              0x{(0x4d8000 + i * 0x100).toString(16)}
+            </text>
+          </g>
+        )
+      })}
+
+      {/* Lifelines */}
+      {chipNames.map((name) => {
+        const cx = laneX(name)
+        const chipType = detectChipType(name)
+        const color = CHIP_TYPE_COLOR[chipType]
+        return (
+          <line key={`ll-${name}`}
+            x1={cx} y1={headerH} x2={cx} y2={H - 20}
+            stroke={color} strokeWidth={1} strokeDasharray="5 5" opacity={0.18} />
+        )
+      })}
+
+      {/* Activation bars on lifelines */}
+      {activeIdx >= 0 && activeIdx < chain.length && (() => {
+        const c = chain[activeIdx]
+        const chips = c.caller === c.callee ? [c.caller] : [c.caller, c.callee]
+        const color = REL_COLORS[c.relation || 'call']
+        const y = headerH + activeIdx * stepH
+        return chips.map(name => {
+          const cx = laneX(name)
+          return (
+            <rect key={`ab-${name}`} x={cx - 5} y={y} width={10} height={stepH} rx={2}
+              fill={color + '20'} stroke={color} strokeWidth={1} opacity={0.7} />
+          )
+        })
+      })()}
+
+      {/* Call arrows */}
+      {chain.map((c, i) => {
+        const y = headerH + i * stepH + stepH / 2
+        const fromX = laneX(c.caller)
+        const toX = laneX(c.callee)
+        const isSelf = c.caller === c.callee
+        const isActive = i === activeIdx
+        const isPast = i < activeIdx
+        const color = REL_COLORS[c.relation || 'call']
+        const opacity = isActive ? 1 : isPast ? 0.42 : 0.10
+        const hasRet = c.ret && c.ret !== 'void'
+
+        return (
+          <g key={i} opacity={opacity}>
+            <text x={6} y={y + 3} fill={isActive ? color : 'var(--text-muted)'}
+              fontSize={7} fontFamily="monospace" fontWeight={isActive ? 'bold' : 'normal'}>
+              T{i}
+            </text>
+
+            {isSelf ? (
+              <g>
+                <path d={`M ${fromX + 5} ${y - 9} Q ${fromX + 30} ${y - 9} ${fromX + 30} ${y} Q ${fromX + 30} ${y + 9} ${fromX + 5} ${y + 9}`}
+                  fill="none" stroke={color} strokeWidth={isActive ? 2 : 1}
+                  markerEnd={`url(#sq-arrow-${c.relation || 'call'})`} />
+                <text x={fromX + 34} y={y + 3} fill={color} fontSize={7.5} fontFamily="monospace"
+                  fontWeight={isActive ? 'bold' : 'normal'}>
+                  .{c.method}({c.params ? c.params.slice(0, 14) : ''})
+                </text>
+              </g>
+            ) : (
+              <g>
+                {/* Call arrow */}
+                <line x1={fromX} y1={y} x2={toX} y2={y}
+                  stroke={color} strokeWidth={isActive ? 2 : 1}
+                  markerEnd={`url(#sq-arrow-${c.relation || 'call'})`} />
+                {/* Method label */}
+                <text x={(fromX + toX) / 2} y={y - 5} textAnchor="middle"
+                  fill={color} fontSize={7.5} fontFamily="monospace"
+                  fontWeight={isActive ? 'bold' : 'normal'}>
+                  .{c.method}({c.params ? c.params.slice(0, 16) : ''})
+                </text>
+                {/* Return arrow (dashed, reversed) */}
+                {isActive && hasRet && (
+                  <g>
+                    <line x1={toX} y1={y + 16} x2={fromX} y2={y + 16}
+                      stroke="#484f58" strokeWidth={1} strokeDasharray="4 3"
+                      markerEnd="url(#sq-arrow-ret)" />
+                    <text x={(fromX + toX) / 2} y={y + 26} textAnchor="middle"
+                      fill="#484f58" fontSize={6.5} fontFamily="monospace">
+                      ↵ {c.ret}
+                    </text>
+                  </g>
+                )}
+                {/* Params hint for active */}
+                {isActive && c.params && (
+                  <text x={(fromX + toX) / 2} y={y + (hasRet ? 38 : 16)} textAnchor="middle"
+                    fill={color + '70'} fontSize={6} fontFamily="monospace">
+                    {c.params.slice(0, 28)}
+                  </text>
+                )}
+              </g>
+            )}
+          </g>
+        )
+      })}
+
+      {/* Signal pulse for active call */}
+      {activeIdx >= 0 && activeIdx < chain.length && animProgress > 0 && (() => {
+        const c = chain[activeIdx]
+        if (c.caller === c.callee) return null
+        const y = headerH + activeIdx * stepH + stepH / 2
+        const fromX = laneX(c.caller)
+        const toX = laneX(c.callee)
+        const color = REL_COLORS[c.relation || 'call']
+        const cx = fromX + (toX - fromX) * Math.min(1, animProgress * 1.5)
+        return (
+          <g>
+            <circle cx={cx} cy={y} r={4.5} fill={color} opacity={0.9} />
+            <circle cx={cx} cy={y} r={9} fill={color} opacity={0.18} />
+          </g>
+        )
+      })()}
+    </svg>
+  )
+}
+
 /* ── Main Component ──────────────────────────────────────────── */
 
 export default function CodeChipView() {
@@ -992,6 +1203,7 @@ export default function CodeChipView() {
   const [animProgress, setAnimProgress] = useState(0)
   const [showHex, setShowHex] = useState(false)
   const [showMem, setShowMem] = useState(false)
+  const [seqMode, setSeqMode] = useState(false)
   const [selectedChip, setSelectedChip] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -1266,6 +1478,11 @@ export default function CodeChipView() {
         <label style={{ fontSize:9, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:2, cursor:'pointer' }}>
           <input type="checkbox" checked={showMem} onChange={e => setShowMem(e.target.checked)} /> MEM
         </label>
+        <button onClick={() => setSeqMode(m => !m)}
+          title={isZh ? '切换空间/时序视图' : 'Toggle Space / Timeline view'}
+          style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${seqMode ? '#79c0ff' : 'var(--border)'}`, background: seqMode ? 'rgba(121,192,255,0.12)' : 'transparent', color: seqMode ? '#79c0ff' : 'var(--text-muted)', cursor:'pointer', fontSize:9, fontWeight: seqMode ? 700 : 400 }}>
+          {seqMode ? (isZh ? '⬛ 空间' : '⬛ Space') : (isZh ? '⏱ 时序' : '⏱ Seq')}
+        </button>
         <div style={{ display:'flex', alignItems:'center', gap:3 }}>
           <span style={{ fontSize:9, color:'var(--text-muted)' }}>{speed}x</span>
           <input type="range" min={1} max={5} value={speed} onChange={e => setSpeed(+e.target.value)} style={{ width:40, accentColor:'#4d8fff' }} />
@@ -1375,6 +1592,10 @@ export default function CodeChipView() {
         <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6, minWidth:0 }}>
           {/* SVG */}
           <div style={{ flex:1, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)', overflow:'hidden', display:'flex', position:'relative' }}>
+            {seqMode ? (
+              <SequenceDiagram chain={chain} chipNames={chipNames} chipMeta={chipMeta}
+                activeIdx={activeToIdx} animProgress={animProgress} isZh={isZh} />
+            ) : (<>
             {/* Zoom controls */}
             <div style={{ position:'absolute', top:6, right:6, display:'flex', flexDirection:'column', gap:2, zIndex:10 }}>
               {[['＋',0.2],['－',-0.2],['↺',0]].map(([label, delta]) => (
@@ -1708,6 +1929,7 @@ export default function CodeChipView() {
                 )
               })()}
             </svg>
+            </>)}
 
             {/* Chip Inspector Panel */}
             {selectedChip && (() => {
