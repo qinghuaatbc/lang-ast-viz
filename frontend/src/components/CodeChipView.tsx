@@ -14,7 +14,9 @@ type BusType = 'addr' | 'ctrl' | 'data'
 
 interface ChainCall {
   caller: string; callee: string; method: string; params: string; ret: string
-  relation?: 'call' | 'compose' | 'aggregate' | 'inherit' | 'depend'
+  relation?: 'call' | 'compose' | 'aggregate' | 'inherit' | 'depend' | 'event' | 'http' | 'db' | 'rpc'
+  depth?: number
+  goroutine?: string
 }
 interface CatExample {
   cat_zh: string; cat_en: string; zh: string; en: string; chain: ChainCall[]
@@ -26,15 +28,32 @@ const BUS_COLORS: Record<BusType, string> = { addr: '#ff7b72', data: '#56d364', 
 
 const REL_LABELS_ZH: Record<string, string> = {
   call: '→ 调用', compose: '◆→ 组合', aggregate: '◇→ 聚合', inherit: '⊳ 继承', depend: '-→ 依赖',
+  event: '~ 事件', http: '🌐 HTTP', db: '🗄 数据库', rpc: '⚡ RPC',
 }
 const REL_LABELS_EN: Record<string, string> = {
   call: '→ call', compose: '◆→ compose', aggregate: '◇→ aggregate', inherit: '⊳ inherit', depend: '-→ depend',
+  event: '~ event', http: '🌐 http', db: '🗄 db', rpc: '⚡ rpc',
 }
 const REL_COLORS: Record<string, string> = {
   call: '#79c0ff', compose: '#ff7b72', aggregate: '#ffa657', inherit: '#d2a8ff', depend: '#8b949e',
+  event: '#56d364', http: '#4d8fff', db: '#e3b341', rpc: '#f0883e',
 }
 const REL_STROKE: Record<string, string> = {
   call: 'solid', compose: 'solid', aggregate: 'solid', inherit: 'solid', depend: 'dashed',
+  event: 'dashed', http: 'solid', db: 'solid', rpc: 'solid',
+}
+
+/* ── Timing multipliers per relation (relative to a local function call) */
+const TIMING_MULT: Record<string, { mult: number; unit: string }> = {
+  call:      { mult: 1,   unit: '~1ns'   },
+  compose:   { mult: 1,   unit: '~2ns'   },
+  aggregate: { mult: 1,   unit: '~2ns'   },
+  inherit:   { mult: 0.5, unit: 'static' },
+  depend:    { mult: 0.5, unit: 'static' },
+  event:     { mult: 12,  unit: '~10μs'  },
+  http:      { mult: 100, unit: '~10ms'  },
+  db:        { mult: 30,  unit: '~500μs' },
+  rpc:       { mult: 50,  unit: '~1ms'   },
 }
 
 /* ── Syntax Highlighting ──────────────────────────────────── */
@@ -631,13 +650,33 @@ type ChipType = 'interface' | 'service' | 'controller' | 'repository' | 'factory
 
 function detectChipType(name: string): ChipType {
   const n = name.toLowerCase()
-  if (/interface|abstract|trait|protocol/.test(n)) return 'interface'
-  if (/service|manager|engine|orchestr|saga|usecase/.test(n)) return 'service'
-  if (/controller|handler|router|gateway|api|middleware/.test(n)) return 'controller'
-  if (/repo|store|cache|db|database|orm|redis|postgres|mysql|mongo/.test(n)) return 'repository'
-  if (/factory|builder|provider|registry|loader/.test(n)) return 'factory'
-  if (/gpu|cpu|mmu|tlb|disk|net|driver|device|block|syscall|vfs/.test(n)) return 'infra'
+  if (/interface|abstract|trait|protocol|iface/.test(n)) return 'interface'
+  if (/repo|store|dao|mapper|database|dbstore|storage|cache|redis|postgres|mysql|mongo|sqlite|orm/.test(n)) return 'repository'
+  if (/controller|ctrl|router|route|endpoint|resource|servlet|presenter|view/.test(n)) return 'controller'
+  if (/handler|gateway|api|middleware|mux|interceptor/.test(n)) return 'controller'
+  if (/service|svc|usecase|manager|orchestr|saga|processor|worker|engine|business|domain|interactor/.test(n)) return 'service'
+  if (/factory|builder|provider|registry|loader|creator|generator|parser|transformer/.test(n)) return 'factory'
+  if (/gpu|cpu|mmu|tlb|disk|net|driver|device|block|syscall|vfs|socket|kernel|hardware/.test(n)) return 'infra'
+  if (/util|helper|tool|common|shared|lib|kit|logger|metric|tracer|monitor|log/.test(n)) return 'infra'
+  if (/client|adapter|connector|proxy|stub|caller|httpclient|rpcclient/.test(n)) return 'controller'
+  if (/queue|buffer|channel|chan|stream|pipe|broker|topic|event|bus/.test(n)) return 'factory'
+  if (/model|entity|dto|record|aggregate|valueobj|vo|struct|schema/.test(n)) return 'service'
+  if (/app|main|server|application|bootstrap|startup|container|injector/.test(n)) return 'controller'
   return 'default'
+}
+
+/* ── Infer call stack depths from chain sequence ──────────────── */
+function inferCallDepths(chain: ChainCall[]): number[] {
+  const depths: number[] = []
+  const stack: string[] = []
+  for (const c of chain) {
+    if (c.depth !== undefined) { depths.push(c.depth); continue }
+    // Pop callers off stack until we find this call's caller (simulates return)
+    while (stack.length > 0 && stack[stack.length - 1] !== c.caller) stack.pop()
+    depths.push(stack.length)
+    stack.push(c.callee)
+  }
+  return depths
 }
 
 const CHIP_TYPE_COLOR: Record<ChipType, string> = {
@@ -926,14 +965,14 @@ function generateMermaid(chain: ChainCall[]): string {
 
 function astResultToChain(
   chips: { name: string; methods: string[]; fields: string[] }[],
-  calls: { from: string; to: string; method: string; params: string; ret: string; relation: string }[]
+  calls: { from: string; to: string; method: string; params: string; ret: string; relation: string; depth?: number; goroutine?: string }[]
 ): ChainCall[] {
   if (calls.length === 0) return []
 
-  // Filter out self-loops and noisy calls, map relation strings
   const relMap: Record<string, ChainCall['relation']> = {
     call: 'call', compose: 'compose', aggregate: 'aggregate',
     inherit: 'inherit', depend: 'depend',
+    event: 'event', http: 'http', db: 'db', rpc: 'rpc',
   }
   const chipNames = new Set(chips.map(c => c.name))
 
@@ -947,8 +986,10 @@ function astResultToChain(
       params: c.params || '',
       ret: c.ret || 'void',
       relation: relMap[c.relation] ?? 'call',
+      depth: c.depth,
+      goroutine: c.goroutine,
     }))
-    .slice(0, 20) // cap for display
+    .slice(0, 24)
 }
 
 /* ── SVG Export ───────────────────────────────────────────────── */
@@ -981,30 +1022,44 @@ function downloadBlob(blob: Blob, name: string) {
 
 /* ── Sequence Diagram (时序图) ───────────────────────────────── */
 
-function SequenceDiagram({ chain, chipNames, chipMeta, activeIdx, animProgress, isZh }: {
+const GOROUTINE_COLORS = ['#56d364','#79c0ff','#ffa657','#d2a8ff','#ff7b72','#e3b341']
+const BASE_STEP_H = 52, MIN_STEP_H = 36, MAX_STEP_H = 140
+
+function stepHeight(rel: string | undefined): number {
+  const mult = TIMING_MULT[rel ?? 'call']?.mult ?? 1
+  return Math.max(MIN_STEP_H, Math.min(MAX_STEP_H, Math.round(BASE_STEP_H * Math.min(mult, 3.5))))
+}
+
+function SequenceDiagram({ chain, chipNames, chipMeta, callDepths, activeIdx, animProgress, isZh }: {
   chain: ChainCall[]
   chipNames: string[]
   chipMeta: Map<string, { methods: string[]; fields: string[] }>
+  callDepths: number[]
   activeIdx: number
   animProgress: number
   isZh: boolean
 }) {
   const laneW = 134
-  const headerH = 68
-  const stepH = 54
-  const marginL = 38
+  const headerH = 70
+  const marginL = 52
   const chipBoxW = 100
-  const chipBoxH = 48
+  const chipBoxH = 50
 
-  const nChips = chipNames.length
-  const nCalls = chain.length
-  const W = marginL + nChips * laneW + 24
-  const H = headerH + nCalls * stepH + 36
+  // Build goroutine color map
+  const goroutineColorMap = new Map<string, string>()
+  let gci = 0
+  chain.forEach(c => { if (c.goroutine && !goroutineColorMap.has(c.goroutine)) goroutineColorMap.set(c.goroutine, GOROUTINE_COLORS[gci++ % GOROUTINE_COLORS.length]) })
 
-  const laneX = (name: string) => {
-    const idx = chipNames.indexOf(name)
-    return marginL + idx * laneW + laneW / 2
-  }
+  // Cumulative Y positions (variable step height by relation type)
+  const stepYs: number[] = []
+  let cumY = 0
+  chain.forEach(c => { stepYs.push(cumY); cumY += stepHeight(c.relation) })
+  const totalCallH = cumY
+
+  const W = marginL + chipNames.length * laneW + 24
+  const H = headerH + totalCallH + 40
+
+  const laneX = (name: string) => marginL + chipNames.indexOf(name) * laneW + laneW / 2
 
   return (
     <svg viewBox={`0 0 ${W} ${H}`} style={{ width: '100%', height: '100%', display: 'block' }}>
@@ -1013,13 +1068,11 @@ function SequenceDiagram({ chain, chipNames, chipMeta, activeIdx, animProgress, 
           <path d="M 20 0 L 0 0 0 20" fill="none" stroke="var(--bg-elevated)" strokeWidth="0.5" />
         </pattern>
         {Object.entries(REL_COLORS).map(([rel, c]) => (
-          <marker key={rel} id={`sq-arrow-${rel}`} viewBox="0 0 10 10" refX="9" refY="5"
-            markerWidth="6" markerHeight="6" orient="auto">
+          <marker key={rel} id={`sq-arrow-${rel}`} viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto">
             <path d="M 0 0 L 10 5 L 0 10 Z" fill={c} />
           </marker>
         ))}
-        <marker id="sq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5"
-          markerWidth="5" markerHeight="5" orient="auto">
+        <marker id="sq-arrow-ret" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="5" markerHeight="5" orient="auto">
           <path d="M 0 0 L 10 5 L 0 10 Z" fill="#484f58" />
         </marker>
       </defs>
@@ -1027,18 +1080,15 @@ function SequenceDiagram({ chain, chipNames, chipMeta, activeIdx, animProgress, 
       <rect width={W} height={H} fill="var(--bg-primary)" />
       <rect width={W} height={H} fill="url(#sq)" />
 
-      {/* Time axis */}
-      <text x={6} y={headerH + 14} fill="#1e2e1e" fontSize={6} fontFamily="monospace" fontWeight="bold">
-        {isZh ? '时间' : 'TIME'}
-      </text>
-      <line x1={19} y1={headerH + 18} x2={19} y2={H - 20} stroke="#1a2a1a" strokeWidth={1} />
-      <path d={`M 15 ${H - 23} L 19 ${H - 15} L 23 ${H - 23}`} fill="none" stroke="#1a2a1a" strokeWidth={1} />
+      {/* Time axis arrow */}
+      <text x={6} y={headerH + 13} fill="#1e2e1e" fontSize={6} fontFamily="monospace" fontWeight="bold">{isZh ? '时间↓' : 'TIME↓'}</text>
+      <line x1={22} y1={headerH + 17} x2={22} y2={H - 18} stroke="#1a2a1a" strokeWidth={1} />
+      <path d={`M 18 ${H - 22} L 22 ${H - 14} L 26 ${H - 22}`} fill="none" stroke="#1a2a1a" strokeWidth={1} />
 
       {/* Chip header boxes */}
       {chipNames.map((name, i) => {
         const cx = laneX(name)
         const bx = cx - chipBoxW / 2
-        const by = 8
         const chipType = detectChipType(name)
         const color = CHIP_TYPE_COLOR[chipType]
         const isActiveSrc = chain[activeIdx]?.caller === name
@@ -1046,120 +1096,127 @@ function SequenceDiagram({ chain, chipNames, chipMeta, activeIdx, animProgress, 
         const isActive = isActiveSrc || isActiveDst
         return (
           <g key={name}>
-            {/* Main box */}
-            <rect x={bx} y={by} width={chipBoxW} height={chipBoxH} rx={4}
-              fill={isActive ? color + '18' : '#0d1117'}
-              stroke={isActive ? color : color + '50'}
-              strokeWidth={isActive ? 1.8 : 0.9} />
-            {/* Left pins */}
-            {[0, 1, 2].map(pi => (
-              <rect key={`lp-${pi}`} x={bx - 7} y={by + 8 + pi * 11} width={7} height={4} rx={1}
-                fill={isActiveDst ? color + '55' : '#172030'} />
-            ))}
-            {/* Right pins */}
-            {[0, 1, 2].map(pi => (
-              <rect key={`rp-${pi}`} x={bx + chipBoxW} y={by + 8 + pi * 11} width={7} height={4} rx={1}
-                fill={isActiveSrc ? color + '55' : '#172030'} />
-            ))}
-            <text x={cx} y={by + 19} textAnchor="middle"
-              fill={isActive ? color : color + 'aa'} fontSize={9} fontWeight="bold" fontFamily="monospace">
-              {name.slice(0, 14)}
-            </text>
-            <text x={cx} y={by + 31} textAnchor="middle"
-              fill={isActive ? color + 'bb' : color + '40'} fontSize={6.5} fontFamily="monospace">
-              {CHIP_TYPE_LABEL[chipType]}
-            </text>
-            <text x={cx} y={by + 43} textAnchor="middle"
-              fill={isActive ? color + '80' : '#18212e'} fontSize={5.5} fontFamily="monospace">
-              0x{(0x4d8000 + i * 0x100).toString(16)}
-            </text>
+            <rect x={bx} y={8} width={chipBoxW} height={chipBoxH} rx={4}
+              fill={isActive ? color + '18' : '#0d1117'} stroke={isActive ? color : color + '50'} strokeWidth={isActive ? 1.8 : 0.9} />
+            {[0, 1, 2].map(pi => <rect key={pi} x={bx - 7} y={16 + pi * 11} width={7} height={4} rx={1} fill={isActiveDst ? color + '55' : '#172030'} />)}
+            {[0, 1, 2].map(pi => <rect key={pi} x={bx + chipBoxW} y={16 + pi * 11} width={7} height={4} rx={1} fill={isActiveSrc ? color + '55' : '#172030'} />)}
+            <text x={cx} y={27} textAnchor="middle" fill={isActive ? color : color + 'aa'} fontSize={9} fontWeight="bold" fontFamily="monospace">{name.slice(0, 14)}</text>
+            <text x={cx} y={39} textAnchor="middle" fill={isActive ? color + 'bb' : color + '40'} fontSize={6.5} fontFamily="monospace">{CHIP_TYPE_LABEL[chipType]}</text>
+            <text x={cx} y={51} textAnchor="middle" fill={isActive ? color + '80' : '#18212e'} fontSize={5.5} fontFamily="monospace">0x{(0x4d8000 + i * 0x100).toString(16)}</text>
           </g>
         )
       })}
 
       {/* Lifelines */}
-      {chipNames.map((name) => {
+      {chipNames.map(name => {
         const cx = laneX(name)
-        const chipType = detectChipType(name)
-        const color = CHIP_TYPE_COLOR[chipType]
-        return (
-          <line key={`ll-${name}`}
-            x1={cx} y1={headerH} x2={cx} y2={H - 20}
-            stroke={color} strokeWidth={1} strokeDasharray="5 5" opacity={0.18} />
-        )
+        const color = CHIP_TYPE_COLOR[detectChipType(name)]
+        return <line key={`ll-${name}`} x1={cx} y1={headerH} x2={cx} y2={H - 22} stroke={color} strokeWidth={1} strokeDasharray="5 5" opacity={0.18} />
       })}
 
-      {/* Activation bars on lifelines */}
-      {activeIdx >= 0 && activeIdx < chain.length && (() => {
-        const c = chain[activeIdx]
-        const chips = c.caller === c.callee ? [c.caller] : [c.caller, c.callee]
+      {/* Goroutine zone bands */}
+      {chain.map((c, i) => {
+        if (!c.goroutine) return null
+        const gColor = goroutineColorMap.get(c.goroutine) ?? '#56d364'
+        const y = headerH + stepYs[i]
+        const h = stepHeight(c.relation)
+        return <rect key={`gz-${i}`} x={marginL} y={y} width={W - marginL - 4} height={h} fill={gColor + '08'} stroke={gColor + '22'} strokeWidth={0.5} />
+      })}
+
+      {/* Activation bars (depth-offset, stacked) */}
+      {chain.map((c, i) => {
+        const isActive = i === activeIdx
+        const isPast = i < activeIdx
+        if (!isActive && !isPast) return null
+        const depth = callDepths[i] ?? 0
         const color = REL_COLORS[c.relation || 'call']
-        const y = headerH + activeIdx * stepH
+        const y = headerH + stepYs[i]
+        const h = stepHeight(c.relation)
+        const barW = 8
+        const chips = c.caller === c.callee ? [c.caller] : [c.caller, c.callee]
         return chips.map(name => {
           const cx = laneX(name)
-          return (
-            <rect key={`ab-${name}`} x={cx - 5} y={y} width={10} height={stepH} rx={2}
-              fill={color + '20'} stroke={color} strokeWidth={1} opacity={0.7} />
-          )
+          const bx = cx - barW / 2 + depth * 4
+          return <rect key={`ab-${i}-${name}`} x={bx} y={y} width={barW} height={h} rx={2}
+            fill={isActive ? color + '25' : color + '10'} stroke={isActive ? color : color + '50'}
+            strokeWidth={isActive ? 1.2 : 0.6} opacity={isActive ? 0.9 : 0.5} />
         })
-      })()}
+      })}
 
       {/* Call arrows */}
       {chain.map((c, i) => {
-        const y = headerH + i * stepH + stepH / 2
+        const sh = stepHeight(c.relation)
+        const y = headerH + stepYs[i] + sh / 2
         const fromX = laneX(c.caller)
         const toX = laneX(c.callee)
         const isSelf = c.caller === c.callee
         const isActive = i === activeIdx
         const isPast = i < activeIdx
-        const color = REL_COLORS[c.relation || 'call']
+        const color = c.goroutine ? (goroutineColorMap.get(c.goroutine) ?? REL_COLORS[c.relation || 'call']) : REL_COLORS[c.relation || 'call']
         const opacity = isActive ? 1 : isPast ? 0.42 : 0.10
         const hasRet = c.ret && c.ret !== 'void'
+        const depth = callDepths[i] ?? 0
+        const timing = TIMING_MULT[c.relation ?? 'call']
+        const depthIndent = depth * 6
 
         return (
           <g key={i} opacity={opacity}>
-            <text x={6} y={y + 3} fill={isActive ? color : 'var(--text-muted)'}
-              fontSize={7} fontFamily="monospace" fontWeight={isActive ? 'bold' : 'normal'}>
+            {/* T-label + timing */}
+            <text x={28} y={y + 3} fill={isActive ? color : 'var(--text-muted)'}
+              fontSize={6.5} fontFamily="monospace" fontWeight={isActive ? 'bold' : 'normal'} textAnchor="end">
               T{i}
             </text>
+            {isActive && timing && (
+              <text x={28} y={y + 11} fill={color + '80'} fontSize={5} fontFamily="monospace" textAnchor="end">{timing.unit}</text>
+            )}
+            {/* Goroutine fork marker */}
+            {c.goroutine && (
+              <text x={30} y={y - 3} fill={color} fontSize={5.5} fontFamily="monospace">⎇{c.goroutine}</text>
+            )}
+            {/* Depth indent marker */}
+            {depth > 0 && (
+              <text x={31 + depthIndent} y={y + 3} fill={color + '60'} fontSize={5.5} fontFamily="monospace">{'  '.repeat(depth)}↳</text>
+            )}
 
             {isSelf ? (
               <g>
-                <path d={`M ${fromX + 5} ${y - 9} Q ${fromX + 30} ${y - 9} ${fromX + 30} ${y} Q ${fromX + 30} ${y + 9} ${fromX + 5} ${y + 9}`}
+                <path d={`M ${fromX + 5 + depthIndent} ${y - 9} Q ${fromX + 32 + depthIndent} ${y - 9} ${fromX + 32 + depthIndent} ${y} Q ${fromX + 32 + depthIndent} ${y + 9} ${fromX + 5 + depthIndent} ${y + 9}`}
                   fill="none" stroke={color} strokeWidth={isActive ? 2 : 1}
+                  strokeDasharray={c.relation === 'event' ? '5 3' : 'none'}
                   markerEnd={`url(#sq-arrow-${c.relation || 'call'})`} />
-                <text x={fromX + 34} y={y + 3} fill={color} fontSize={7.5} fontFamily="monospace"
-                  fontWeight={isActive ? 'bold' : 'normal'}>
+                <text x={fromX + 36 + depthIndent} y={y + 3} fill={color} fontSize={7.5} fontFamily="monospace" fontWeight={isActive ? 'bold' : 'normal'}>
                   .{c.method}({c.params ? c.params.slice(0, 14) : ''})
                 </text>
               </g>
             ) : (
               <g>
-                {/* Call arrow */}
-                <line x1={fromX} y1={y} x2={toX} y2={y}
+                <line x1={fromX + depthIndent} y1={y} x2={toX + depthIndent} y2={y}
                   stroke={color} strokeWidth={isActive ? 2 : 1}
+                  strokeDasharray={c.relation === 'event' || c.relation === 'depend' ? '5 3' : 'none'}
                   markerEnd={`url(#sq-arrow-${c.relation || 'call'})`} />
-                {/* Method label */}
-                <text x={(fromX + toX) / 2} y={y - 5} textAnchor="middle"
-                  fill={color} fontSize={7.5} fontFamily="monospace"
-                  fontWeight={isActive ? 'bold' : 'normal'}>
+                <text x={(fromX + toX) / 2 + depthIndent} y={y - 5} textAnchor="middle"
+                  fill={color} fontSize={7.5} fontFamily="monospace" fontWeight={isActive ? 'bold' : 'normal'}>
                   .{c.method}({c.params ? c.params.slice(0, 16) : ''})
                 </text>
-                {/* Return arrow (dashed, reversed) */}
+                {/* Relation type badge */}
+                {isActive && c.relation && c.relation !== 'call' && (
+                  <text x={(fromX + toX) / 2 + depthIndent} y={y + 13} textAnchor="middle"
+                    fill={color + 'bb'} fontSize={6} fontFamily="monospace">
+                    [{c.relation.toUpperCase()}]
+                  </text>
+                )}
+                {/* Return arrow */}
                 {isActive && hasRet && (
                   <g>
-                    <line x1={toX} y1={y + 16} x2={fromX} y2={y + 16}
+                    <line x1={toX + depthIndent} y1={y + 18} x2={fromX + depthIndent} y2={y + 18}
                       stroke="#484f58" strokeWidth={1} strokeDasharray="4 3"
                       markerEnd="url(#sq-arrow-ret)" />
-                    <text x={(fromX + toX) / 2} y={y + 26} textAnchor="middle"
-                      fill="#484f58" fontSize={6.5} fontFamily="monospace">
-                      ↵ {c.ret}
-                    </text>
+                    <text x={(fromX + toX) / 2 + depthIndent} y={y + 28} textAnchor="middle"
+                      fill="#484f58" fontSize={6.5} fontFamily="monospace">↵ {c.ret}</text>
                   </g>
                 )}
-                {/* Params hint for active */}
                 {isActive && c.params && (
-                  <text x={(fromX + toX) / 2} y={y + (hasRet ? 38 : 16)} textAnchor="middle"
+                  <text x={(fromX + toX) / 2 + depthIndent} y={y + (hasRet ? 40 : 18)} textAnchor="middle"
                     fill={color + '70'} fontSize={6} fontFamily="monospace">
                     {c.params.slice(0, 28)}
                   </text>
@@ -1170,19 +1227,21 @@ function SequenceDiagram({ chain, chipNames, chipMeta, activeIdx, animProgress, 
         )
       })}
 
-      {/* Signal pulse for active call */}
+      {/* Animated signal pulse */}
       {activeIdx >= 0 && activeIdx < chain.length && animProgress > 0 && (() => {
         const c = chain[activeIdx]
         if (c.caller === c.callee) return null
-        const y = headerH + activeIdx * stepH + stepH / 2
-        const fromX = laneX(c.caller)
-        const toX = laneX(c.callee)
-        const color = REL_COLORS[c.relation || 'call']
+        const sh = stepHeight(c.relation)
+        const y = headerH + stepYs[activeIdx] + sh / 2
+        const depthIndent = (callDepths[activeIdx] ?? 0) * 6
+        const fromX = laneX(c.caller) + depthIndent
+        const toX = laneX(c.callee) + depthIndent
+        const color = c.goroutine ? (goroutineColorMap.get(c.goroutine) ?? REL_COLORS[c.relation || 'call']) : REL_COLORS[c.relation || 'call']
         const cx = fromX + (toX - fromX) * Math.min(1, animProgress * 1.5)
         return (
           <g>
             <circle cx={cx} cy={y} r={4.5} fill={color} opacity={0.9} />
-            <circle cx={cx} cy={y} r={9} fill={color} opacity={0.18} />
+            <circle cx={cx} cy={y} r={10} fill={color} opacity={0.15} />
           </g>
         )
       })()}
@@ -1204,6 +1263,8 @@ export default function CodeChipView() {
   const [showHex, setShowHex] = useState(false)
   const [showMem, setShowMem] = useState(false)
   const [seqMode, setSeqMode] = useState(false)
+  const [dissolved, setDissolved] = useState(false)
+  const [seqTransition, setSeqTransition] = useState(false)
   const [selectedChip, setSelectedChip] = useState<string | null>(null)
   const [zoom, setZoom] = useState(1)
   const [pan, setPan] = useState({ x: 0, y: 0 })
@@ -1290,14 +1351,32 @@ export default function CodeChipView() {
 
   const memLayout = useMemo(() => {
     if (!showMem || chain.length === 0) return []
-    const last = chain[chain.length - 1]
-    return [
-      { offset: '0x00', field: 'vtable', value: '0x4d8000', active: false },
-      { offset: '0x08', field: 'data', value: `${last.params.split('=')[1] || '0'}`, active: true },
-      { offset: '0x10', field: 'flags', value: '0x01', active: false },
-      { offset: '0x18', field: 'refs', value: '2', active: false },
+    const lastCallee = chain[chain.length - 1].callee
+    // Use a simple index derived from unique chip names in chain order (chipNames not yet in scope)
+    const seen = new Set<string>(); let chipIdx = 0; let idx = 0
+    for (const c of chain) {
+      if (!seen.has(c.caller)) { seen.add(c.caller); if (c.caller === lastCallee) chipIdx = idx; idx++ }
+      if (!seen.has(c.callee)) { seen.add(c.callee); if (c.callee === lastCallee) chipIdx = idx; idx++ }
+    }
+    const vtableAddr = `0x${(0x4d8000 + chipIdx * 0x100).toString(16)}`
+    const meta = chipMeta.get(lastCallee)
+    const fields = meta?.fields ?? []
+    const rows = [
+      { offset: '0x00', field: 'vtable', value: vtableAddr, active: false },
+      ...fields.slice(0, 4).map((f, i) => {
+        const parts = f.split(':')
+        const fname = parts[0].slice(0, 8)
+        const ftype = parts[1]?.trim().slice(0, 8) ?? ''
+        return { offset: `0x${((i + 1) * 8).toString(16).padStart(2, '0')}`, field: fname, value: ftype ? `[${ftype}]` : '0x00', active: i === 0 }
+      }),
     ]
-  }, [showMem, chain])
+    if (fields.length === 0) {
+      const paramVal = chain[chain.length - 1].params.split('=')[1]?.trim() || '0'
+      rows.push({ offset: '0x08', field: 'data', value: paramVal, active: true })
+    }
+    rows.push({ offset: `0x${((fields.length + 1) * 8).toString(16).padStart(2, '0')}`, field: 'refs', value: String(chain.filter(c => c.callee === lastCallee).length), active: false })
+    return rows.slice(0, 6)
+  }, [showMem, chain, chipMeta])
 
   const nextStep = useCallback(() => { setStep(s => (s + 1) % allSteps.length); setAnimProgress(0) }, [allSteps.length])
   const prevStep = useCallback(() => { setStep(s => Math.max(0, s - 1)); setAnimProgress(0) }, [])
@@ -1338,7 +1417,15 @@ export default function CodeChipView() {
         if (p < 1) { animRef.current = requestAnimationFrame(anim) }
         else {
           startRef.current = 0; const n = (step + 1) % allSteps.length
-          if (n === 0) { setPlaying(false); return }
+          if (n === 0) {
+            setPlaying(false)
+            // Circuit dissolve: fade out then reset
+            if (!seqMode) {
+              setDissolved(true)
+              setTimeout(() => { setDissolved(false); setStep(0); setAnimProgress(0) }, 1400)
+            }
+            return
+          }
           setAnimProgress(0); setStep(n)
         }
       }
@@ -1453,6 +1540,9 @@ export default function CodeChipView() {
   // Active connection index for animation
   const activeToIdx = s.highlightLine ? s.highlightLine - 1 : -1
 
+  // Call stack depths inferred from chain sequence
+  const callDepths = useMemo(() => inferCallDepths(chain), [chain])
+
   return (
     <div style={{ height:'100%', display:'flex', flexDirection:'column', padding:'8px 12px', gap:6, overflow:'auto' }}>
       {/* Toolbar */}
@@ -1478,8 +1568,8 @@ export default function CodeChipView() {
         <label style={{ fontSize:9, color:'var(--text-muted)', display:'flex', alignItems:'center', gap:2, cursor:'pointer' }}>
           <input type="checkbox" checked={showMem} onChange={e => setShowMem(e.target.checked)} /> MEM
         </label>
-        <button onClick={() => setSeqMode(m => !m)}
-          title={isZh ? '切换空间/时序视图' : 'Toggle Space / Timeline view'}
+        <button onClick={() => { setSeqTransition(true); setTimeout(() => { setSeqMode(m => !m); setSeqTransition(false) }, 220) }}
+          title={isZh ? '切换空间/时序视图 (空间=同时存在的电路, 时序=时间展开的指令)' : 'Toggle Space (circuit) / Timeline (time-unrolled) view'}
           style={{ padding:'3px 7px', borderRadius:4, border:`1px solid ${seqMode ? '#79c0ff' : 'var(--border)'}`, background: seqMode ? 'rgba(121,192,255,0.12)' : 'transparent', color: seqMode ? '#79c0ff' : 'var(--text-muted)', cursor:'pointer', fontSize:9, fontWeight: seqMode ? 700 : 400 }}>
           {seqMode ? (isZh ? '⬛ 空间' : '⬛ Space') : (isZh ? '⏱ 时序' : '⏱ Seq')}
         </button>
@@ -1591,10 +1681,10 @@ export default function CodeChipView() {
         {/* Right: Circuit + Description + Waveform + Stack */}
         <div style={{ flex:1, display:'flex', flexDirection:'column', gap:6, minWidth:0 }}>
           {/* SVG */}
-          <div style={{ flex:1, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)', overflow:'hidden', display:'flex', position:'relative' }}>
+          <div style={{ flex:1, borderRadius:6, border:'1px solid var(--border)', background:'var(--bg-primary)', overflow:'hidden', display:'flex', position:'relative', opacity: dissolved ? 0 : (seqTransition ? 0.1 : 1), transition: dissolved ? 'opacity 1.2s ease-out' : seqTransition ? 'opacity 0.22s ease' : 'opacity 0.22s ease' }}>
             {seqMode ? (
               <SequenceDiagram chain={chain} chipNames={chipNames} chipMeta={chipMeta}
-                activeIdx={activeToIdx} animProgress={animProgress} isZh={isZh} />
+                callDepths={callDepths} activeIdx={activeToIdx} animProgress={animProgress} isZh={isZh} />
             ) : (<>
             {/* Zoom controls */}
             <div style={{ position:'absolute', top:6, right:6, display:'flex', flexDirection:'column', gap:2, zIndex:10 }}>
@@ -1987,15 +2077,38 @@ export default function CodeChipView() {
             })()}
 
             {/* Stack Panel */}
-            <div style={{ width:100, flexShrink:0, borderLeft:'1px solid var(--border)', padding:4, background:'var(--bg-primary)', display:'flex', flexDirection:'column', gap:3 }}>
-              <div style={{ fontSize:7, color:'var(--text-secondary)', fontFamily:'monospace', textAlign:'center' }}>{isZh ? '栈' : 'Stack'}</div>
+            <div style={{ width:108, flexShrink:0, borderLeft:'1px solid var(--border)', padding:4, background:'var(--bg-primary)', display:'flex', flexDirection:'column', gap:3 }}>
+              <div style={{ fontSize:7, color:'var(--text-secondary)', fontFamily:'monospace', textAlign:'center', display:'flex', alignItems:'center', justifyContent:'space-between' }}>
+                <span>{isZh ? '栈深度' : 'Stack'}</span>
+                <span style={{ color:'#4d8fff', fontWeight:700 }}>{(s?.stack||[]).length}</span>
+              </div>
+              {/* Depth meter bar */}
+              {(s?.stack||[]).length > 0 && (
+                <div style={{ display:'flex', gap:1.5, alignItems:'flex-end', height:18, paddingBottom:1 }}>
+                  {(s?.stack||[]).map((_, i) => {
+                    const hue = 200 + i * 18
+                    const h = Math.min(18, 4 + i * 3.5)
+                    return <div key={i} style={{ width:7, height:h, background:`hsl(${hue},70%,55%)`, borderRadius:'1px 1px 0 0', flexShrink:0, opacity:0.85 }} />
+                  })}
+                </div>
+              )}
+              {/* Current depth indicator */}
+              {(s?.stack||[]).length > 0 && (
+                <div style={{ fontSize:6.5, color:'#4d8fff80', fontFamily:'monospace', textAlign:'center', marginBottom:1 }}>
+                  {'─'.repeat(Math.min(14, (s?.stack||[]).length * 2))}
+                </div>
+              )}
               {(s?.stack||[]).length === 0 ? <div style={{ fontSize:8, color:'#445', fontFamily:'monospace', padding:4 }}>—</div> :
-                (s?.stack||[]).slice().reverse().map((f, i) => (
-                  <div key={i} style={{ padding:'3px 4px', borderRadius:2, background:'#1a2332', border:'1px solid #334', borderLeft:'2px solid #4d8fff', fontSize:8, fontFamily:'monospace' }}>
-                    <div style={{ color:'#ff7b72' }}>{f.pc}</div>
-                    <div style={{ color:'var(--text-secondary)', fontSize:7 }}>{f.desc}</div>
-                  </div>
-                ))
+                (s?.stack||[]).slice().reverse().map((f, i, arr) => {
+                  const depth = arr.length - 1 - i
+                  const hue = 200 + depth * 18
+                  return (
+                    <div key={i} style={{ padding:'3px 4px', borderRadius:2, background:'#1a2332', border:'1px solid #334', borderLeft:`2px solid hsl(${hue},70%,55%)`, fontSize:8, fontFamily:'monospace', marginLeft: depth * 2 }}>
+                      <div style={{ color:`hsl(${hue},70%,65%)` }}>{f.pc}</div>
+                      <div style={{ color:'var(--text-secondary)', fontSize:6.5 }}>{f.desc}</div>
+                    </div>
+                  )
+                })
               }
             </div>
           </div>

@@ -24,12 +24,33 @@ type ChipInfo struct {
 }
 
 type CallEdge struct {
-	From     string `json:"from"`
-	To       string `json:"to"`
-	Method   string `json:"method"`
-	Params   string `json:"params"`
-	Ret      string `json:"ret"`
-	Relation string `json:"relation"`
+	From      string `json:"from"`
+	To        string `json:"to"`
+	Method    string `json:"method"`
+	Params    string `json:"params"`
+	Ret       string `json:"ret"`
+	Relation  string `json:"relation"`
+	Depth     int    `json:"depth,omitempty"`
+	Goroutine string `json:"goroutine,omitempty"`
+}
+
+// inferRelation infers the semantic relation type from callee/method name patterns.
+func inferRelation(callee, method string) string {
+	c := strings.ToLower(callee)
+	m := strings.ToLower(method)
+	switch {
+	case strings.Contains(c, "http") || strings.HasPrefix(c, "client") && (m == "do" || m == "get" || m == "post" || m == "put" || m == "delete" || m == "patch"):
+		return "http"
+	case strings.Contains(c, "grpc") || strings.Contains(c, "rpc") || strings.HasSuffix(c, "client") && (m == "call" || m == "invoke" || m == "unary"):
+		return "rpc"
+	case strings.Contains(c, "db") || strings.Contains(c, "sql") || strings.Contains(c, "repo") || strings.Contains(c, "store") ||
+		m == "query" || m == "exec" || m == "scan" || m == "find" || m == "findall" || m == "findbyid" || m == "save" || m == "delete" || m == "update" || m == "insert":
+		return "db"
+	case m == "emit" || m == "publish" || m == "subscribe" || m == "dispatch" || m == "notify" || m == "fire" || m == "trigger" || m == "send" || m == "broadcast":
+		return "event"
+	default:
+		return "call"
+	}
 }
 
 type GenASTNode struct {
@@ -117,6 +138,7 @@ func parseGo(code string) ChipParseResult {
 
 	chipMap := map[string]*ChipInfo{}
 	var calls []CallEdge
+	goroutineCounter := 0
 
 	if err != nil && f == nil {
 		return ChipParseResult{Lang: "go"}
@@ -191,27 +213,42 @@ func parseGo(code string) ChipParseResult {
 				}
 			}
 
-			// Walk body for call expressions
+			// Walk body for call expressions and goroutine launches
 			if fn.Body != nil {
 				caller := receiverType
 				if caller == "" {
 					caller = fn.Name.Name
 				}
 				ast.Inspect(fn.Body, func(n ast.Node) bool {
-					call, ok := n.(*ast.CallExpr)
-					if !ok {
+					switch node := n.(type) {
+					case *ast.GoStmt:
+						// Goroutine launch: go obj.Method() or go func()
+						goroutineCounter++
+						gid := fmt.Sprintf("g%d", goroutineCounter)
+						if sel, ok := node.Call.Fun.(*ast.SelectorExpr); ok {
+							callee := exprString(sel.X)
+							method := sel.Sel.Name
+							rel := inferRelation(callee, method)
+							calls = append(calls, CallEdge{
+								From: caller, To: callee,
+								Method: method, Params: callArgsString(node.Call.Args),
+								Relation: rel, Goroutine: gid,
+							})
+						}
+						return false // don't recurse into goroutine body as same caller
+					case *ast.CallExpr:
+						if sel, ok := node.Fun.(*ast.SelectorExpr); ok {
+							callee := exprString(sel.X)
+							method := sel.Sel.Name
+							params := callArgsString(node.Args)
+							rel := inferRelation(callee, method)
+							calls = append(calls, CallEdge{
+								From: caller, To: callee,
+								Method: method, Params: params,
+								Relation: rel,
+							})
+						}
 						return true
-					}
-					switch sel := call.Fun.(type) {
-					case *ast.SelectorExpr:
-						callee := exprString(sel.X)
-						method := sel.Sel.Name
-						params := callArgsString(call.Args)
-						calls = append(calls, CallEdge{
-							From: caller, To: callee,
-							Method: method, Params: params,
-							Relation: "call",
-						})
 					}
 					return true
 				})
@@ -515,7 +552,8 @@ func parsePython(code string) ChipParseResult {
 
 		// method calls via self.x.method()
 		for _, cm := range pyCall.FindAllStringSubmatch(body, -1) {
-			calls = append(calls, CallEdge{From: name, To: cm[1], Method: cm[2], Params: cm[3], Relation: "call"})
+			rel := inferRelation(cm[1], cm[2])
+			calls = append(calls, CallEdge{From: name, To: cm[1], Method: cm[2], Params: cm[3], Relation: rel})
 		}
 
 		chips = append(chips, chip)
@@ -584,7 +622,8 @@ func parseJava(code string) ChipParseResult {
 		}
 		for _, cm := range javaCall.FindAllStringSubmatch(body, -1) {
 			if cm[1] != "System" && cm[1] != "super" && cm[1] != "this" {
-				calls = append(calls, CallEdge{From: name, To: cm[1], Method: cm[2], Params: cm[3], Relation: "call"})
+				rel := inferRelation(cm[1], cm[2])
+				calls = append(calls, CallEdge{From: name, To: cm[1], Method: cm[2], Params: cm[3], Relation: rel})
 			}
 		}
 
@@ -648,7 +687,8 @@ func parseCpp(code string) ChipParseResult {
 				obj, method, params = cm[4], cm[5], cm[6]
 			}
 			if obj != "" && method != "" {
-				calls = append(calls, CallEdge{From: name, To: obj, Method: method, Params: params, Relation: "call"})
+				rel := inferRelation(obj, method)
+				calls = append(calls, CallEdge{From: name, To: obj, Method: method, Params: params, Relation: rel})
 			}
 		}
 		_ = cppScope
@@ -725,7 +765,8 @@ func parseTypeScript(code string) ChipParseResult {
 		}
 		for _, cm := range tsCall.FindAllStringSubmatch(body, -1) {
 			if cm[1] != "console" && cm[1] != "Math" && cm[1] != "JSON" {
-				calls = append(calls, CallEdge{From: name, To: cm[1], Method: cm[2], Params: cm[3], Relation: "call"})
+				rel := inferRelation(cm[1], cm[2])
+				calls = append(calls, CallEdge{From: name, To: cm[1], Method: cm[2], Params: cm[3], Relation: rel})
 			}
 		}
 
