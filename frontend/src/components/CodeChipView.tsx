@@ -1820,6 +1820,39 @@ export default function CodeChipView() {
             </tbody>
           </table>
 
+          {/* HTTP Server Example */}
+          <div style={{ marginTop:12 }}>
+            <div style={{ fontSize:9, fontWeight:700, color:'#ffa657', marginBottom:6 }}>
+              {isZh ? '📡 实例：HTTP 服务器 = 虚拟电路板' : '📡 Example: HTTP Server as Virtual Circuit'}
+            </div>
+            <table style={{ borderCollapse:'collapse', fontSize:10, fontFamily:'monospace', width:'100%', minWidth:400 }}>
+              <thead>
+                <tr>{[isZh?'服务器概念':'Server Concept', isZh?'电路类比':'Circuit Analogy'].map(h => (
+                  <th key={h} style={{ textAlign:'left', padding:'3px 10px', borderBottom:'1px solid var(--border)', color:'var(--text-secondary)', fontWeight:600, fontSize:9 }}>{h}</th>
+                ))}</tr>
+              </thead>
+              <tbody>
+                {[
+                  [isZh?'监听端口 :8080':'Listen port :8080',           isZh?'天线 / 输入引脚（等待信号）':'Antenna / Input pin (wait for signal)'],
+                  [isZh?'收到 HTTP 请求':'Receive HTTP request',         isZh?'中断 IRQ 触发':'IRQ interrupt fired'],
+                  [isZh?'Router 路由匹配':'Router match',                isZh?'地址译码器（信号去哪个 chip）':'Address decoder (which chip handles)'],
+                  [isZh?'Handler 处理函数':'Handler function',           isZh?'功能芯片（执行逻辑）':'Functional chip (execute logic)'],
+                  [isZh?'数据库查询':'Database query',                   isZh?'外部存储器读写（慢速总线）':'External memory (slow bus)'],
+                  [isZh?'JSON 序列化返回':'JSON response',               isZh?'数据总线输出':'Data bus output'],
+                  [isZh?'Goroutine / Thread':'Goroutine / Thread',       isZh?'并行信号通道':'Parallel signal channel'],
+                  [isZh?'Context 超时':'Context timeout',                isZh?'看门狗定时器 WDT':'Watchdog timer (WDT)'],
+                  [isZh?'中间件 Middleware':'Middleware',                 isZh?'信号调理电路（滤波 / 放大）':'Signal conditioning (filter/amp)'],
+                  [isZh?'负载均衡':'Load balancer',                      isZh?'总线仲裁器（决定谁先用总线）':'Bus arbiter (who gets the bus)'],
+                ].map(([srv, cir], i) => (
+                  <tr key={i} style={{ background: i % 2 === 0 ? 'transparent' : 'rgba(255,255,255,0.02)' }}>
+                    <td style={{ padding:'3px 10px', color:'#79c0ff' }}>{srv}</td>
+                    <td style={{ padding:'3px 10px', color:'#ffa657' }}>{cir}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+
           {/* Virtual vs Real Circuit */}
           <div style={{ marginTop:12, display:'flex', gap:12, flexWrap:'wrap' }}>
             {/* Advantages / Limitations */}
