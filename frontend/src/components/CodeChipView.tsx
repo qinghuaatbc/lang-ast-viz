@@ -672,26 +672,33 @@ function ChipModule({ name, sub, x, y, w, active, color, state: st, memLayout, i
   const pinPositions = [14, 28, 42, 56, 70]
   const pinLen = 7
   const pinColor = active ? typeColor + '99' : '#2d3748'
+  const hasMethodPins = (inMethods && inMethods.length > 0) || (outMethods && outMethods.length > 0)
   return (
     <g>
       {/* Glow behind active chip */}
       {active && <rect x={x-4} y={y-4} width={w+8} height={ch+8} rx={6} fill={typeColor} opacity={0.08} />}
-      {/* IC pin stubs — left side */}
-      {pinPositions.map((py, pi) => (
-        <g key={`pl-${pi}`}>
-          <rect x={x - pinLen - 2} y={y + py - 2} width={4} height={4} rx={0.5} fill={pinColor} />
-          <line x1={x - pinLen + 2} y1={y + py} x2={x} y2={y + py} stroke={pinColor} strokeWidth={1.2} />
-          <text x={x + 4} y={y + py + 3} fill={active ? typeColor + '80' : '#252f3a'} fontSize={5} fontFamily="monospace">{pi + 1}</text>
-        </g>
-      ))}
-      {/* IC pin stubs — right side */}
-      {pinPositions.map((py, pi) => (
-        <g key={`pr-${pi}`}>
-          <line x1={x + w} y1={y + py} x2={x + w + pinLen - 2} y2={y + py} stroke={pinColor} strokeWidth={1.2} />
-          <rect x={x + w + pinLen - 2} y={y + py - 2} width={4} height={4} rx={0.5} fill={pinColor} />
-          <text x={x + w - 4} y={y + py + 3} fill={active ? typeColor + '80' : '#252f3a'} fontSize={5} fontFamily="monospace" textAnchor="end">{10 - pi}</text>
-        </g>
-      ))}
+      {/* IC pin stubs — left side (method inputs) */}
+      {pinPositions.map((py, pi) => {
+        const label = hasMethodPins ? (inMethods?.[pi] ?? '').slice(0, 7) : String(pi + 1)
+        return (
+          <g key={`pl-${pi}`}>
+            <rect x={x - pinLen - 2} y={y + py - 2} width={4} height={4} rx={0.5} fill={pinColor} />
+            <line x1={x - pinLen + 2} y1={y + py} x2={x} y2={y + py} stroke={pinColor} strokeWidth={1.2} />
+            <text x={x + 4} y={y + py + 3} fill={active ? typeColor + '80' : '#252f3a'} fontSize={5} fontFamily="monospace">{label}</text>
+          </g>
+        )
+      })}
+      {/* IC pin stubs — right side (method outputs / fields) */}
+      {pinPositions.map((py, pi) => {
+        const label = hasMethodPins ? (outMethods?.[pi] ?? '').slice(0, 7) : String(10 - pi)
+        return (
+          <g key={`pr-${pi}`}>
+            <line x1={x + w} y1={y + py} x2={x + w + pinLen - 2} y2={y + py} stroke={pinColor} strokeWidth={1.2} />
+            <rect x={x + w + pinLen - 2} y={y + py - 2} width={4} height={4} rx={0.5} fill={pinColor} />
+            <text x={x + w - 4} y={y + py + 3} fill={active ? typeColor + '80' : '#252f3a'} fontSize={5} fontFamily="monospace" textAnchor="end">{label}</text>
+          </g>
+        )
+      })}
       {/* Chip body */}
       <rect x={x} y={y} width={w} height={ch} rx={3} fill="#111a24" stroke={effectiveColor} strokeWidth={active ? 2 : 1} />
       {/* Top color stripe by chip type */}
@@ -944,75 +951,6 @@ function astResultToChain(
     .slice(0, 20) // cap for display
 }
 
-/* ── Code Parser (fallback / local) ───────────────────────────── */
-
-function analyzePastedCode(code: string): ChainCall[] {
-  const calls: ChainCall[] = []
-  const classes: string[] = []
-  // Extract class/struct/interface/type names
-  const cr = /(?:class|struct|interface|type\s+\w+\s+struct|trait|protocol)\s+(\w+)/g
-  let m: RegExpExecArray | null
-  while ((m = cr.exec(code)) !== null) classes.push(m[1])
-
-  const seen = new Set<string>()
-  type RawCall = { caller: string; callee: string; method: string; args: string; rel: ChainCall['relation'] }
-  const raw: RawCall[] = []
-
-  // Pattern 1: obj.method(args) or obj.method(args); — standard method call
-  const p1 = /\b(\w+)\.(\w+)\s*\(([^)]{0,80})\)/g
-  while ((m = p1.exec(code)) !== null) {
-    const [, obj, method, args] = m
-    if (['main','this','self','super','console','fmt','log','print','println','len','cap','make','new','append'].includes(obj)) continue
-    if (['toString','valueOf','hashCode','equals','length','size'].includes(method)) continue
-    const key = `${obj}.${method}`
-    if (seen.has(key)) continue; seen.add(key)
-    // Determine callee: prefer class name match over method name
-    let callee = classes.find(c => obj.toLowerCase() === c.toLowerCase()) || obj
-    // Detect relation from context
-    const lineStart = code.lastIndexOf('\n', m.index)
-    const lineText = code.slice(lineStart, m.index + m[0].length)
-    let rel: ChainCall['relation'] = 'call'
-    if (/new\s+\w+/.test(lineText) || /compose|contain|has/.test(method.toLowerCase())) rel = 'compose'
-    if (/subscribe|listen|attach|addObserver|addEventListener/.test(method)) rel = 'aggregate'
-    raw.push({ caller: obj, callee, method, args: args.trim().slice(0, 30), rel })
-  }
-
-  // Pattern 2: ClassName::method(args) — C++ static / scope resolution
-  const p2 = /\b(\w+)::(\w+)\s*\(([^)]{0,80})\)/g
-  while ((m = p2.exec(code)) !== null) {
-    const [, obj, method, args] = m
-    const key = `${obj}::${method}`
-    if (seen.has(key)) continue; seen.add(key)
-    raw.push({ caller: obj, callee: obj, method, args: args.trim().slice(0, 30), rel: 'call' })
-  }
-
-  // Pattern 3: extends / implements — inheritance
-  const p3 = /class\s+(\w+)\s+(?:extends|implements)\s+(\w+)/g
-  while ((m = p3.exec(code)) !== null) {
-    const [, child, parent] = m
-    const key = `${child}:${parent}`
-    if (seen.has(key)) continue; seen.add(key)
-    raw.push({ caller: child, callee: parent, method: 'extends', args: '', rel: 'inherit' })
-  }
-
-  // Pattern 4: new ClassName(args) — construction / composition
-  const p4 = /new\s+(\w+)\s*\(([^)]{0,60})\)/g
-  while ((m = p4.exec(code)) !== null) {
-    const [, cls, args] = m
-    if (seen.has(`new:${cls}`)) continue; seen.add(`new:${cls}`)
-    const caller = classes[0] || 'App'
-    raw.push({ caller, callee: cls, method: cls, args: args.trim().slice(0, 30), rel: 'compose' })
-  }
-
-  // Build chain: use first caller as anchor, link subsequent calls
-  let prevCallee = raw[0]?.caller || 'App'
-  for (const r of raw.slice(0, 6)) {
-    calls.push({ caller: prevCallee, callee: r.callee, method: r.method, params: r.args || 'x', ret: 'void', relation: r.rel })
-    prevCallee = r.callee
-  }
-  return calls
-}
-
 /* ── SVG Export ───────────────────────────────────────────────── */
 
 function svgToBlob(svgEl: SVGSVGElement | null): Blob | null {
@@ -1075,6 +1013,7 @@ export default function CodeChipView() {
   const [parseLoading, setParseLoading] = useState(false)
   const [parseError, setParseError] = useState('')
   const [cuMode, setCuMode] = useState<'form'|'paste'>('form')
+  const [chipMeta, setChipMeta] = useState<Map<string, { methods: string[]; fields: string[] }>>(new Map())
   const svgRef = useRef<SVGSVGElement>(null)
   const animRef = useRef<ReturnType<typeof requestAnimationFrame>|null>(null)
   const startRef = useRef(0)
@@ -1109,8 +1048,10 @@ export default function CodeChipView() {
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data: { chips: {name:string,methods:string[],fields:string[]}[], calls: {from:string,to:string,method:string,params:string,ret:string,relation:string}[], lang: string } = await res.json()
         const chain = astResultToChain(data.chips, data.calls)
-        if (chain.length > 0) setCuChain(chain)
-        else setParseError(isZh ? '未识别到结构' : 'No structure found')
+        if (chain.length > 0) {
+          setCuChain(chain)
+          setChipMeta(new Map(data.chips.map(c => [c.name, { methods: c.methods ?? [], fields: c.fields ?? [] }])))
+        } else setParseError(isZh ? '未识别到结构' : 'No structure found')
       } catch (e) {
         setParseError(isZh ? '解析失败' : 'Parse failed')
       } finally {
@@ -1128,7 +1069,6 @@ export default function CodeChipView() {
   const s = allSteps[step % allSteps.length]
   const conflict = checkConflict(s)
 
-  /* ── Fix: compute codeLines, hlLine, memLayout, detectCalls inside component ── */
   const codeLines = useMemo(() => {
     if (isStatic && staticEx) return staticEx.code.split('\n')
     return []
@@ -1147,16 +1087,14 @@ export default function CodeChipView() {
     ]
   }, [showMem, chain])
 
-  const detectCalls = useMemo(() => {
-    if (exIdx === -2 && pasteCode.trim()) return analyzePastedCode(pasteCode).length
-    return 0
-  }, [pasteCode, exIdx])
-
   const nextStep = useCallback(() => { setStep(s => (s + 1) % allSteps.length); setAnimProgress(0) }, [allSteps.length])
   const prevStep = useCallback(() => { setStep(s => Math.max(0, s - 1)); setAnimProgress(0) }, [])
 
   // Auto-reset view when example/chain changes
-  useEffect(() => { setZoom(1); setPan({ x: 0, y: 0 }); reset() }, [exIdx]) // eslint-disable-line
+  useEffect(() => {
+    setZoom(1); setPan({ x: 0, y: 0 }); reset()
+    if (exIdx !== -2) setChipMeta(new Map())  // clear API metadata when switching to examples
+  }, [exIdx]) // eslint-disable-line
 
   // Keyboard shortcuts: arrows step, space play/pause, r reset
   useEffect(() => {
@@ -1536,8 +1474,9 @@ export default function CodeChipView() {
                 const typeColor = CHIP_TYPE_COLOR[chipType]
                 const isActiveChip = chain.some((c, ci) => (c.caller === name || c.callee === name) && ci === activeToIdx)
                 const isSelected = selectedChip === name
-                const inMethods = [...new Set(chain.filter(c => c.callee === name).map(c => c.method))]
-                const outMethods = [...new Set(chain.filter(c => c.caller === name).map(c => c.method))]
+                const meta = chipMeta.get(name)
+                const inMethods = meta ? meta.methods : [...new Set(chain.filter(c => c.callee === name).map(c => c.method))]
+                const outMethods = meta ? meta.fields.map(f => f.split(':')[0]) : [...new Set(chain.filter(c => c.caller === name).map(c => c.method))]
                 return (
                   <g key={name} onClick={() => setSelectedChip(selectedChip === name ? null : name)} style={{ cursor:'pointer' }}>
                     {isSelected && <rect x={p.x-6} y={p.y-6} width={chipW+12} height={chipH+12} rx={8}
